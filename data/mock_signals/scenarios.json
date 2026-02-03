@@ -1,0 +1,325 @@
+{
+  "metadata": {
+    "version": "1.0",
+    "created": "2026-02-03",
+    "equipment_model": "CCTV-PSU-24W-V1",
+    "description": "Mock signal scenarios for AI troubleshooting agent development and testing"
+  },
+  "scenarios": [
+    {
+      "scenario_id": "FAULT-001",
+      "name": "Output Rail Collapse",
+      "category": "power",
+      "difficulty": "easy",
+      "description": "The 12V output rail has completely collapsed to 0V while the unit is powered on. This is a common symptom of output short, failed regulator, or primary side failure.",
+      "signals": [
+        {
+          "signal_id": "SIG-F001-TP1",
+          "test_point": { "id": "TP1", "name": "AC Input Voltage", "location": "Input Connector", "component_id": "AC_IN" },
+          "parameter": "voltage_rms",
+          "value": 232.5,
+          "unit": "V",
+          "accuracy": { "tolerance": 2, "instrument_error": 0.5 },
+          "timestamp": "2026-02-03T10:00:00Z",
+          "instrument": { "model": "Fluke 87V", "id": "METER-001", "calibration_date": "2025-08-15" },
+          "measurement_conditions": { "load_state": "nominal_load", "power_state": "operating", "ambient_temp": 22 }
+        },
+        {
+          "signal_id": "SIG-F001-TP2",
+          "test_point": { "id": "TP2", "name": "12V Output Rail", "location": "U5 Pin 4", "component_id": "U5" },
+          "parameter": "voltage_dc",
+          "value": 0.08,
+          "unit": "V",
+          "accuracy": { "tolerance": 5, "instrument_error": 0.02 },
+          "timestamp": "2026-02-03T10:00:05Z",
+          "instrument": { "model": "Fluke 87V", "id": "METER-001", "calibration_date": "2025-08-15" },
+          "measurement_conditions": { "load_state": "nominal_load", "power_state": "operating", "ambient_temp": 22 }
+        },
+        {
+          "signal_id": "SIG-F001-TP3",
+          "test_point": { "id": "TP3", "name": "Feedback Reference", "location": "U5 Pin 2", "component_id": "U5" },
+          "parameter": "voltage_dc",
+          "value": 0.0,
+          "unit": "V",
+          "accuracy": { "tolerance": 2, "instrument_error": 0.01 },
+          "timestamp": "2026-02-03T10:00:10Z",
+          "instrument": { "model": "Fluke 87V", "id": "METER-001", "calibration_date": "2025-08-15" },
+          "measurement_conditions": { "load_state": "nominal_load", "power_state": "operating", "ambient_temp": 22 }
+        },
+        {
+          "signal_id": "SIG-F001-R2",
+          "test_point": { "id": "R2", "name": "Feedback Resistor", "location": "R2", "component_id": "R2" },
+          "parameter": "resistance",
+          "value": 470,
+          "unit": "Ω",
+          "accuracy": { "tolerance": 1, "instrument_error": 1 },
+          "timestamp": "2026-02-03T10:00:15Z",
+          "instrument": { "model": "Fluke 87V", "id": "METER-001", "calibration_date": "2025-08-15" },
+          "measurement_conditions": { "load_state": "no_load", "power_state": "operating" }
+        }
+      ],
+      "expected_diagnosis": {
+        "primary_cause": "Failed buck converter (U5) or associated output stage",
+        "confidence": 0.85,
+        "supporting_evidence": [
+          "AC input is normal (232.5V), ruling out primary side failure",
+          "12V output is 0.08V (collapsed)",
+          "Feedback reference is 0V (normally 2.5V), indicating no regulation",
+          "Feedback resistor is nominal (470Ω), ruling out feedback circuit"
+        ],
+        "recommended_action": "Replace U5 (buck converter IC)",
+        "verification_step": "After replacement, verify TP2 = 12V ± 5% and TP3 = 2.5V reference"
+      }
+    },
+    {
+      "scenario_id": "FAULT-002",
+      "name": "Overvoltage Output",
+      "category": "power",
+      "difficulty": "medium",
+      "description": "The 12V output rail is reading 14.2V, which is above the acceptable maximum. This indicates a feedback loop failure, typically caused by an open feedback resistor or reference voltage failure.",
+      "signals": [
+        {
+          "signal_id": "SIG-F002-TP1",
+          "test_point": { "id": "TP1", "name": "AC Input Voltage", "location": "Input Connector", "component_id": "AC_IN" },
+          "parameter": "voltage_rms",
+          "value": 228.0,
+          "unit": "V",
+          "accuracy": { "tolerance": 2, "instrument_error": 0.5 },
+          "timestamp": "2026-02-03T10:15:00Z",
+          "instrument": { "model": "Fluke 87V", "id": "METER-001", "calibration_date": "2025-08-15" },
+          "measurement_conditions": { "load_state": "nominal_load", "power_state": "operating", "ambient_temp": 24 }
+        },
+        {
+          "signal_id": "SIG-F002-TP2",
+          "test_point": { "id": "TP2", "name": "12V Output Rail", "location": "U5 Pin 4", "component_id": "U5" },
+          "parameter": "voltage_dc",
+          "value": 14.2,
+          "unit": "V",
+          "accuracy": { "tolerance": 5, "instrument_error": 0.05 },
+          "timestamp": "2026-02-03T10:15:05Z",
+          "instrument": { "model": "Fluke 87V", "id": "METER-001", "calibration_date": "2025-08-15" },
+          "measurement_conditions": { "load_state": "nominal_load", "power_state": "operating", "ambient_temp": 24 }
+        },
+        {
+          "signal_id": "SIG-F002-TP3",
+          "test_point": { "id": "TP3", "name": "Feedback Reference", "location": "U5 Pin 2", "component_id": "U5" },
+          "parameter": "voltage_dc",
+          "value": 2.48,
+          "unit": "V",
+          "accuracy": { "tolerance": 2, "instrument_error": 0.01 },
+          "timestamp": "2026-02-03T10:15:10Z",
+          "instrument": { "model": "Fluke 87V", "id": "METER-001", "calibration_date": "2025-08-15" },
+          "measurement_conditions": { "load_state": "nominal_load", "power_state": "operating", "ambient_temp": 24 }
+        },
+        {
+          "signal_id": "SIG-F002-R2",
+          "test_point": { "id": "R2", "name": "Feedback Resistor", "location": "R2", "component_id": "R2" },
+          "parameter": "resistance",
+          "value": 470000,
+          "unit": "Ω",
+          "accuracy": { "tolerance": 1, "instrument_error": 100 },
+          "timestamp": "2026-02-03T10:15:15Z",
+          "instrument": { "model": "Fluke 87V", "id": "METER-001", "calibration_date": "2025-08-15" },
+          "measurement_conditions": { "load_state": "no_load", "power_state": "operating" }
+        }
+      ],
+      "expected_diagnosis": {
+        "primary_cause": "Open feedback resistor R2 (470kΩ instead of 470Ω)",
+        "confidence": 0.92,
+        "supporting_evidence": [
+          "AC input normal",
+          "Output overvoltage at 14.2V (expected 12V ± 5%)",
+          "Reference voltage normal at 2.48V (expected 2.5V)",
+          "R2 measures 470kΩ (expected 470Ω) - 1000x higher than spec"
+        ],
+        "recommended_action": "Replace R2 with 470Ω ±1% resistor",
+        "verification_step": "After replacement, verify TP2 = 12V ± 5% and R2 = 470Ω"
+      }
+    },
+    {
+      "scenario_id": "FAULT-003",
+      "name": "Primary Side Input Fault",
+      "category": "power",
+      "difficulty": "medium",
+      "description": "The AC input side is not delivering proper voltage to the primary side of the power supply. The unit shows no output and the primary test point reads very low.",
+      "signals": [
+        {
+          "signal_id": "SIG-F003-AC1",
+          "test_point": { "id": "AC1", "name": "AC Line Input", "location": "Input Connector Pin 1", "component_id": "F1" },
+          "parameter": "voltage_rms",
+          "value": 234.0,
+          "unit": "V",
+          "accuracy": { "tolerance": 2, "instrument_error": 0.5 },
+          "timestamp": "2026-02-03T10:30:00Z",
+          "instrument": { "model": "Fluke 87V", "id": "METER-001", "calibration_date": "2025-08-15" },
+          "measurement_conditions": { "load_state": "no_load", "power_state": "on" }
+        },
+        {
+          "signal_id": "SIG-F003-AC2",
+          "test_point": { "id": "AC2", "name": "AC Neutral Input", "location": "Input Connector Pin 2", "component_id": "F1" },
+          "parameter": "voltage_rms",
+          "value": 0.2,
+          "unit": "V",
+          "accuracy": { "tolerance": 2, "instrument_error": 0.1 },
+          "timestamp": "2026-02-03T10:30:05Z",
+          "instrument": { "model": "Fluke 87V", "id": "METER-001", "calibration_date": "2025-08-15" },
+          "measurement_conditions": { "load_state": "no_load", "power_state": "on" }
+        },
+        {
+          "signal_id": "SIG-F003-TP1",
+          "test_point": { "id": "TP1", "name": "Primary Side DC Bus", "location": "After Bridge Rectifier", "component_id": "BR1" },
+          "parameter": "voltage_dc",
+          "value": 15.0,
+          "unit": "V",
+          "accuracy": { "tolerance": 5, "instrument_error": 0.1 },
+          "timestamp": "2026-02-03T10:30:10Z",
+          "instrument": { "model": "Fluke 87V", "id": "METER-001", "calibration_date": "2025-08-15" },
+          "measurement_conditions": { "load_state": "no_load", "power_state": "on" }
+        },
+        {
+          "signal_id": "SIG-F003-F1",
+          "test_point": { "id": "F1", "name": "Input Fuse", "location": "F1", "component_id": "F1" },
+          "parameter": "resistance",
+          "value": 0.5,
+          "unit": "Ω",
+          "accuracy": { "tolerance": 10, "instrument_error": 0.1 },
+          "timestamp": "2026-02-03T10:30:15Z",
+          "instrument": { "model": "Fluke 87V", "id": "METER-001", "calibration_date": "2025-08-15" },
+          "measurement_conditions": { "load_state": "no_load", "power_state": "off" }
+        }
+      ],
+      "expected_diagnosis": {
+        "primary_cause": "Failed input fuse F1 (partially open)",
+        "confidence": 0.88,
+        "supporting_evidence": [
+          "AC Line shows 234V, but AC Neutral shows only 0.2V - indicating open circuit",
+          "Primary DC bus is 15V (expected ~320V after bridge rectifier)",
+          "Fuse F1 shows 0.5Ω (should be <0.1Ω for good fuse) - partially open",
+          "Pattern indicates fuse is failing/has internal degradation"
+        ],
+        "recommended_action": "Replace input fuse F1 (250V 1A slow-blow)",
+        "verification_step": "After fuse replacement, verify AC1-AC2 voltage = 170-265V RMS and TP1 = 310-340V DC"
+      }
+    },
+    {
+      "scenario_id": "FAULT-004",
+      "name": "Ripple and Noise on Output",
+      "category": "signal_quality",
+      "difficulty": "hard",
+      "description": "The 12V output has excessive ripple voltage (>200mV p-p) indicating failing output capacitor or inadequate filtering. The DC level is within spec but noise is unacceptable.",
+      "signals": [
+        {
+          "signal_id": "SIG-F004-TP2-DC",
+          "test_point": { "id": "TP2-DC", "name": "12V Output DC Level", "location": "U5 Pin 4", "component_id": "U5" },
+          "parameter": "voltage_dc",
+          "value": 12.05,
+          "unit": "V",
+          "accuracy": { "tolerance": 5, "instrument_error": 0.02 },
+          "timestamp": "2026-02-03T10:45:00Z",
+          "instrument": { "model": "Fluke 87V", "id": "METER-001", "calibration_date": "2025-08-15" },
+          "measurement_conditions": { "load_state": "full_load", "power_state": "operating", "ambient_temp": 25 }
+        },
+        {
+          "signal_id": "SIG-F004-TP2-RIPPLE",
+          "test_point": { "id": "TP2-RIPPLE", "name": "12V Output Ripple", "location": "U5 Pin 4", "component_id": "C12" },
+          "parameter": "voltage_rms",
+          "value": 0.185,
+          "unit": "V",
+          "accuracy": { "tolerance": 10, "instrument_error": 0.005 },
+          "timestamp": "2026-02-03T10:45:05Z",
+          "instrument": { "model": "Rigol DS1054Z", "id": "SCOPE-001", "calibration_date": "2025-03-20" },
+          "measurement_conditions": { "load_state": "full_load", "power_state": "operating", "ambient_temp": 25 }
+        },
+        {
+          "signal_id": "SIG-F004-C12-ESR",
+          "test_point": { "id": "C12", "name": "Output Capacitor ESR", "location": "C12", "component_id": "C12" },
+          "parameter": "resistance",
+          "value": 2.8,
+          "unit": "Ω",
+          "accuracy": { "tolerance": 20, "instrument_error": 0.1 },
+          "timestamp": "2026-02-03T10:45:10Z",
+          "instrument": { "model": "BK Precision 878B", "id": "ESR-001", "calibration_date": "2025-01-10" },
+          "measurement_conditions": { "load_state": "no_load", "power_state": "off" }
+        }
+      ],
+      "expected_diagnosis": {
+        "primary_cause": "Failed/degraded output capacitor C12 (ESR increased from 0.1Ω to 2.8Ω)",
+        "confidence": 0.90,
+        "supporting_evidence": [
+          "DC output level is normal at 12.05V",
+          "Ripple voltage is 185mV RMS (expected <50mV) - 3.7x above spec",
+          "C12 ESR measures 2.8Ω (expected <0.2Ω for 1000μF capacitor)",
+          "High ESR causes excessive ripple under load"
+        ],
+        "recommended_action": "Replace output capacitor C12 (1000μF 16V low-ESR electrolytic)",
+        "verification_step": "After replacement, verify ripple <50mV p-p at full load and ESR <0.2Ω"
+      }
+    },
+    {
+      "scenario_id": "FAULT-005",
+      "name": "Thermal Shutdown Condition",
+      "category": "control",
+      "difficulty": "easy",
+      "description": "The power supply shuts down after operating for 5-10 minutes. The unit works initially but then stops producing output. Thermal imaging reveals a hot spot near the buck converter.",
+      "signals": [
+        {
+          "signal_id": "SIG-F005-COLD-TP2",
+          "test_point": { "id": "TP2", "name": "12V Output Rail (Cold)", "location": "U5 Pin 4", "component_id": "U5" },
+          "parameter": "voltage_dc",
+          "value": 11.9,
+          "unit": "V",
+          "accuracy": { "tolerance": 5, "instrument_error": 0.02 },
+          "timestamp": "2026-02-03T11:00:00Z",
+          "instrument": { "model": "Fluke 87V", "id": "METER-001", "calibration_date": "2025-08-15" },
+          "measurement_conditions": { "load_state": "nominal_load", "power_state": "operating", "ambient_temp": 22 }
+        },
+        {
+          "signal_id": "SIG-F005-HOT-TP2",
+          "test_point": { "id": "TP2", "name": "12V Output Rail (Hot)", "location": "U5 Pin 4", "component_id": "U5" },
+          "parameter": "voltage_dc",
+          "value": 0.0,
+          "unit": "V",
+          "accuracy": { "tolerance": 5, "instrument_error": 0.02 },
+          "timestamp": "2026-02-03T11:10:00Z",
+          "instrument": { "model": "Fluke 87V", "id": "METER-001", "calibration_date": "2025-08-15" },
+          "measurement_conditions": { "load_state": "nominal_load", "power_state": "off_thermal" }
+        },
+        {
+          "signal_id": "SIG-F005-U5-TEMP",
+          "test_point": { "id": "U5-CASE", "name": "U5 Case Temperature", "location": "U5 Top", "component_id": "U5" },
+          "parameter": "temperature",
+          "value": 94,
+          "unit": "°C",
+          "accuracy": { "tolerance": 2, "instrument_error": 0.5 },
+          "timestamp": "2026-02-03T11:09:30Z",
+          "instrument": { "model": "Fluke 62 MAX", "id": "TEMP-001", "calibration_date": "2025-07-01" },
+          "measurement_conditions": { "load_state": "nominal_load", "power_state": "operating" }
+        },
+        {
+          "signal_id": "SIG-F005-I-OUT",
+          "test_point": { "id": "I-OUT", "name": "Output Current", "location": "Shunt", "component_id": "R_SENSE" },
+          "parameter": "current",
+          "value": 1.85,
+          "unit": "A",
+          "accuracy": { "tolerance": 3, "instrument_error": 0.02 },
+          "timestamp": "2026-02-03T11:00:30Z",
+          "instrument": { "model": "Fluke 87V", "id": "METER-001", "calibration_date": "2025-08-15" },
+          "measurement_conditions": { "load_state": "nominal_load", "power_state": "operating", "ambient_temp": 22 }
+        }
+      ],
+      "expected_diagnosis": {
+        "primary_cause": "Thermal shutdown due to inadequate heatsinking on U5 (buck converter)",
+        "confidence": 0.87,
+        "supporting_evidence": [
+          "Unit works normally when cold (11.9V output)",
+          "After ~10 minutes, output collapses to 0V due to thermal shutdown",
+          "U5 case temperature reached 94°C (thermal shutdown typically activates at 90-100°C)",
+          "Output current is 1.85A - within rated 2A but generating significant heat",
+          "Lack of active cooling causes cumulative heating"
+        ],
+        "recommended_action": "Improve thermal management: add heatsink to U5 or ensure adequate airflow",
+        "verification_step": "After thermal improvement, verify U5 temperature stays below 70°C at full load for 30 minutes"
+      }
+    }
+  ]
+}
