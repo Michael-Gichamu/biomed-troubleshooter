@@ -3,51 +3,29 @@ Domain Models
 
 Pure business entities with no framework dependencies.
 All validation and business rules encapsulated here.
+NOTHING equipment-specific should exist in this file.
 """
 
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from enum import Enum
 from typing import Optional
-import re
+import uuid
 
 
-class SemanticState(Enum):
-    """Semantic interpretation of signal states."""
-    NORMAL = "normal"
-    DEGRADED = "degraded"
-    OUT_OF_SPEC_LOW = "out_of_spec_low"
-    OUT_OF_SPEC_HIGH = "out_of_spec_high"
-    MISSING = "missing"
-    NOISY = "noisy"
-    INTERMITTENT = "intermittent"
-    SHORTED = "shorted"
-    OPEN_CIRCUIT = "open_circuit"
-    UNKNOWN = "unknown"
+# =============================================================================
+# ENUMS - Generic only, no equipment-specific values
+# =============================================================================
 
-
-class Severity(Enum):
-    """Severity levels for anomalies and errors."""
-    CRITICAL = "critical"
-    HIGH = "high"
-    MEDIUM = "medium"
-    LOW = "low"
-    MINOR = "minor"
-
-
-class DiagnosticStatus(Enum):
-    """Overall diagnostic status."""
-    NORMAL = "normal"
-    DEGRADED = "degraded"
-    FAILED = "failed"
-    UNKNOWN = "unknown"
-
-
-class WorkflowType(Enum):
-    """Workflow routing types."""
+class WorkflowType:
+    """Workflow routing types - generic, no equipment-specific values."""
     INITIAL = "initial"
     FOLLOW_UP = "follow_up"
     VERIFICATION = "verification"
+
+    @classmethod
+    def from_string(cls, value: str) -> str:
+        valid = {cls.INITIAL, cls.FOLLOW_UP, cls.VERIFICATION}
+        return value if value in valid else cls.INITIAL
 
 
 # =============================================================================
@@ -56,33 +34,40 @@ class WorkflowType(Enum):
 
 @dataclass(frozen=True, slots=True)
 class TestPoint:
-    """Location and metadata for a test point (Value Object)."""
+    """
+    Location and metadata for a test point.
+
+    NOTE: Signal IDs and parameters come from equipment config, not hard-coded here.
+    """
     id: str
     name: str
     location: Optional[str] = None
     component_id: Optional[str] = None
 
     def __post_init__(self):
-        if not re.match(r'^[A-Za-z0-9_-]+$', self.id):
-            raise ValueError(f"Invalid test point ID: {self.id}")
+        if not self.id or not self.id.strip():
+            raise ValueError("Test point ID cannot be empty")
 
 
 @dataclass(frozen=True, slots=True)
 class Measurement:
-    """A single measurement value (Value Object)."""
+    """
+    A single measurement value.
+
+    NOTE: Thresholds come from equipment config, not hard-coded here.
+    """
     test_point: TestPoint
     value: float
     unit: str
     timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
-    # Acceptable range for this measurement
+    # Optional expected range from equipment config
     nominal_value: Optional[float] = None
     tolerance_percent: Optional[float] = None
 
     def __post_init__(self):
-        valid_units = {'V', 'mV', 'A', 'mA', 'Ω', 'kΩ', 'W', 'mW', 'Hz', 'kHz', '°C', '%RH'}
-        if self.unit not in valid_units:
-            raise ValueError(f"Invalid unit: {self.unit}")
+        if not self.unit or not self.unit.strip():
+            raise ValueError("Unit cannot be empty")
 
     @property
     def expected_range(self) -> tuple[Optional[float], Optional[float]]:
@@ -95,23 +80,37 @@ class Measurement:
 
 @dataclass(frozen=True, slots=True)
 class SignalState:
-    """Semantic interpretation of a signal (Value Object)."""
+    """
+    Semantic interpretation of a signal.
+
+    NOTE: Semantic states come from equipment config thresholds, not hard-coded here.
+    The state string is data-driven, not an enum.
+    """
     measurement: Measurement
-    semantic_state: SemanticState
+    state: str  # e.g., "normal", "missing", "over_voltage" - from config
     confidence: float = 1.0
     deviation_percent: Optional[float] = None
 
+    def __post_init__(self):
+        if not 0.0 <= self.confidence <= 1.0:
+            raise ValueError(f"Confidence must be 0.0-1.0, got {self.confidence}")
+
     def is_anomaly(self) -> bool:
-        """Check if this signal represents an anomaly."""
-        return self.semantic_state not in (
-            SemanticState.NORMAL,
-            SemanticState.UNKNOWN
-        )
+        """
+        Check if this signal represents an anomaly.
+
+        NOTE: "Normal" state definition comes from equipment config, not hard-coded.
+        """
+        return self.state != "normal"
 
 
 @dataclass(frozen=True, slots=True)
 class EquipmentId:
-    """Equipment identifier (Value Object)."""
+    """
+    Equipment identifier.
+
+    NOTE: Model names come from data files, not hard-coded here.
+    """
     model: str
     serial: Optional[str] = None
 
@@ -150,87 +149,29 @@ class SignalCollection:
         """Return number of measurements."""
         return len(self.measurements)
 
-    def anomaly_count(self) -> int:
-        """Return count of anomalous signals."""
-        # Requires state mapping - lazy evaluation in domain service
-        return 0  # Placeholder
-
-
-@dataclass
-class ThresholdProfile:
-    """Threshold configuration for signal interpretation."""
-    equipment_model: str
-    parameter: str
-    nominal_value: float
-    unit: str
-    thresholds: dict  # semantic_state -> {min, max}
-    hysteresis_percent: float = 5.0
-
-    def get_state(self, value: float) -> SemanticState:
-        """Determine semantic state from raw value."""
-        for state_name, range_spec in self.thresholds.items():
-            state = SemanticState(state_name)
-            min_val = range_spec.get("min")
-            max_val = range_spec.get("max")
-
-            if min_val is not None and value < min_val:
-                continue
-            if max_val is not None and value > max_val:
-                continue
-
-            return state
-
-        return SemanticState.UNKNOWN
-
-
-@dataclass
-class FaultHypothesis:
-    """A hypothesis about the root cause of a fault."""
-    cause: str
-    confidence: float  # 0.0 - 1.0
-    component: Optional[str] = None
-    failure_mode: Optional[str] = None
-
-    supporting_evidence: list[str] = field(default_factory=list)
-    contradicting_evidence: list[str] = field(default_factory=list)
-
-    differential_causes: list["FaultHypothesis"] = field(default_factory=list)
-
-    def __post_init__(self):
-        if not 0.0 <= self.confidence <= 1.0:
-            raise ValueError(f"Confidence must be 0.0-1.0, got {self.confidence}")
-
-    def is_definitive(self) -> bool:
-        """Check if this hypothesis is definitive (high confidence, no contradictions)."""
-        return (
-            self.confidence >= 0.9 and
-            not self.contradicting_evidence and
-            len(self.differential_causes) == 0
-        )
-
-    def needs_review(self) -> bool:
-        """Check if human review is recommended."""
-        return self.confidence < 0.7 or bool(self.contradicting_evidence)
-
 
 @dataclass
 class DiagnosticSession:
-    """A complete diagnostic session."""
+    """
+    A complete diagnostic session.
+
+    NOTE: All fault knowledge comes from equipment config files, not hard-coded.
+    """
     session_id: str
     equipment_id: EquipmentId
     signals: SignalCollection
-    workflow_type: WorkflowType
+    workflow_type: str
     started_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     completed_at: Optional[datetime] = None
 
-    hypothesis: Optional[FaultHypothesis] = None
+    hypothesis: Optional[dict] = None  # From equipment config fault definition
     reasoning_chain: list[dict] = field(default_factory=list)
     recommendations: list[dict] = field(default_factory=list)
 
     status: str = "in_progress"
     errors: list[str] = field(default_factory=list)
 
-    def complete(self, hypothesis: FaultHypothesis) -> None:
+    def complete(self, hypothesis: dict) -> None:
         """Complete the session with a hypothesis."""
         self.hypothesis = hypothesis
         self.completed_at = datetime.now(timezone.utc)
@@ -252,178 +193,261 @@ class DiagnosticSession:
 
 
 @dataclass
-class TroubleshootingStep:
-    """A step in the troubleshooting process."""
-    step_number: int
-    action: str  # measure, inspect, replace, verify
-    target: str
-    instruction: str
-    expected_result: str
-    priority: Severity = Severity.MEDIUM
-    safety_warning: Optional[str] = None
+class ReasoningStep:
+    """A step in the troubleshooting reasoning process."""
+    step: int
+    observation: str
+    inference: str
+    source: str  # "signal", "documentation", "config"
 
     def to_dict(self) -> dict:
         return {
-            "step_number": self.step_number,
-            "action": self.action,
-            "target": self.target,
-            "instruction": self.instruction,
-            "expected_result": self.expected_result,
-            "priority": self.priority.value,
-            "safety_warning": self.safety_warning
+            "step": self.step,
+            "observation": self.observation,
+            "inference": self.inference,
+            "source": self.source
         }
 
 
 # =============================================================================
-# DOMAIN SERVICES (Pure business logic)
+# DOMAIN SERVICES (Generic, data-driven)
 # =============================================================================
 
 class SignalInterpreter:
-    """Domain service for interpreting signals."""
+    """
+    Domain service for interpreting signals.
 
-    def __init__(self, thresholds: dict[str, ThresholdProfile]):
-        self.thresholds = thresholds
+    NOTE: Threshold logic is data-driven from equipment config files.
+    """
 
-    def interpret(self, signals: SignalCollection) -> tuple[list[SignalState], DiagnosticStatus]:
+    def __init__(self, threshold_configs: dict):
         """
-        Interpret a collection of signals.
+        Initialize with threshold configurations from equipment file.
+
+        Args:
+            threshold_configs: Dict mapping signal_id to threshold config
+        """
+        self.threshold_configs = threshold_configs
+
+    def interpret(self, signals: SignalCollection) -> tuple[list[SignalState], str]:
+        """
+        Interpret a collection of signals using equipment thresholds.
+
+        Args:
+            signals: Collection of measurements
 
         Returns:
-            Tuple of (interpreted_states, overall_status)
+            Tuple of (signal_states, overall_status)
         """
         states = []
         has_critical = False
         has_warning = False
 
         for measurement in signals.measurements:
-            # Find applicable threshold
-            threshold = self._find_threshold(measurement, signals.equipment_id)
+            threshold = self.threshold_configs.get(measurement.test_point.id)
+
             if threshold:
-                semantic = threshold.get_state(measurement.value)
+                state = threshold.get_state(measurement.value)
                 deviation = self._calculate_deviation(measurement, threshold)
             else:
-                semantic = SemanticState.UNKNOWN
+                state = "unknown"
                 deviation = None
 
-            state = SignalState(
+            signal_state = SignalState(
                 measurement=measurement,
-                semantic_state=semantic,
+                state=state or "unknown",
                 deviation_percent=deviation
             )
-            states.append(state)
+            states.append(signal_state)
 
-            if semantic in (SemanticState.MISSING, SemanticState.SHORTED, SemanticState.OPEN_CIRCUIT):
+            if state in ("missing", "shorted", "open_circuit"):
                 has_critical = True
-            elif semantic in (SemanticState.OUT_OF_SPEC_LOW, SemanticState.OUT_OF_SPEC_HIGH):
+            elif state in ("under_voltage", "over_voltage", "failed"):
                 has_warning = True
 
         if has_critical:
-            status = DiagnosticStatus.FAILED
+            status = "failed"
         elif has_warning:
-            status = DiagnosticStatus.DEGRADED
+            status = "degraded"
         else:
-            status = DiagnosticStatus.NORMAL
+            status = "normal"
 
         return states, status
 
-    def _find_threshold(self, measurement: Measurement, equipment_id: EquipmentId) -> Optional[ThresholdProfile]:
-        """Find the applicable threshold profile for a measurement."""
-        # Look for exact parameter match
-        key = f"{equipment_id.model}_{measurement.test_point.id}"
-        return self.thresholds.get(key)
-
-    def _calculate_deviation(self, measurement: Measurement, threshold: ThresholdProfile) -> Optional[float]:
+    def _calculate_deviation(self, measurement: Measurement, threshold) -> Optional[float]:
         """Calculate percentage deviation from nominal."""
-        if threshold.nominal_value == 0:
+        nominal = getattr(threshold, 'nominal_value', None) or measurement.nominal_value
+        if nominal is None or nominal == 0:
             return None
-        return ((measurement.value - threshold.nominal_value) / threshold.nominal_value) * 100
+        return ((measurement.value - nominal) / nominal) * 100
+
+
+class FaultMatcher:
+    """
+    Domain service for matching faults based on signal states.
+
+    NOTE: Fault definitions come from equipment config files, not hard-coded.
+    """
+
+    def __init__(self, fault_configs: dict):
+        """
+        Initialize with fault configurations from equipment file.
+
+        Args:
+            fault_configs: Dict mapping fault_id to fault config
+        """
+        self.fault_configs = fault_configs
+
+    def find_matching_fault(self, signal_states: dict) -> Optional[dict]:
+        """
+        Find a fault that matches the observed signal states.
+
+        Args:
+            signal_states: Dict mapping signal_id to semantic state
+
+        Returns:
+            Matching fault config or None
+        """
+        for fault in self.fault_configs.values():
+            if self._matches_fault(fault, signal_states):
+                return fault
+        return None
+
+    def _matches_fault(self, fault: dict, signal_states: dict) -> bool:
+        """Check if fault signatures match observed signal states."""
+        signatures = fault.get("signatures", [])
+        for sig in signatures:
+            sig_signal_id = sig.get("signal_id")
+            sig_state = sig.get("state")
+            observed_state = signal_states.get(sig_signal_id)
+            if observed_state != sig_state:
+                return False
+        return True
+
+
+class RecommendationGenerator:
+    """
+    Domain service for generating recommendations from fault definitions.
+
+    NOTE: Recovery actions come from equipment config files, not hard-coded.
+    """
+
+    def __init__(self, fault_configs: dict):
+        """
+        Initialize with fault configurations.
+
+        Args:
+            fault_configs: Dict mapping fault_id to fault config
+        """
+        self.fault_configs = fault_configs
+
+    def generate(self, fault_id: str, signal_states: dict) -> list[dict]:
+        """
+        Generate recovery recommendations for a fault.
+
+        Args:
+            fault_id: The fault ID
+            signal_states: Observed signal states
+
+        Returns:
+            List of recovery step dicts
+        """
+        fault = self.fault_configs.get(fault_id)
+        if not fault:
+            return []
+
+        recovery = fault.get("recovery", [])
+
+        # Transform recovery steps to recommendations
+        recommendations = []
+        for step in recovery:
+            recommendations.append({
+                "action": step.get("action", "inspect"),
+                "target": step.get("target", "Unknown"),
+                "instruction": step.get("instruction", ""),
+                "verification_step": step.get("verification", ""),
+                "estimated_difficulty": step.get("difficulty", "moderate"),
+                "safety_warning": step.get("safety", ""),
+                "estimated_time": step.get("estimated_time", "")
+            })
+
+        return recommendations
 
 
 class HypothesisGenerator:
-    """Domain service for generating fault hypotheses."""
+    """
+    Domain service for generating fault hypotheses.
 
-    def __init__(self, rule_engine: "DiagnosticRuleEngine"):
-        self.rule_engine = rule_engine
+    NOTE: All hypothesis generation uses data from equipment config files.
+    """
+
+    def __init__(self, fault_configs: dict):
+        """
+        Initialize with fault configurations.
+
+        Args:
+            fault_configs: Dict mapping fault_id to fault config
+        """
+        self.fault_configs = fault_configs
 
     def generate(
         self,
-        equipment_id: EquipmentId,
-        signal_states: list[SignalState],
+        equipment_id: str,
+        signal_states: dict,
         evidence: list[str]
-    ) -> FaultHypothesis:
+    ) -> dict:
         """
         Generate a fault hypothesis from signal states and evidence.
 
-        This is a deterministic function based on rules - NOT freeform reasoning.
+        Args:
+            equipment_id: The equipment model
+            signal_states: Dict of signal_id -> semantic state
+            evidence: List of evidence descriptions
+
+        Returns:
+            Hypothesis dict with cause, confidence, etc.
         """
-        # Apply diagnostic rules to generate hypothesis
-        matched_rules = self.rule_engine.evaluate(equipment_id, signal_states)
+        # Find matching fault
+        fault = self._find_matching_fault(signal_states)
 
-        if not matched_rules:
-            return FaultHypothesis(
-                cause="Unknown - no matching diagnostic rules",
-                confidence=0.0
-            )
+        if not fault:
+            return {
+                "cause": "Unknown - no matching fault pattern",
+                "confidence": 0.0,
+                "component": None,
+                "failure_mode": None,
+                "supporting_evidence": evidence,
+                "contradicting_evidence": [],
+                "fault_id": None
+            }
 
-        # Use highest-confidence matching rule
-        best_rule = max(matched_rules, key=lambda r: r.confidence)
+        # Get best hypothesis from fault
+        hypotheses = fault.get("hypotheses", [])
+        if not hypotheses:
+            return {
+                "cause": fault.get("description", "Unknown fault"),
+                "confidence": 0.5,
+                "component": None,
+                "failure_mode": None,
+                "supporting_evidence": evidence,
+                "contradicting_evidence": [],
+                "fault_id": fault.get("fault_id")
+            }
 
-        return FaultHypothesis(
-            cause=best_rule.cause,
-            confidence=best_rule.confidence,
-            component=best_rule.component,
-            failure_mode=best_rule.failure_mode,
-            supporting_evidence=evidence + [e.description for e in signal_states if e.is_anomaly()],
-            differential_causes=[]
-        )
+        # Get highest-ranked hypothesis
+        best = min(hypotheses, key=lambda h: h.get("rank", 99))
 
+        return {
+            "cause": best.get("cause", fault.get("description", "Unknown")),
+            "confidence": best.get("confidence", 0.5),
+            "component": best.get("component"),
+            "failure_mode": best.get("failure_mode"),
+            "supporting_evidence": evidence,
+            "contradicting_evidence": [],
+            "fault_id": fault.get("fault_id")
+        }
 
-@dataclass
-class DiagnosticRule:
-    """A deterministic diagnostic rule."""
-    rule_id: str
-    name: str
-    cause: str
-    confidence: float
-    component: Optional[str] = None
-    failure_mode: Optional[str] = None
-
-    # Preconditions: signals that must match
-    required_signals: list[dict] = field(default_factory=list)
-    forbidden_signals: list[dict] = field(default_factory=list)
-
-    def matches(self, signal_states: list[SignalState]) -> bool:
-        """Check if this rule matches the given signal states."""
-        # Check required signals
-        for req in self.required_signals:
-            if not self._matches_requirement(signal_states, req):
-                return False
-
-        # Check forbidden signals
-        for forb in self.forbidden_signals:
-            if self._matches_requirement(signal_states, forb):
-                return False
-
-        return True
-
-    def _matches_requirement(self, signal_states: list[SignalState], requirement: dict) -> bool:
-        """Check if a signal state matches a requirement."""
-        tp_id = requirement.get("test_point_id")
-        state = requirement.get("state")
-
-        for ss in signal_states:
-            if ss.measurement.test_point.id == tp_id:
-                return ss.semantic_state.value == state
-
-        return False
-
-
-class DiagnosticRuleEngine:
-    """Engine for evaluating diagnostic rules."""
-
-    def __init__(self, rules: list[DiagnosticRule]):
-        self.rules = rules
-
-    def evaluate(self, equipment_id: EquipmentId, signal_states: list[SignalState]) -> list[DiagnosticRule]:
-        """Evaluate all rules against signal states."""
-        return [r for r in self.rules if r.matches(signal_states)]
+    def _find_matching_fault(self, signal_states: dict) -> Optional[dict]:
+        """Find fault matching observed signal states."""
+        matcher = FaultMatcher(self.fault_configs)
+        return matcher.find_matching_fault(signal_states)
