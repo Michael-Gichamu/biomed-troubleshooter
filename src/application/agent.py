@@ -3,6 +3,10 @@ LangGraph Agent Implementation
 
 Deterministic agent control flow using LangGraph.
 Each node is a pure function with explicit inputs/outputs.
+
+Observability:
+- LangSmith tracing for debugging and monitoring
+- Configurable via environment variables or explicit configuration
 """
 
 from dataclasses import dataclass, field
@@ -24,6 +28,35 @@ from src.domain.models import (
     SemanticState,
 )
 from src.infrastructure.rag_repository import RAGRepository, EvidenceAggregator
+from src.infrastructure.langsmith_client import (
+    get_langsmith_client,
+    configure_langsmith,
+    LangSmithConfig,
+)
+
+
+# =============================================================================
+# LANGSMITH CONFIGURATION
+# =============================================================================
+
+def initialize_observability(
+    api_key: str = None,
+    project_name: str = "biomed-troubleshooter",
+    enabled: bool = True
+) -> None:
+    """
+    Initialize LangSmith observability.
+
+    Environment variables:
+        LANGCHAIN_API_KEY: LangSmith API key
+        LANGCHAIN_PROJECT: Project name (default: biomed-troubleshooter)
+        LANGCHAIN_TRACING: Enable tracing (default: true)
+    """
+    configure_langsmith(
+        api_key=api_key,
+        project_name=project_name,
+        enabled=enabled
+    )
 
 
 # =============================================================================
@@ -495,14 +528,49 @@ def run_diagnostic(
     trigger_content: str,
     equipment_model: str,
     equipment_serial: str,
-    measurements: list[dict]
+    measurements: list[dict],
+    enable_tracing: bool = True
 ) -> dict:
     """
     Run a complete diagnostic session.
 
     This is the main entry point for the agent.
+
+    Args:
+        trigger_type: Type of trigger (symptom_report, signal_submission, etc.)
+        trigger_content: Description of the problem
+        equipment_model: Equipment model identifier
+        equipment_serial: Equipment serial number (optional)
+        measurements: List of measurement dicts
+        enable_tracing: Enable LangSmith tracing (default: True)
+
+    Returns:
+        Diagnostic response dict
     """
     import time
+
+    # Initialize LangSmith if enabled
+    if enable_tracing:
+        initialize_observability()
+
+    langsmith = get_langsmith_client()
+
+    # Create parent trace run
+    session_id = str(uuid.uuid4())
+    run_id = None
+
+    if langsmith.is_enabled():
+        run_id = langsmith.create_run(
+            name="diagnostic_session",
+            run_type="chain",
+            inputs={
+                "trigger_type": trigger_type,
+                "trigger_content": trigger_content,
+                "equipment_model": equipment_model,
+                "equipment_serial": equipment_serial,
+                "measurement_count": len(measurements)
+            }
+        )
 
     # Initialize state
     state = AgentState(
@@ -511,7 +579,7 @@ def run_diagnostic(
         equipment_model=equipment_model,
         equipment_serial=equipment_serial,
         raw_measurements=measurements,
-        session_id=str(uuid.uuid4()),
+        session_id=session_id,
         timestamp=datetime.now(timezone.utc).isoformat()
     )
 
@@ -521,23 +589,46 @@ def run_diagnostic(
     print(f"Session ID: {state.session_id}")
     print(f"Equipment: {equipment_model}")
     print(f"Measurements: {len(measurements)}")
+    if langsmith.is_enabled():
+        print("[LangSmith] Tracing enabled")
 
     start = time.time()
 
-    # Run graph
-    graph = compile_graph()
-    result = graph.invoke(state)
+    try:
+        # Run graph
+        graph = compile_graph()
+        result = graph.invoke(state)
 
-    elapsed_ms = int((time.time() - start) * 1000)
-    result.processing_time_ms = elapsed_ms
+        elapsed_ms = int((time.time() - start) * 1000)
+        result.processing_time_ms = elapsed_ms
 
-    print("\n" + "=" * 60)
-    print(f"COMPLETE ({elapsed_ms}ms)")
-    print("=" * 60)
-    print(f"Nodes: {' → '.join(result.node_history)}")
-    print(f"Status: {'error' if result.response.get('error') else 'success'}")
+        print("\n" + "=" * 60)
+        print(f"COMPLETE ({elapsed_ms}ms)")
+        print("=" * 60)
+        print(f"Nodes: {' → '.join(result.node_history)}")
+        print(f"Status: {'error' if result.response.get('error') else 'success'}")
 
-    return result.response
+        # End trace run
+        if run_id:
+            langsmith.end_run(
+                run_id,
+                outputs={
+                    "status": result.response.get("error", "success"),
+                    "processing_time_ms": elapsed_ms,
+                    "nodes_executed": len(result.node_history),
+                    "hypothesis": result.response.get("diagnosis", {}).get("primary_cause", "N/A")
+                }
+            )
+
+        return result.response
+
+    except Exception as e:
+        elapsed_ms = int((time.time() - start) * 1000)
+
+        if run_id:
+            langsmith.end_run(run_id, outputs={}, error=str(e))
+
+        raise
 
 
 if __name__ == "__main__":

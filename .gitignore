@@ -247,6 +247,11 @@ logs/
 *.temp
 temp/
 
+# Environment variables (DO NOT COMMIT)
+.env
+.env.local
+.env.*.local
+
 # OS files
 Thumbs.db
 ehthumbs.db

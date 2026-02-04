@@ -5,6 +5,9 @@
 langgraph>=0.0.20
 langchain>=0.1.0
 
+# Observability
+langsmith>=0.1.0
+
 # Vector Database
 chromadb>=0.4.0
 
