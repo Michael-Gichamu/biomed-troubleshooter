@@ -42,32 +42,30 @@ class RAGRepository:
 
     def __init__(
         self,
-        chromadb_path: Optional[str] = None,
+        chromadb_client: Optional["ChromaDBClient"] = None,
         namespace: str = "troubleshooting"
     ):
-        self.chromadb_path = chromadb_path
+        self._client = chromadb_client
         self.namespace = namespace
-        self._client = None
-        self._collection = None
+
+    @classmethod
+    def from_directory(cls, persist_directory: str = "data/chromadb") -> "RAGRepository":
+        """Factory method to create RAGRepository from directory."""
+        from src.infrastructure.chromadb_client import create_chromadb_client
+        client = create_chromadb_client(persist_directory)
+        return cls(chromadb_client=client)
+
+    @property
+    def is_available(self) -> bool:
+        """Check if RAG is available."""
+        return self._client is not None and self._client.is_initialized
 
     def initialize(self) -> None:
         """Initialize the ChromaDB connection."""
-        try:
-            import chromadb
-            if self.chromadb_path:
-                self._client = chromadb.PersistentClient(path=self.chromadb_path)
-            else:
-                self._client = chromadb.InMemoryClient()
-            self._collection = self._client.get_or_create_collection(
-                name=self.namespace,
-                metadata={"description": "Troubleshooting documentation"}
-            )
-        except ImportError:
-            raise RuntimeError("ChromaDB not installed. Run: pip install chromadb")
-
-    def is_available(self) -> bool:
-        """Check if RAG is available."""
-        return self._collection is not None
+        if self._client is None:
+            from src.infrastructure.chromadb_client import create_chromadb_client
+            self._client = create_chromadb_client()
+        self._client.initialize()
 
     def retrieve(
         self,
@@ -86,7 +84,7 @@ class RAGRepository:
         Returns:
             List of relevant document snippets
         """
-        if not self.is_available():
+        if not self.is_available:
             # Fallback to empty results if RAG unavailable
             return []
 
@@ -94,11 +92,10 @@ class RAGRepository:
             # Add equipment filter to query for better results
             filtered_query = f"{query} {equipment_model}"
 
-            results = self._collection.query(
+            results = self._client.query(
                 query_texts=[filtered_query],
                 n_results=top_k,
-                where={"equipment_model": equipment_model},
-                include=["documents", "metadatas", "distances"]
+                where={"equipment_model": equipment_model}
             )
 
             return self._parse_results(results)
@@ -120,10 +117,12 @@ class RAGRepository:
             distance = results.get("distances", [[1.0]])[0][i]
             relevance = max(0.0, 1.0 - distance)
 
+            metadata = results.get("metadatas", [[{}]])[0][i]
+
             snippet = DocumentSnippet(
                 doc_id=results["ids"][0][i],
-                title=results["metadatas"][0][i].get("title", "Unknown"),
-                section=results["metadatas"][0][i].get("section"),
+                title=metadata.get("title", "Unknown"),
+                section=metadata.get("category"),
                 content=results["documents"][0][i],
                 relevance_score=relevance
             )

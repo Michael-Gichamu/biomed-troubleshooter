@@ -143,10 +143,13 @@ cython_debug/
 # LangGraph Specific
 # =============================================================================
 
-# ChromaDB data
+# ChromaDB data (persistent vector store)
 data/chromadb/
 *.db
 *.vectordb
+
+# ChromaDB backup files
+*.chroma_backup
 
 # Vector store backups
 backups/
