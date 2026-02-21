@@ -1,169 +1,186 @@
 """
-Configuration Loader
+Configuration Module
 
-Loads environment variables from .env file.
-Supports development and production configurations.
+Centralized configuration management for the AI Agent.
 """
 
 import os
+from dataclasses import dataclass, field
+from typing import Optional, List
 from pathlib import Path
-from dataclasses import dataclass
-from typing import Optional
 
+from dotenv import load_dotenv
 
-def load_env_file(env_path: Optional[str] = None) -> None:
-    """
-    Load environment variables from .env file.
-
-    Args:
-        env_path: Path to .env file (default: project root/.env)
-    """
-    if env_path is None:
-        env_path = Path(__file__).parent.parent.parent / ".env"
-
-    env_file = Path(env_path)
-
-    if not env_file.exists():
-        return
-
-    with open(env_file, 'r') as f:
-        for line in f:
-            line = line.strip()
-            if line and not line.startswith('#') and '=' in line:
-                key, value = line.split('=', 1)
-                os.environ.setdefault(key.strip(), value.strip())
-
-
-# Load .env on module import
-load_env_file()
+# Load environment variables
+load_dotenv()
 
 
 @dataclass
 class LLMConfig:
-    """LLM configuration."""
-    provider: str = "openai"  # openai, anthropic, ollama
+    """LLM provider configuration."""
+    provider: str = "groq"
+    model: str = "llama-3.3-70b-versatile"
     api_key: Optional[str] = None
-    base_url: Optional[str] = None
-    model: str = "gpt-4o-mini"
-
+    temperature: float = 0.1
+    max_tokens: int = 2048
+    
     @classmethod
     def from_env(cls) -> "LLMConfig":
-        """Create from environment variables."""
         return cls(
-            provider=os.environ.get("LLM_PROVIDER", "openai"),
-            api_key=os.environ.get("OPENAI_API_KEY") or os.environ.get("ANTHROPIC_API_KEY"),
-            base_url=os.environ.get("OLLAMA_BASE_URL"),
-            model=os.environ.get("LLM_MODEL", "gpt-4o-mini")
+            provider=os.getenv("LLM_PROVIDER", "groq"),
+            model=os.getenv("LLM_MODEL", "llama-3.3-70b-versatile"),
+            api_key=os.getenv("GROQ_API_KEY") or os.getenv("OPENAI_API_KEY"),
+            temperature=float(os.getenv("LLM_TEMPERATURE", "0.1")),
+            max_tokens=int(os.getenv("LLM_MAX_TOKENS", "2048"))
         )
 
 
 @dataclass
 class EmbeddingConfig:
-    """Embedding configuration."""
-    provider: str = "openai"  # openai, huggingface
-    model: str = "text-embedding-3-small"
-    api_key: Optional[str] = None
-
+    """Embedding model configuration."""
+    provider: str = "local"
+    model: str = "all-MiniLM-L6-v2"
+    
     @classmethod
     def from_env(cls) -> "EmbeddingConfig":
-        """Create from environment variables."""
         return cls(
-            provider=os.environ.get("EMBEDDING_PROVIDER", "openai"),
-            model=os.environ.get("EMBEDDING_MODEL", "text-embedding-3-small"),
-            api_key=os.environ.get("OPENAI_API_KEY")
+            provider=os.getenv("EMBEDDING_PROVIDER", "local"),
+            model=os.getenv("EMBEDDING_MODEL", "all-MiniLM-L6-v2")
         )
 
 
 @dataclass
 class ChromaDBConfig:
     """ChromaDB configuration."""
-    persist_directory: str = "data/chromadb"
-    collection_name: str = "troubleshooting"
-
+    host: str = "localhost"
+    port: int = 8000
+    collection: str = "biomed_equipment"
+    
     @classmethod
     def from_env(cls) -> "ChromaDBConfig":
-        """Create from environment variables."""
         return cls(
-            persist_directory=os.environ.get("CHROMADB_PERSIST_DIRECTORY", "data/chromadb"),
-            collection_name=os.environ.get("CHROMADB_COLLECTION", "troubleshooting")
+            host=os.getenv("CHROMADB_HOST", "localhost"),
+            port=int(os.getenv("CHROMADB_PORT", "8000")),
+            collection=os.getenv("CHROMADB_COLLECTION", "biomed_equipment")
         )
 
 
 @dataclass
-class LangSmithConfig:
-    """LangSmith configuration."""
-    api_key: Optional[str] = None
-    project: str = "biomed-troubleshooter"
-    endpoint: str = "https://api.smith.langchain.com"
-    enabled: bool = True
-
+class USBConfig:
+    """USB Multimeter configuration."""
+    port: Optional[str] = None  # Auto-detect if None
+    baud_rate: int = 2400
+    timeout: float = 2.0
+    
     @classmethod
-    def from_env(cls) -> "LangSmithConfig":
-        """Create from environment variables."""
+    def from_env(cls) -> "USBConfig":
         return cls(
-            api_key=os.environ.get("LANGCHAIN_API_KEY"),
-            project=os.environ.get("LANGCHAIN_PROJECT", "biomed-troubleshooter"),
-            endpoint=os.environ.get("LANGCHAIN_ENDPOINT", "https://api.smith.langchain.com"),
-            enabled=os.environ.get("LANGCHAIN_TRACING", "true").lower() == "true"
+            port=os.getenv("USB_PORT") or None,
+            baud_rate=int(os.getenv("USB_BAUD_RATE", "2400")),
+            timeout=float(os.getenv("USB_TIMEOUT", "2.0"))
+        )
+
+
+@dataclass
+class MockConfig:
+    """Mock mode configuration."""
+    scenario: str = "cctv-psu-output-rail"
+    
+    @classmethod
+    def from_env(cls) -> "MockConfig":
+        return cls(
+            scenario=os.getenv("MOCK_SCENARIO", "cctv-psu-output-rail")
         )
 
 
 @dataclass
 class AppConfig:
-    """Application configuration."""
-    env: str = "development"
-    debug: bool = True
+    """Main application configuration."""
+    mode: str = "mock"  # "mock" or "usb"
+    debug: bool = False
     log_level: str = "INFO"
-
+    
+    # Sub-configurations
+    llm: LLMConfig = field(default_factory=LLMConfig.from_env)
+    embedding: EmbeddingConfig = field(default_factory=EmbeddingConfig.from_env)
+    chromadb: ChromaDBConfig = field(default_factory=ChromaDBConfig.from_env)
+    usb: USBConfig = field(default_factory=USBConfig.from_env)
+    mock: MockConfig = field(default_factory=MockConfig.from_env)
+    
+    # Paths
+    knowledge_path: Path = field(default_factory=lambda: Path("data/knowledge"))
+    equipment_path: Path = field(default_factory=lambda: Path("data/equipment"))
+    
     @classmethod
     def from_env(cls) -> "AppConfig":
-        """Create from environment variables."""
         return cls(
-            env=os.environ.get("APP_ENV", "development"),
-            debug=os.environ.get("DEBUG", "true").lower() == "true",
-            log_level=os.environ.get("LOG_LEVEL", "INFO")
+            mode=os.getenv("APP_MODE", "mock").lower(),
+            debug=os.getenv("DEBUG", "false").lower() == "true",
+            log_level=os.getenv("LOG_LEVEL", "INFO"),
+            llm=LLMConfig.from_env(),
+            embedding=EmbeddingConfig.from_env(),
+            chromadb=ChromaDBConfig.from_env(),
+            usb=USBConfig.from_env(),
+            mock=MockConfig.from_env()
         )
+    
+    def is_mock_mode(self) -> bool:
+        """Check if running in mock mode."""
+        return self.mode == "mock"
+    
+    def is_usb_mode(self) -> bool:
+        """Check if running in USB mode."""
+        return self.mode == "usb"
+
+
+# Global configuration instance
+_config: Optional[AppConfig] = None
+
+
+def get_config() -> AppConfig:
+    """Get the global configuration instance."""
+    global _config
+    if _config is None:
+        _config = AppConfig.from_env()
+    return _config
+
+
+def reload_config() -> AppConfig:
+    """Reload configuration from environment."""
+    global _config
+    _config = AppConfig.from_env()
+    return _config
 
 
 # =============================================================================
-# Configuration Factory
+# Convenience Functions for Backward Compatibility
 # =============================================================================
 
 def get_llm_config() -> LLMConfig:
     """Get LLM configuration."""
-    return LLMConfig.from_env()
+    return get_config().llm
 
 
 def get_embedding_config() -> EmbeddingConfig:
     """Get embedding configuration."""
-    return EmbeddingConfig.from_env()
+    return get_config().embedding
 
 
 def get_chromadb_config() -> ChromaDBConfig:
     """Get ChromaDB configuration."""
-    return ChromaDBConfig.from_env()
+    return get_config().chromadb
 
 
-def get_langsmith_config() -> LangSmithConfig:
+def get_langsmith_config() -> dict:
     """Get LangSmith configuration."""
-    return LangSmithConfig.from_env()
+    import os
+    return {
+        "api_key": os.getenv("LANGCHAIN_API_KEY"),
+        "project": os.getenv("LANGCHAIN_PROJECT", "biomed-troubleshooter"),
+        "tracing": os.getenv("LANGCHAIN_TRACING", "true").lower() == "true"
+    }
 
 
 def get_app_config() -> AppConfig:
     """Get application configuration."""
-    return AppConfig.from_env()
-
-
-# =============================================================================
-# Environment Variable Setup
-# =============================================================================
-
-def setup_environment() -> None:
-    """
-    Setup all environment variables from .env file.
-
-    Call this at application startup:
-        from src.infrastructure.config import setup_environment
-        setup_environment()
-    """
-    load_env_file()
+    return get_config()

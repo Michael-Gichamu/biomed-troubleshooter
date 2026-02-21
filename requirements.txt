@@ -1,25 +1,38 @@
-# Biomedical Equipment Troubleshooting Agent
-# Core Dependencies
+# =============================================================================
+# Biomedical Equipment Troubleshooting Agent - Dependencies
+# =============================================================================
 
-# LangGraph & LangChain
-langgraph>=0.0.20
-langchain>=0.1.0
+# Core Framework
+langgraph>=0.4.10
+langchain-core>=0.3.0
+langchain-community>=0.3.0
+
+# LLM Integration
+langchain-groq>=0.2.0
+
+# Embeddings (Local)
+sentence-transformers>=2.2.0
+
+# Vector Database
+chromadb>=0.5.0
+
+# USB Multimeter Support
+pyserial>=3.5
+
+# PDF Support (for knowledge ingestion)
+pypdf>=4.0.0
 
 # Observability
 langsmith>=0.1.0
 
-# Vector Database
-chromadb>=0.4.0
-
-# Data Validation
+# Configuration
+python-dotenv>=1.0.0
 pydantic>=2.0.0
+pyyaml>=6.0
 
 # CLI
-click>=8.0.0
+colorama>=0.4.6
 
-# Testing
-pytest>=7.0.0
-pytest-cov>=4.0.0
-
-# Utilities
-python-dateutil>=2.8.0
+# Development
+pytest>=8.0.0
+pytest-asyncio>=0.23.0

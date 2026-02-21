@@ -21,6 +21,7 @@ from src.domain.models import (
     EquipmentId,
     SignalInterpreter,
     HypothesisGenerator,
+    RecommendationGenerator,
     WorkflowType,
     ReasoningStep,
 )
@@ -213,15 +214,22 @@ def retrieve_evidence(state: AgentState) -> AgentState:
         return state
 
     # Retrieve evidence
-    evidence = rag.retrieve(
+    documents = rag.retrieve(
         query=query,
         equipment_model=state.equipment_model,
         top_k=5
     )
 
+    # Convert to dict format for compatibility
+    evidence = {
+        "documents": [doc.to_dict() for doc in documents],
+        "rules": [],
+        "query": query
+    }
+    
     state.retrieved_evidence = evidence
 
-    print(f"  [OK] Retrieved {len(evidence.get('documents', []))} documents")
+    print(f"  [OK] Retrieved {len(evidence['documents'])} documents")
     return state
 
 
@@ -278,6 +286,49 @@ def analyze_fault(state: AgentState) -> AgentState:
         signal_states=state.signal_states,
         evidence=evidence
     )
+
+    # Try LLM diagnosis if available
+    llm_diagnosis = None
+    try:
+        from src.infrastructure.llm_client import create_llm_client
+        llm_client = create_llm_client()
+        if llm_client and llm_client.is_available():
+            print(f"  [LLM] Calling Groq for intelligent diagnosis...")
+            
+            # Prepare measurements for LLM from raw_measurements + signal_states
+            measurements_for_llm = []
+            for m in state.raw_measurements:
+                tp_id = m["test_point"]
+                meas = {
+                    "test_point": tp_id,
+                    "value": m["value"],
+                    "unit": m["unit"],
+                    "anomaly": None
+                }
+                # Check if this test point has an anomaly
+                if tp_id in state.signal_states:
+                    state_str = state.signal_states[tp_id]
+                    if state_str not in ("normal", "ok"):
+                        meas["anomaly"] = {"type": state_str}
+                measurements_for_llm.append(meas)
+            
+            llm_diagnosis = llm_client.diagnose(
+                equipment_model=state.equipment_model,
+                symptom_description=state.trigger_content or "Equipment malfunction detected",
+                measurements=measurements_for_llm,
+                evidence=state.retrieved_evidence.get("documents", [])
+            )
+            
+            if llm_diagnosis and "primary_cause" in llm_diagnosis:
+                print(f"  [LLM] Diagnosis: {llm_diagnosis['primary_cause'][:50]}...")
+                # Merge LLM diagnosis with rule-based
+                if float(llm_diagnosis.get("confidence", 0)) > float(hypothesis.get("confidence", 0)):
+                    hypothesis = llm_diagnosis
+                    hypothesis["source"] = "llm"
+                else:
+                    hypothesis["llm_diagnosis"] = llm_diagnosis
+    except Exception as e:
+        print(f"  [WARN] LLM diagnosis failed: {e}")
 
     state.hypothesis = hypothesis
 
@@ -523,18 +574,19 @@ def run_diagnostic(
 
     # Run graph
     graph = compile_graph()
-    result = graph.invoke(state)
+    config = {"configurable": {"thread_id": state.session_id}}
+    result = graph.invoke(state, config=config)
 
     elapsed_ms = int((time.time() - start) * 1000)
-    result.processing_time_ms = elapsed_ms
+    result["processing_time_ms"] = elapsed_ms
 
     print("\n" + "=" * 60)
     print(f"COMPLETE ({elapsed_ms}ms)")
     print("=" * 60)
-    print(f"Nodes: {' → '.join(result.node_history)}")
-    print(f"Status: {'error' if result.response.get('error') else 'success'}")
+    print(f"Nodes: {' -> '.join(result.get('node_history', []))}")
+    print(f"Status: {'error' if result.get('response', {}).get('error') else 'success'}")
 
-    return result.response
+    return result
 
 
 if __name__ == "__main__":

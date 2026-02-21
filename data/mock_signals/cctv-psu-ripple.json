@@ -1,0 +1,95 @@
+{
+  "scenario_name": "CCTV PSU Ripple and Noise",
+  "equipment_id": "CCTV-PSU-24W-V1",
+  "category": "Power Supply",
+  "difficulty": "medium",
+  "description": "Excessive ripple voltage on output, indicating filter capacitor failure or insufficient smoothing",
+  "signals": [
+    {
+      "test_point": {
+        "id": "TP1",
+        "name": "Primary Input",
+        "description": "AC mains input voltage"
+      },
+      "value": 230.0,
+      "unit": "V",
+      "accuracy": 0.5,
+      "measurement_type": "voltage",
+      "timestamp": "2026-02-04T14:30:00Z"
+    },
+    {
+      "test_point": {
+        "id": "TP2",
+        "name": "Output Rail",
+        "description": "24V DC output - Normal average voltage"
+      },
+      "value": 24.2,
+      "unit": "V",
+      "accuracy": 0.1,
+      "measurement_type": "voltage",
+      "timestamp": "2026-02-04T14:30:05Z"
+    },
+    {
+      "test_point": {
+        "id": "TP4",
+        "name": "Ripple Voltage",
+        "description": "AC component on DC output - EXCESSIVE",
+        "nominal_ripple": 50,
+        "unit": "mVpp"
+      },
+      "value": 2.5,
+      "unit": "Vpp",
+      "accuracy": 0.01,
+      "measurement_type": "voltage_ac",
+      "timestamp": "2026-02-04T14:30:05Z",
+      "anomaly": {
+        "type": "high_ripple",
+        "severity": "medium",
+        "expected_max": 0.05,
+        "actual_value": 2.5,
+        "deviation_percent": 4900,
+        "impact": "May cause interference in connected audio/video equipment"
+      }
+    }
+  ],
+  "expected_diagnosis": {
+    "primary_cause": "Excessive ripple voltage - likely failed output filter capacitor",
+    "confidence": "high",
+    "severity": "medium",
+    "fault_types": ["ripple", "noise"],
+    "recommended_actions": [
+      "Replace output filter capacitors",
+      "Check input bridge rectifier",
+      "Verify transformer secondary resistance",
+      "Test LC filter components",
+      "Check for loose solder joints"
+    ],
+    "related_components": [
+      "Output filter capacitors",
+      "Input bridge rectifier",
+      "Transformer secondary",
+      "LC filter network"
+    ]
+  },
+  "troubleshooting_notes": {
+    "common_causes": [
+      "Failed output capacitor",
+      "Degraded electrolytic capacitor",
+      "Open filter inductor",
+      "Failed bridge rectifier",
+      "Loose PCB connection"
+    ],
+    "safety_warnings": [
+      "Capacitors can hold charge - discharge before handling",
+      "Ripple measurement requires oscilloscope",
+      "Use proper probing technique to avoid false readings"
+    ],
+    "test_procedure": [
+      "1. Connect oscilloscope to output",
+      "2. Set to AC coupling, 100mV/div",
+      "3. Measure peak-to-peak ripple",
+      "4. Check capacitor ESR with meter",
+      "5. Verify ripple frequency (should be 100-120Hz for linear supply)"
+    ]
+  }
+}

@@ -451,3 +451,79 @@ class HypothesisGenerator:
         """Find fault matching observed signal states."""
         matcher = FaultMatcher(self.fault_configs)
         return matcher.find_matching_fault(signal_states)
+
+
+# =============================================================================
+# SIGNAL BATCH MODELS (For CLI and Mock Mode)
+# =============================================================================
+
+@dataclass
+class Signal:
+    """A signal measurement with test point and value."""
+    test_point: TestPoint
+    value: float
+    unit: str
+    measurement_type: str = "voltage"
+    accuracy: float = 0.1
+    timestamp: str = ""
+    anomaly: Optional[dict] = None
+
+    def to_dict(self) -> dict:
+        """Convert to dictionary."""
+        return {
+            "test_point": {
+                "id": self.test_point.id,
+                "name": self.test_point.name,
+                "location": self.test_point.location
+            },
+            "value": self.value,
+            "unit": self.unit,
+            "measurement_type": self.measurement_type,
+            "accuracy": self.accuracy,
+            "timestamp": self.timestamp,
+            "anomaly": self.anomaly
+        }
+
+
+@dataclass
+class SignalBatch:
+    """A batch of signals from equipment."""
+    timestamp: str = ""
+    equipment_id: str = ""
+    signals: list[Signal] = field(default_factory=list)
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "SignalBatch":
+        """Create SignalBatch from dictionary (JSON data)."""
+        signals = []
+        for sig_data in data.get("signals", []):
+            tp_data = sig_data.get("test_point", {})
+            test_point = TestPoint(
+                id=tp_data.get("id", "TP1"),
+                name=tp_data.get("name", "Unknown"),
+                location=tp_data.get("location")
+            )
+            signal = Signal(
+                test_point=test_point,
+                value=sig_data.get("value", 0.0),
+                unit=sig_data.get("unit", "V"),
+                measurement_type=sig_data.get("measurement_type", "voltage"),
+                accuracy=sig_data.get("accuracy", 0.1),
+                timestamp=sig_data.get("timestamp", ""),
+                anomaly=sig_data.get("anomaly")
+            )
+            signals.append(signal)
+
+        return cls(
+            timestamp=data.get("timestamp", ""),
+            equipment_id=data.get("equipment_id", data.get("scenario_name", "")),
+            signals=signals
+        )
+
+    def to_dict(self) -> dict:
+        """Convert to dictionary."""
+        return {
+            "timestamp": self.timestamp,
+            "equipment_id": self.equipment_id,
+            "signals": [s.to_dict() for s in self.signals]
+        }

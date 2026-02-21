@@ -1,0 +1,108 @@
+{
+  "scenario_name": "CCTV PSU Thermal Shutdown",
+  "equipment_id": "CCTV-PSU-24W-V1",
+  "category": "Power Supply",
+  "difficulty": "easy",
+  "description": "Device entering thermal protection due to inadequate cooling or excessive load",
+  "signals": [
+    {
+      "test_point": {
+        "id": "TP1",
+        "name": "Primary Input",
+        "description": "AC mains input voltage"
+      },
+      "value": 230.0,
+      "unit": "V",
+      "accuracy": 0.5,
+      "measurement_type": "voltage",
+      "timestamp": "2026-02-04T14:30:00Z"
+    },
+    {
+      "test_point": {
+        "id": "TP2",
+        "name": "Output Rail",
+        "description": "24V DC output - INTERMITTENT OR ZERO"
+      },
+      "value": 0.0,
+      "unit": "V",
+      "accuracy": 0.1,
+      "measurement_type": "voltage",
+      "timestamp": "2026-02-04T14:30:05Z",
+      "anomaly": {
+        "type": "thermal_shutdown",
+        "severity": "medium",
+        "expected_value": 24.0,
+        "actual_value": 0.0,
+        "description": "Output disabled due to thermal protection"
+      }
+    },
+    {
+      "test_point": {
+        "id": "TP5",
+        "name": "Temperature",
+        "description": "Internal temperature sensor",
+        "nominal_temp": 45,
+        "max_temp": 70,
+        "shutdown_temp": 85,
+        "unit": "°C"
+      },
+      "value": 82.0,
+      "unit": "°C",
+      "accuracy": 1.0,
+      "measurement_type": "temperature",
+      "timestamp": "2026-02-04T14:30:05Z",
+      "anomaly": {
+        "type": "over_temperature",
+        "severity": "high",
+        "nominal_value": 45,
+        "actual_value": 82,
+        "deviation_percent": 82.2,
+        "shutdown_threshold": 85
+      }
+    }
+  ],
+  "expected_diagnosis": {
+    "primary_cause": "Thermal shutdown - device overheating due to poor ventilation or excessive load",
+    "confidence": "high",
+    "severity": "medium",
+    "fault_types": ["thermal", "shutdown"],
+    "recommended_actions": [
+      "Allow unit to cool down before testing",
+      "Check for blocked ventilation openings",
+      "Clean accumulated dust from heatsinks",
+      "Verify load does not exceed rated current",
+      "Check room ambient temperature",
+      "Inspect thermal paste on power transistors"
+    ],
+    "related_components": [
+      "Heat sink",
+      "Thermal paste",
+      "Ventilation openings",
+      "Power transistors",
+      "Thermal fuse"
+    ]
+  },
+  "troubleshooting_notes": {
+    "common_causes": [
+      "Blocked ventilation",
+      "Accumulated dust on heatsink",
+      "Excessive ambient temperature",
+      "Overloaded power supply",
+      "Failed cooling fan",
+      "Dried thermal paste"
+    ],
+    "safety_warnings": [
+      "Allow unit to cool before opening",
+      "Thermal paste may be hot",
+      "Do not bypass thermal protection"
+    ],
+    "test_procedure": [
+      "1. Allow unit to cool completely",
+      "2. Clean all ventilation openings",
+      "3. Check load current is within rating",
+      "4. Verify cooling fan operation (if present)",
+      "5. Reapply thermal paste if needed",
+      "6. Test in well-ventilated area"
+    ]
+  }
+}

@@ -1,0 +1,89 @@
+{
+  "scenario_name": "CCTV PSU Overvoltage Condition",
+  "equipment_id": "CCTV-PSU-24W-V1",
+  "category": "Power Supply",
+  "difficulty": "medium",
+  "description": "Output voltage exceeded 24V spec, indicating regulation circuit failure - dangerous to connected equipment",
+  "signals": [
+    {
+      "test_point": {
+        "id": "TP1",
+        "name": "Primary Input",
+        "description": "AC mains input voltage"
+      },
+      "value": 230.0,
+      "unit": "V",
+      "accuracy": 0.5,
+      "measurement_type": "voltage",
+      "timestamp": "2026-02-04T14:30:00Z"
+    },
+    {
+      "test_point": {
+        "id": "TP2",
+        "name": "Output Rail",
+        "description": "24V DC output - OVERVOLTAGE - SHOULD NOT EXCEED 26V",
+        "location": "Output terminals",
+        "nominal_value": 24.0,
+        "max_value": 26.0,
+        "absolute_max": 28.0
+      },
+      "value": 28.5,
+      "unit": "V",
+      "accuracy": 0.1,
+      "measurement_type": "voltage",
+      "timestamp": "2026-02-04T14:30:05Z",
+      "anomaly": {
+        "type": "overvoltage",
+        "severity": "critical",
+        "expected_value": 24.0,
+        "actual_value": 28.5,
+        "deviation_percent": 18.75,
+        "risk": "Can damage connected CCTV cameras"
+      }
+    }
+  ],
+  "expected_diagnosis": {
+    "primary_cause": "Overvoltage condition - voltage regulator failure or feedback loop broken",
+    "confidence": "high",
+    "severity": "critical",
+    "fault_types": ["overvoltage"],
+    "recommended_actions": [
+      "IMMEDIATELY disconnect load to prevent damage",
+      "Check voltage regulator IC for failure",
+      "Verify feedback voltage divider resistors",
+      "Test error amplifier in regulation circuit",
+      "Inspect optocoupler in feedback circuit",
+      "Check primary side PWM controller"
+    ],
+    "related_components": [
+      "Voltage regulator IC",
+      "Feedback voltage divider",
+      "Error amplifier",
+      "PWM controller",
+      "Optocoupler"
+    ]
+  },
+  "troubleshooting_notes": {
+    "common_causes": [
+      "Failed voltage regulator",
+      "Open feedback resistor",
+      "Failed error amplifier",
+      "Blown optocoupler",
+      "PWM controller malfunction"
+    ],
+    "safety_warnings": [
+      "CRITICAL: Overvoltage can damage connected equipment",
+      "Disconnect load immediately",
+      "Use voltage limiter during testing",
+      "Monitor voltage during all tests"
+    ],
+    "test_procedure": [
+      "1. Disconnect load immediately",
+      "2. Measure output with multimeter",
+      "3. Check regulation IC datasheet for failure modes",
+      "4. Verify feedback resistors for open circuit",
+      "5. Test optocoupler with diode test",
+      "6. Check PWM controller output"
+    ]
+  }
+}

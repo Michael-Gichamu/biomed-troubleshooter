@@ -1,0 +1,98 @@
+{
+  "scenario_name": "CCTV PSU Output Rail Collapse",
+  "equipment_id": "CCTV-PSU-24W-V1",
+  "category": "Power Supply",
+  "difficulty": "easy",
+  "description": "24V output rail collapsed to 12V, indicating possible load short or regulation failure",
+  "signals": [
+    {
+      "test_point": {
+        "id": "TP1",
+        "name": "Primary Input",
+        "description": "AC mains input voltage",
+        "location": "Input connector"
+      },
+      "value": 230.0,
+      "unit": "V",
+      "accuracy": 0.5,
+      "measurement_type": "voltage",
+      "timestamp": "2026-02-04T14:30:00Z"
+    },
+    {
+      "test_point": {
+        "id": "TP2",
+        "name": "Output Rail",
+        "description": "24V DC output - SHOULD BE 24V, MEASURING 12.3V",
+        "location": "Output terminals",
+        "nominal_value": 24.0,
+        "tolerance": 0.1
+      },
+      "value": 12.3,
+      "unit": "V",
+      "accuracy": 0.1,
+      "measurement_type": "voltage",
+      "timestamp": "2026-02-04T14:30:05Z",
+      "anomaly": {
+        "type": "collapsed_output",
+        "severity": "high",
+        "expected_value": 24.0,
+        "actual_value": 12.3,
+        "deviation_percent": -48.75
+      }
+    },
+    {
+      "test_point": {
+        "id": "TP3",
+        "name": "Output Current",
+        "description": "Load current draw",
+        "location": "Output circuit",
+        "nominal_value": 1.0,
+        "max_value": 1.2
+      },
+      "value": 0.52,
+      "unit": "A",
+      "accuracy": 0.01,
+      "measurement_type": "current",
+      "timestamp": "2026-02-04T14:30:05Z"
+    }
+  ],
+  "expected_diagnosis": {
+    "primary_cause": "Output rail collapsed - possible load short or regulation failure",
+    "confidence": "high",
+    "severity": "critical",
+    "fault_types": ["output_failure"],
+    "recommended_actions": [
+      "Check for short circuit on output terminals",
+      "Verify output capacitor integrity using ESR meter",
+      "Check voltage regulator IC for proper operation",
+      "Inspect secondary winding of transformer",
+      "Verify no excessive load on the power supply"
+    ],
+    "related_components": [
+      "Output filter capacitors",
+      "Voltage regulator IC",
+      "Transformer secondary",
+      "Output transistors"
+    ]
+  },
+  "troubleshooting_notes": {
+    "common_causes": [
+      "Shorted output capacitor",
+      "Failed voltage regulator",
+      "Open secondary winding",
+      "Blown output transistor"
+    ],
+    "safety_warnings": [
+      "Disconnect power before inspecting",
+      "Capacitors may hold charge - discharge safely",
+      "Use appropriate PPE when working with mains voltage"
+    ],
+    "test_procedure": [
+      "1. Disconnect load and measure output voltage",
+      "2. If voltage returns to normal, problem is in load",
+      "3. If still low, check output capacitors",
+      "4. Test regulator IC inputs and outputs",
+      "5. Verify transformer secondary resistance"
+    ]
+  }
+}
