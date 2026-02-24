@@ -12,6 +12,11 @@ from dotenv import load_dotenv
 from pathlib import Path
 from langgraph.graph import START, StateGraph
 
+# Load environment variables at module level (before async context)
+# Use Path(__file__).parent without .resolve() to avoid blocking os.getcwd() call
+_env_path = Path(__file__).parent.parent.parent / '.env'
+load_dotenv(dotenv_path=_env_path)
+
 from src.application.agent import (
     validate_input,
     interpret_signals,
@@ -56,56 +61,25 @@ def create_diagnostic_graph() -> "StateGraph":
     return graph
 
 
-def graph(input_state: dict) -> dict:
+def graph():
     """
-    Simple graph function for LangGraph Studio.
+    Return the compiled diagnostic graph for LangGraph Studio.
     
-    Args:
-        input_state: Dictionary with:
-            - equipment_model: str
-            - equipment_serial: str
-            - trigger_type: str
-            - trigger_content: str
-            - measurements: list[dict] with test_point, value, unit
+    This is a factory function that returns the graph definition.
+    LangGraph Studio calls this to get the graph for visualization.
+    Invocation happens separately when users run the graph from Studio.
     
     Returns:
-        Graph execution result
+        Compiled StateGraph for the diagnostic workflow
     """
-    # Load environment variables
-    env_path = Path(__file__).resolve().parent.parent.parent / '.env'
-    load_dotenv(dotenv_path=env_path)
+    # Environment variables are loaded at module level
     
-    # Create the graph
-    diagnostic_graph = create_diagnostic_graph()
-    
-    # Convert input to AgentState (using correct field names)
-    state = AgentState(
-        equipment_model=input_state.get("equipment_model", "CCTV-PSU-24W-V1"),
-        equipment_serial=input_state.get("equipment_serial", ""),
-        trigger_type=input_state.get("trigger_type", "symptom_report"),
-        trigger_content=input_state.get("trigger_content", "Equipment malfunction"),
-        raw_measurements=input_state.get("measurements", []),
-    )
-    
-    # Invoke the graph
-    result = diagnostic_graph.invoke(state)
-    
-    return result
+    # Build and return the graph (don't invoke it)
+    return create_diagnostic_graph()
 
 
 if __name__ == "__main__":
-    # Test the graph directly
-    test_input = {
-        "equipment_model": "CCTV-PSU-24W-V1",
-        "equipment_serial": "TEST-001",
-        "trigger_type": "symptom_report",
-        "trigger_content": "Equipment not functioning properly",
-        "measurements": [
-            {"test_point": "TP1", "value": 230.0, "unit": "V"},
-            {"test_point": "TP2", "value": 12.3, "unit": "V"},
-            {"test_point": "TP3", "value": 0.52, "unit": "A"},
-        ]
-    }
-    
-    result = graph(test_input)
-    print("Graph result:", result)
+    # Test the graph factory
+    compiled_graph = graph()
+    print("Graph compiled successfully!")
+    print(f"Graph nodes: {list(compiled_graph.nodes.keys())}")
