@@ -67,6 +67,38 @@ class RAGRepository:
             self._client = create_chromadb_client()
         self._client.initialize()
 
+    def add_document(
+        self,
+        content: str,
+        metadata: dict,
+        doc_id: Optional[str] = None
+    ) -> str:
+        """
+        Add a document to the knowledge base.
+
+        Args:
+            content: Document text content
+            metadata: Document metadata
+            doc_id: Optional document ID (auto-generated if not provided)
+
+        Returns:
+            Document ID
+        """
+        if not self.is_available:
+            self.initialize()
+
+        import uuid
+        if doc_id is None:
+            doc_id = str(uuid.uuid4())
+
+        self._client.add_documents(
+            documents=[content],
+            metadatas=[metadata],
+            ids=[doc_id]
+        )
+
+        return doc_id
+
     def retrieve(
         self,
         query: str,

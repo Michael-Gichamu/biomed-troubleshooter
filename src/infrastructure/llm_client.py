@@ -42,7 +42,7 @@ class LLMClient:
     
     def initialize(self) -> None:
         """Initialize the LLM client."""
-        if not self.is_available:
+        if not self.is_available():
             raise RuntimeError("LLM API key not configured")
         
         try:

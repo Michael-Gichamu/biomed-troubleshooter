@@ -129,6 +129,7 @@ class FaultConfig:
     fault_id: str
     name: str
     description: str
+    priority: int = 999  # Lower number = higher priority
     signatures: List[Dict[str, Any]] = field(default_factory=list)
     hypotheses: List[FaultHypothesis] = field(default_factory=list)
     recovery: List[RecoveryStep] = field(default_factory=list)
@@ -141,6 +142,7 @@ class FaultConfig:
             fault_id=data["fault_id"],
             name=data["name"],
             description=data["description"],
+            priority=data.get("priority", 999),
             signatures=data.get("signatures", []),
             hypotheses=hypotheses,
             recovery=recovery

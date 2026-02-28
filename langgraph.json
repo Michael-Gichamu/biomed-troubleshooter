@@ -1,10 +1,10 @@
 {
   "dockerfile_lines": [],
   "graphs": {
-    "diagnostic_agent": "./src/studio/langgraph_studio.py:graph"
+    "conversational_agent": "./src/studio/conversational_agent.py:graph"
   },
   "env": "./.env",
-  "python_version": "3.11",
+  "python_version": "3.13",
   "dependencies": [
     "."
   ]

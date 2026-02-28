@@ -16,6 +16,7 @@ print(f"LangChain Project: {langchain_project}")
 
 import json
 import argparse
+import time
 from pathlib import Path
 from typing import Optional
 
@@ -140,13 +141,13 @@ def run_mock_mode(scenario: str = "cctv-psu-output-rail") -> dict:
 
 def run_usb_mode(equipment_id: str, timeout: int = 60) -> None:
     """
-    Run agent in USB multimeter mode.
+    Run agent in USB multimeter mode with INTERACTIVE agent guidance after each measurement.
 
     Args:
         equipment_id: Equipment ID being tested
         timeout: Seconds to wait for measurements
     """
-    print_header("USB MULTIMETER MODE - Biomedical Troubleshooting Agent")
+    print_header("USB MULTIMETER MODE - Interactive Troubleshooting Agent")
     print(f"Equipment: {equipment_id}")
     print(f"Timeout: {timeout} seconds")
     print("\nPress Ctrl+C to exit\n")
@@ -174,31 +175,120 @@ def run_usb_mode(equipment_id: str, timeout: int = 60) -> None:
         return
 
     print(f"Connected to multimeter!")
-    print("\nTaking measurements...")
-    print("Connect probes to test points and press Enter after each measurement.")
+    print("\nTaking measurements with agent guidance...")
+    print("After each measurement, the agent will analyze it and guide your next step.")
     print()
 
+    # Skip initial analysis - we'll analyze after each measurement
+    print("="*60)
+    print("Ready to take measurements...")
+    print("The agent will guide you after each measurement you take.")
+    print("="*60 + "\n")
+    
+    # Store initial recommendations for display
+    initial_recommendations = []
+    
+    # Initialize measurement tracking
+    measurements = []
+    test_point_id = 1
+    start_time = time.time()
+    last_reading = None
+    
     try:
-        measurements = []
-        test_point_id = 1
-        
-        while True:
-            input(f"Press Enter to take measurement {test_point_id} (or 'q' to finish): ")
+        while time.time() - start_time < timeout:
+            print(f"\n[Step {test_point_id}] Waiting for measurement...")
+            print("(IMPORTANT: Change multimeter mode/rotary switch to trigger a reading)")
+            print("(e.g., switch from DC Voltage to Continuity, or to a different range)")
             
-            reading = client.read_measurement(timeout=5.0)
+            # Wait longer for MS8250D which only sends on mode change
+            reading = client.read_measurement(timeout=30.0)
+            
             if reading:
-                measurements.append({
-                    "test_point": f"TP{test_point_id}",
-                    "value": reading.value,
-                    "unit": reading.unit
-                })
-                print(f"  Recorded: {reading.value} {reading.unit} ({reading.measurement_type})")
-                test_point_id += 1
+                # Only record if we get a new distinct reading
+                if last_reading is None or reading.value != last_reading.value or reading.unit != last_reading.unit:
+                    
+                    # Collect multiple readings to get stable average
+                    print("\n  Collecting readings for stability...")
+                    readings_for_avg = [reading]
+                    stable_timeout = time.time() + 5  # Collect for 5 seconds
+                    
+                    while time.time() < stable_timeout:
+                        extra_reading = client.read_measurement(timeout=1.0)
+                        if extra_reading and extra_reading.unit == reading.unit:
+                            readings_for_avg.append(extra_reading)
+                            print(f"    Sample: {extra_reading.value} {extra_reading.unit}")
+                        else:
+                            break
+                    
+                    # Smart filtering: only average stable values (within threshold)
+                    if len(readings_for_avg) > 1:
+                        values = [r.value for r in readings_for_avg]
+                        mean_val = sum(values) / len(values)
+                        
+                        # Filter: keep only values within 5% of mean (stable readings)
+                        threshold = abs(mean_val) * 0.05  # 5% tolerance
+                        if threshold < 0.5:  # Minimum threshold of 0.5 for small values
+                            threshold = 0.5
+                        
+                        stable_values = [v for v in values if abs(v - mean_val) <= threshold]
+                        
+                        if len(stable_values) >= 2:
+                            avg_value = sum(stable_values) / len(stable_values)
+                            print(f"\n  [Filtered] {len(stable_values)} stable values (within +/-{threshold:.2f})")
+                            print(f"  [Averaged] {avg_value:.2f} {reading.unit} (from {len(stable_values)}/{len(values)} samples)")
+                            final_value = avg_value
+                        else:
+                            print(f"\n  [WARN] Readings too unstable - using first value")
+                            final_value = reading.value
+                            stable_values = [reading.value]
+                    else:
+                        final_value = reading.value
+                    
+                    measurement = {
+                        "test_point": f"TP{test_point_id}",
+                        "value": final_value,
+                        "unit": reading.unit
+                    }
+                    measurements.append(measurement)
+                    print(f"\n[OK] Recorded: {final_value:.2f} {reading.unit} ({reading.measurement_type})")
+                    
+                    # INTERACTIVE: Run agent after EACH measurement
+                    print_section("AGENT ANALYSIS")
+                    result = run_diagnostic(
+                        trigger_type="usb_measurement",
+                        trigger_content=f"Live measurement: {final_value:.2f} {reading.unit} ({reading.measurement_type})",
+                        equipment_model=equipment_id,
+                        equipment_serial="USB-001",
+                        measurements=measurements
+                    )
+                    
+                    # Display agent guidance
+                    if "recommended_actions" in result and result["recommended_actions"]:
+                        print("Agent Guidance:")
+                        for action in result["recommended_actions"][:3]:
+                            print(f"  → {action}")
+                    
+                    if "diagnosis" in result and result["diagnosis"]:
+                        diag = result["diagnosis"]
+                        current_diag = diag.get('primary_cause', 'Unknown')
+                        confidence = diag.get('confidence_score', 'Unknown')
+                        print(f"\nCurrent Assessment: {current_diag} (Confidence: {confidence})")
+                    
+                    # Check if we should continue
+                    if "should_continue" in result:
+                        if not result["should_continue"]:
+                            print("\n[Agent] Diagnostic complete! No more measurements needed.")
+                            break
+                    
+                    test_point_id += 1
+                    last_reading = reading
+                else:
+                    print(f"  (Duplicate reading: {reading.value} {reading.unit}, ignoring)")
             else:
-                print("  No reading received. Try again.")
-            
-            if len(measurements) >= 10:
-                print("\nMaximum measurements reached (10)")
+                print("  (No reading detected - check multimeter connection)")
+                
+            if len(measurements) >= 15:
+                print("\nMaximum measurements reached (15)")
                 break
 
     except KeyboardInterrupt:
@@ -208,20 +298,27 @@ def run_usb_mode(equipment_id: str, timeout: int = 60) -> None:
         client.disconnect()
 
     if measurements:
-        print_section("RUNNING DIAGNOSIS")
+        print_section("FINAL DIAGNOSIS")
         result = run_diagnostic(
             trigger_type="usb_measurement",
-            trigger_content="Live USB multimeter measurements",
+            trigger_content="Final diagnosis from all measurements",
             equipment_model=equipment_id,
             equipment_serial="USB-001",
             measurements=measurements
         )
 
-        print_section("Diagnosis Result")
+        print_section("Final Diagnosis Result")
         if "diagnosis" in result:
             diag = result["diagnosis"]
             print(f"  Primary Cause: {diag.get('primary_cause', 'Unknown')}")
             print(f"  Confidence: {diag.get('confidence_score', 'Unknown')}")
+            if "severity" in diag:
+                print(f"  Severity: {diag.get('severity', 'Unknown')}")
+        
+        if "recommended_actions" in result:
+            print("\nFinal Recommended Actions:")
+            for action in result["recommended_actions"]:
+                print(f"  → {action}")
 
     print("\nDisconnected from multimeter.")
 

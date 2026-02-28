@@ -86,7 +86,7 @@ class AgentState:
 # NODES (Data-driven, no equipment-specific logic)
 # =============================================================================
 
-def validate_input(state: AgentState) -> AgentState:
+def validate_input(state: AgentState) -> dict:
     """
     Node: Validate incoming request.
 
@@ -97,30 +97,30 @@ def validate_input(state: AgentState) -> AgentState:
     """
     print(f"\n[NODE] validate_input | session={state.session_id[:8] if state.session_id else 'none'}")
 
-    state.node_history.append("validate_input")
+    updates = {"node_history": state.node_history + ["validate_input"]}
 
     # Validate required fields
     if not state.equipment_model:
-        state.is_valid = False
-        state.validation_error = "Equipment model is required"
-        return state
+        updates["is_valid"] = False
+        updates["validation_error"] = "Equipment model is required"
+        return updates
 
     if not state.raw_measurements:
-        state.is_valid = False
-        state.validation_error = "At least one measurement is required"
-        return state
+        updates["is_valid"] = False
+        updates["validation_error"] = "At least one measurement is required"
+        return updates
 
     # Determine workflow type from trigger
     if state.trigger_type in ("follow_up", "verification"):
-        state.workflow_type = WorkflowType.FOLLOW_UP
+        updates["workflow_type"] = WorkflowType.FOLLOW_UP
     else:
-        state.workflow_type = WorkflowType.INITIAL
+        updates["workflow_type"] = WorkflowType.INITIAL
 
-    print(f"  [OK] Validated: workflow={state.workflow_type}")
-    return state
+    print(f"  [OK] Validated: workflow={updates.get('workflow_type', state.workflow_type)}")
+    return updates
 
 
-def interpret_signals(state: AgentState) -> AgentState:
+def interpret_signals(state: AgentState) -> dict:
     """
     Node: Interpret raw measurements into semantic states.
 
@@ -130,7 +130,8 @@ def interpret_signals(state: AgentState) -> AgentState:
                 (states come from equipment config, NOT hard-coded)
     """
     print(f"\n[NODE] interpret_signals | count={len(state.raw_measurements)}")
-    state.node_history.append("interpret_signals")
+
+    updates = {"node_history": state.node_history + ["interpret_signals"]}
 
     # Load equipment configuration
     try:
@@ -178,19 +179,19 @@ def interpret_signals(state: AgentState) -> AgentState:
     signal_states, status = interpreter.interpret(signal_collection)
 
     # Serialize state: signal_id -> semantic state
-    state.signal_states = {
+    updates["signal_states"] = {
         s.measurement.test_point.id: s.state
         for s in signal_states
     }
 
-    state.overall_status = status
-    state.anomaly_count = sum(1 for s in signal_states if s.is_anomaly())
+    updates["overall_status"] = status
+    updates["anomaly_count"] = sum(1 for s in signal_states if s.is_anomaly())
 
-    print(f"  [OK] Status: {state.overall_status} | anomalies: {state.anomaly_count}")
-    return state
+    print(f"  [OK] Status: {status} | anomalies: {updates['anomaly_count']}")
+    return updates
 
 
-def retrieve_evidence(state: AgentState) -> AgentState:
+def retrieve_evidence(state: AgentState) -> dict:
     """
     Node: Retrieve evidence from RAG and equipment config.
 
@@ -199,7 +200,8 @@ def retrieve_evidence(state: AgentState) -> AgentState:
         Output: Evidence from knowledge base
     """
     print(f"\n[NODE] retrieve_evidence")
-    state.node_history.append("retrieve_evidence")
+    
+    updates = {"node_history": state.node_history + ["retrieve_evidence"]}
 
     # Build query from trigger content
     query = state.trigger_content or "troubleshoot power supply"
@@ -210,8 +212,8 @@ def retrieve_evidence(state: AgentState) -> AgentState:
         rag.initialize()
     except RuntimeError as e:
         print(f"  [WARN] RAG unavailable: {e}")
-        state.retrieved_evidence = {"documents": [], "rules": [], "error": str(e)}
-        return state
+        updates["retrieved_evidence"] = {"documents": [], "rules": [], "error": str(e)}
+        return updates
 
     # Retrieve evidence
     documents = rag.retrieve(
@@ -227,10 +229,10 @@ def retrieve_evidence(state: AgentState) -> AgentState:
         "query": query
     }
     
-    state.retrieved_evidence = evidence
+    updates["retrieved_evidence"] = evidence
 
     print(f"  [OK] Retrieved {len(evidence['documents'])} documents")
-    return state
+    return updates
 
 
 def analyze_fault(state: AgentState) -> AgentState:
@@ -466,18 +468,18 @@ def generate_response(state: AgentState) -> AgentState:
     return state
 
 
-def return_error(state: AgentState) -> AgentState:
+def return_error(state: AgentState) -> dict:
     """Node: Return error response."""
     print(f"\n[NODE] return_error | {state.validation_error}")
-    state.node_history.append("return_error")
-
-    state.response = {
-        "error": True,
-        "message": state.validation_error or "Validation failed",
-        "session_id": state.session_id
+    
+    return {
+        "node_history": state.node_history + ["return_error"],
+        "response": {
+            "error": True,
+            "message": state.validation_error or "Validation failed",
+            "session_id": state.session_id
+        }
     }
-
-    return state
 
 
 # =============================================================================
@@ -522,6 +524,9 @@ def build_graph() -> StateGraph:
             "return_error": "return_error"
         }
     )
+
+    # Add edge from error node to END
+    builder.add_edge("return_error", END)
 
     return builder
 

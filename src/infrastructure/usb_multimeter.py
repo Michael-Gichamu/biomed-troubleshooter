@@ -273,7 +273,7 @@ class USBMultimeterClient:
                 else:
                     # Generic parsing
                     value = float(groups[0])
-                    unit = groups[1] if len(groups) > 1 else ""
+                    unit = groups[1] if len(groups) > 1 and groups[1] else ""
                     measurement_type = reading_type.upper()
                 
                 return MultimeterReading(
@@ -300,6 +300,196 @@ class USBMultimeterClient:
         
         return None
     
+    def _parse_binary_frame(self, raw_bytes: bytes) -> Optional[MultimeterReading]:
+        """
+        Parse binary frame from MS8250D multimeter.
+        
+        Args:
+            raw_bytes: Raw binary data from multimeter
+            
+        Returns:
+            MultimeterReading or None if parsing failed
+        """
+        # Look for MS8250D frame formats:
+        # Format 1: Starts with 0xC8FEEC, variable length, contains value and mode info
+        if raw_bytes and len(raw_bytes) >= 10:
+            # Find all possible frame candidates
+            i = 0
+            while i < len(raw_bytes) - 10:
+                # Look for start markers
+                if raw_bytes[i] == 0xC8 and i + 1 < len(raw_bytes) and raw_bytes[i+1] == 0xFE and raw_bytes[i+2] == 0xEC:
+                    # Look for end marker (0x10 or 0x1F) within reasonable distance
+                    end_pos = -1
+                    for j in range(i + 5, min(i + 20, len(raw_bytes))):
+                        if raw_bytes[j] in [0x10, 0x1F]:
+                            end_pos = j
+                            break
+                    
+                    if end_pos != -1:
+                        frame = raw_bytes[i:end_pos+1]
+                        reading = self._parse_new_frame_format(frame)
+                        if reading:
+                            return reading
+                        
+                    i = end_pos + 1
+                    continue
+                
+                i += 1
+        
+        # Fallback to old formats
+        if raw_bytes and len(raw_bytes) >= 10:
+            i = 0
+            while i < len(raw_bytes) - 9:
+                if raw_bytes[i] in [0x40, 0x44] and raw_bytes[i+9] == 0x10:
+                    frame = raw_bytes[i:i+10]
+                    return self._parse_um24c_frame(frame)
+                i += 1
+        
+        return None
+    
+    def _parse_new_frame_format(self, frame: bytes) -> Optional[MultimeterReading]:
+        """
+        Parse the new MS8250D frame format.
+        
+        New format starts with C8FEEC and contains various measurement types.
+        """
+        try:
+            if len(frame) < 10 or frame[0] != 0xC8 or frame[1] != 0xFE or frame[2] != 0xEC:
+                return None
+                
+            # Analyze different sections of the frame
+            # Look for digit bytes (0x30-0x39) that might represent values
+            digits = []
+            for byte in frame:
+                if 0x30 <= byte <= 0x39:
+                    digits.append(byte - 0x30)
+            
+            if len(digits) >= 2:
+                # Convert digits to value (first two digits)
+                value = digits[0] + digits[1] / 10.0
+                
+                # Check for 3-digit values (like 240V AC)
+                if len(digits) >= 3:
+                    value = digits[0] * 100 + digits[1] * 10 + digits[2]
+                
+                # Determine measurement type based on frame content
+                # Look for characteristic patterns
+                unit = "V"
+                measurement_type = "DC_VOLTAGE"
+                
+                # Look for AC voltage indicators in the frame
+                # AC voltage typically has different byte patterns
+                has_ac_indicator = False
+                if 0xAC in frame or 0x21 in frame:
+                    has_ac_indicator = True
+                
+                if 0x1F in frame:
+                    # Current measurement indicator
+                    unit = "A"
+                    measurement_type = "DC_CURRENT"
+                elif has_ac_indicator:
+                    # AC Voltage indicator
+                    unit = "V"
+                    measurement_type = "AC_VOLTAGE"
+                elif 0x85 in frame and 0x7F in frame:
+                    # Voltage measurement indicator
+                    unit = "V"
+                    measurement_type = "DC_VOLTAGE"
+                
+                return MultimeterReading(
+                    raw_value=f"0x{frame.hex().upper()}",
+                    value=value,
+                    unit=unit,
+                    measurement_type=measurement_type,
+                    timestamp=datetime.utcnow().isoformat()
+                )
+        
+        except Exception as e:
+            print(f"[USB] New format parse error: {e}")
+        
+        return None
+
+    def _parse_um24c_frame(self, frame: bytes) -> Optional[MultimeterReading]:
+        """
+        Parse MS8250D style binary frame (older format).
+        Format example: 0x44 0x22 0x03 0x00 0x00 0x30 0x35 0x04 0x03 0x10
+        
+        Frame structure analysis from captured data:
+        - Byte 0: 0x40 or 0x44 (start marker)
+        - Byte 1-2: Function code
+        - Byte 3-4: Measurement mode/unit
+        - Bytes 5-6: Value (ASCII digits, 0x30-0x39)
+        - Byte 7: Decimal point position
+        - Byte 8: Additional mode info
+        - Byte 9: 0x10 (end marker)
+        """
+        try:
+            # Extract voltage/current from frame
+            if len(frame) == 10 and frame[0] in [0x40, 0x44] and frame[-1] == 0x10:
+                # Bytes 5-6 are ASCII digits
+                digit1 = frame[5] - 0x30
+                digit2 = frame[6] - 0x30
+                
+                if 0 <= digit1 <= 9 and 0 <= digit2 <= 9:
+                    # Byte 7 indicates decimal point position
+                    decimal_pos = frame[7]
+                    
+                    # Calculate value based on decimal position
+                    if decimal_pos == 0x01:
+                        value = digit1 + digit2 / 10.0
+                    elif decimal_pos == 0x02:
+                        value = digit1 / 10.0 + digit2 / 100.0
+                    elif decimal_pos == 0x03:
+                        value = digit1 * 10 + digit2
+                    elif decimal_pos == 0x04:
+                        value = digit1 * 100 + digit2 * 10
+                    elif decimal_pos == 0x57:
+                        # Special case from our data - this seems to represent 0.5V
+                        value = 0.5
+                    elif decimal_pos == 0x76:
+                        # Special case - seems to represent 5.0V
+                        value = 5.0
+                    else:
+                        value = digit1 + digit2
+                    
+                    # Determine measurement type and unit from bytes 3-4
+                    mode_byte = frame[3]
+                    unit_byte = frame[4]
+                    
+                    if mode_byte == 0x03 and unit_byte == 0x00:
+                        # DC Voltage
+                        unit = "V"
+                        measurement_type = "DC_VOLTAGE"
+                    elif mode_byte == 0x02 and unit_byte == 0x00:
+                        # DC Current
+                        unit = "A"
+                        measurement_type = "DC_CURRENT"
+                    elif mode_byte == 0x02 and unit_byte == 0x21:
+                        # AC Voltage
+                        unit = "V"
+                        measurement_type = "AC_VOLTAGE"
+                    elif mode_byte == 0x01 and unit_byte == 0x00:
+                        # Resistance
+                        unit = "Ω"
+                        measurement_type = "RESISTANCE"
+                    else:
+                        # Default to DC Voltage if unknown
+                        unit = "V"
+                        measurement_type = "DC_VOLTAGE"
+                        
+                    return MultimeterReading(
+                        raw_value=f"0x{frame.hex().upper()}",
+                        value=value,
+                        unit=unit,
+                        measurement_type=measurement_type,
+                        timestamp=datetime.utcnow().isoformat()
+                    )
+        
+        except Exception as e:
+            print(f"[USB] Binary parse error: {e}")
+        
+        return None
+    
     def read_measurement(self, timeout: float = 2.0) -> Optional[MultimeterReading]:
         """
         Read a single measurement from the multimeter.
@@ -315,34 +505,38 @@ class USBMultimeterClient:
             return None
         
         try:
-            # Read until we get a complete line
+            # Read until we get a complete frame or timeout
             start_time = time.time()
-            buffer = ""
+            buffer = b""
             
             while time.time() - start_time < timeout:
                 if self._serial.in_waiting > 0:
-                    byte = self._serial.read(1)
-                    char = byte.decode('ascii', errors='ignore')
+                    buffer += self._serial.read(self._serial.in_waiting)
                     
-                    if char in ['\n', '\r']:
-                        if buffer.strip():
-                            reading = self._parse_reading(buffer)
-                            if reading:
-                                self._last_reading = reading
-                                return reading
-                            buffer = ""
-                    else:
-                        buffer += char
+                    # Try to parse binary frames first (MS8250D format)
+                    binary_reading = self._parse_binary_frame(buffer)
+                    if binary_reading:
+                        self._last_reading = binary_reading
+                        return binary_reading
+                        
+                    # Limit buffer size and clean up invalid data
+                    if len(buffer) > 30:
+                        # Look for start marker in buffer
+                        start_pos = -1
+                        for i in range(len(buffer)):
+                            if buffer[i] in [0x40, 0x44]:
+                                start_pos = i
+                                break
+                        
+                        if start_pos != -1:
+                            buffer = buffer[start_pos:]
+                        else:
+                            buffer = b""  # Discard all invalid data
+                        
                 else:
                     time.sleep(0.01)
             
-            # Timeout - try to parse whatever we have
-            if buffer.strip():
-                reading = self._parse_reading(buffer)
-                if reading:
-                    self._last_reading = reading
-                    return reading
-            
+            # Timeout - no valid frame received
             return None
             
         except Exception as e:

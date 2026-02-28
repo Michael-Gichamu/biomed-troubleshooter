@@ -9,6 +9,7 @@ langchain-community>=0.3.0
 
 # LLM Integration
 langchain-groq>=0.2.0
+langchain-openai>=0.2.0
 
 # Embeddings (Local)
 sentence-transformers>=2.2.0

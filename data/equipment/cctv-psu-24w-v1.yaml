@@ -160,6 +160,7 @@ faults:
   - fault_id: "output_rail_collapse"
     name: "Output Rail Collapse"
     description: "12V output has collapsed to near zero"
+    priority: 1  # Highest priority - most common failure
     signatures:
       - signal_id: "output_12v"
         state: "missing"
@@ -203,6 +204,7 @@ faults:
   - fault_id: "overvoltage_output"
     name: "Overvoltage Output"
     description: "12V output exceeds safe maximum"
+    priority: 4
     signatures:
       - signal_id: "output_12v"
         state: "over_voltage"
@@ -234,6 +236,7 @@ faults:
   - fault_id: "thermal_shutdown"
     name: "Thermal Shutdown"
     description: "Unit shuts down after operating for several minutes"
+    priority: 5
     signatures:
       - signal_id: "u5_temperature"
         state: "critical"
@@ -266,6 +269,7 @@ faults:
   - fault_id: "excessive_ripple"
     name: "Excessive Output Ripple"
     description: "Output voltage ripple exceeds specification"
+    priority: 3
     signatures:
       - signal_id: "output_12v"
         state: "degraded"
@@ -295,6 +299,7 @@ faults:
   - fault_id: "primary_side_failure"
     name: "Primary Side Input Fault"
     description: "AC input not reaching primary side circuits"
+    priority: 2
     signatures:
       - signal_id: "ac_input"
         state: "normal"
