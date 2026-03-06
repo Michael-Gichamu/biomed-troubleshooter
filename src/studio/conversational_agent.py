@@ -61,22 +61,22 @@ class ConversationalAgentState:
 # HELPER: IMAGE EMBEDDING
 # =============================================================================
 
-def format_message_with_images(content: str, tool_results: list) -> list:
+def format_message_content(text: str, image_data: Optional[dict] = None) -> Any:
     """
-    Format a message content to include base64 images if found in tool results.
+    Format message content as a list of blocks for LangGraph Studio rendering.
     """
-    elements = [{"type": "text", "text": content}]
-    
-    for res in tool_results:
-        if isinstance(res, dict) and res.get("image_base64"):
-            elements.append({
-                "type": "image_url",
-                "image_url": {
-                    "url": f"data:{res.get('mime_type', 'image/jpeg')};base64,{res.get('image_base64')}"
-                }
-            })
-            
-    return elements
+    if not image_data:
+        return text
+        
+    return [
+        {"type": "text", "text": text},
+        {
+            "type": "image_url", 
+            "image_url": {
+                "url": f"data:{image_data.get('mime_type', 'image/jpeg')};base64,{image_data.get('image_base64')}"
+            }
+        }
+    ]
 
 # =============================================================================
 # NODES
@@ -124,22 +124,26 @@ SYSTEM_PROMPT = """You are a professional Biomedical Engineering Diagnostic Assi
 DIAGNOSTIC PRINCIPLES:
 1. DOCUMENT-FIRST: Before suggesting any tests, you MUST consult the equipment configuration and diagnostic knowledge base to identify the most probable faults.
 2. ONE STEP AT A TIME: Never provide multiple instructions or measurements in one message. Guide the user through EXACTLY ONE test point, get the result, and then evaluate.
-3. PROACTIVE AUTO-COLLECTION: When you guide a user to a test point, you MUST call the `read_multimeter` tool in the same turn. Do not wait for the user to say "Ready".
-4. NO MARKDOWN TOOLS: Never write tool calls as JSON code blocks in your response. Use the provided tools directly.
+3. PROACTIVE AUTO-COLLECTION: When you guide a user to a test point, you MUST call the `read_multimeter` tool in the same message turn. NEVER provide guidance without a tool call.
+4. SESSION CONTINUITY: After every tool result, analyze it against thresholds. If an anomaly is found, immediately move to the next logical step in the fault signature sequence. DO NOT stop the diagnostic session until a final "SESSION COMPLETED" status is reached.
 
 INTERACTION STYLE:
 - Be concise and technical.
 - Locating the point: Provide the physical description and image.
 - MUST provide text instructions: Always explain what the user should do in your response content.
-- Polling Feedback: Explicitly state "Polling the meter now... please place your probes on [Test Point]." This text will stay visible while the tool is running.
+- Polling Feedback: Explicitly state "Polling the meter now... please place your probes on [Test Point]." This text must be in the final message content.
 - Interpreting: After a tool returns a value, analyze it against the expected range in the docs before moving to the next point.
 
 WORKFLOW:
 1. Identify equipment model.
 2. Call `query_diagnostic_knowledge` and `get_equipment_configuration` (request_type='faults').
-3. Based on probabilities, choose the HIGHEST priority fault and its first signature.
-4. Call `get_test_point_guidance` for that signature's test point.
-5. Provide ONLY that guidance in your message and call `read_multimeter` immediately.
+3. Based on probabilities, choose the HIGHEST priority fault and its signatures.
+4. For each signature:
+   a. Call `get_test_point_guidance`.
+   b. Provide guidance + "Polling..." message.
+   c. Call `read_multimeter` immediately in the same turn.
+   d. Analyze result. If missing/degraded, continue to next signature or diagnose.
+5. When diagnosis is clear, provide final repair instructions and state "SESSION COMPLETED".
 """
 
 
@@ -162,28 +166,19 @@ def agent_node(state: ConversationalAgentState):
     # IMAGE ENRICHMENT: Find the most recent test point guidance in history
     # and attach it to the CURRENT response content if applicable.
     # This ensures images show up even while the multimeter is polling.
-    last_guidance_res = None
+    image_data = None
     for m in reversed(state.messages):
         if isinstance(m, ToolMessage):
             try:
                 res_data = json.loads(m.content)
                 if isinstance(res_data, dict) and res_data.get("image_base64"):
-                    last_guidance_res = res_data
+                    image_data = res_data
                     break
             except:
                 continue
     
-    if last_guidance_res:
-        # Check if the current response content already has this image
-        # or if the current response is related to this test point.
-        # To be safe and helpful, we append the image to the response content
-        # so it's guaranteed visible during the "loading/tool" state.
-        image_tag = f"\n\n![{last_guidance_res.get('name', 'Test Point')}](data:{last_guidance_res.get('mime_type', 'image/jpeg')};base64,{last_guidance_res.get('image_base64')})"
-        if image_tag not in response.content:
-             response.content += image_tag
-    
-    # We DO NOT clear response.content anymore. 
-    # The user needs to see the instructions and the "Polling..." message.
+    # Format as multimodal content blocks if image exists
+    response.content = format_message_content(response.content, image_data)
     
     return {"messages": [response]}
 
