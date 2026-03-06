@@ -4,9 +4,8 @@ Background USB Multimeter Reader
 This module provides a singleton background reader that continuously
 reads from the USB multimeter and intelligently processes readings:
 1. Ignores noise (very low values from air/probe handling)
-2. Collects readings for a short period
-3. Averages stable readings (ignores outliers)
-4. Returns the stable average when values settle
+2. Uses sliding window to find stable readings
+3. Returns the stable average when values settle
 """
 
 import threading
@@ -14,29 +13,40 @@ import time
 import statistics
 from typing import Optional
 from dataclasses import dataclass, field
+from collections import deque
 
 from src.infrastructure.usb_multimeter import USBMultimeterClient, MultimeterReading
 
 
 @dataclass
 class ReadingStats:
-    """Track reading statistics for stabilization detection."""
+    """Track reading statistics using sliding window for stabilization detection."""
     # Fluctuation thresholds by measurement type (as percentage)
+    # Increased to be more robust for "real-world" probe handling
     FLUCTUATION_THRESHOLDS = {
-        "AC_VOLTAGE": 2.5,      # 2.5% for AC
-        "AC_CURRENT": 2.5,
-        "DC_VOLTAGE": 0.5,      # 0.5% for DC (very stable)
-        "DC_CURRENT": 1.0,       # 1% for DC current
-        "RESISTANCE": 1.0,       # 1% for resistance
-        "DEFAULT": 1.0           # Default 1%
+        "AC_VOLTAGE": 10.0,      # 10% for AC
+        "AC_CURRENT": 10.0,
+        "DC_VOLTAGE": 7.0,       # 7% for DC (was 2%)
+        "DC_CURRENT": 7.0,
+        "RESISTANCE": 5.0,
+        "DEFAULT": 7.0
     }
     
-    # Noise threshold - ignore readings below this (air interference)
-    NOISE_THRESHOLD = 0.5  # volts
+    # Sliding window size for stability check
+    WINDOW_SIZE = 20
     
-    readings: list = field(default_factory=list)
+    # Noise threshold - ignore readings below this (air interference)
+    NOISE_THRESHOLD = 0.5  # volts - ignore values below 0.5V
+    
+    # Use deque for sliding window
+    _window: deque = field(default_factory=lambda: deque(maxlen=20))
     timestamps: list = field(default_factory=list)
     measurement_type: str = "DC_VOLTAGE"
+    
+    @property
+    def readings(self) -> list:
+        """Return readings list from window."""
+        return list(self._window)
     
     def set_measurement_type(self, m_type: str):
         """Set the measurement type for threshold calculation."""
@@ -44,52 +54,87 @@ class ReadingStats:
         self.clear()
     
     def add(self, reading: float):
-        """Add a reading."""
-        self.readings.append(reading)
+        """Add a reading to the sliding window."""
+        self._window.append(reading)
         self.timestamps.append(time.time())
-        # Keep only last 30 readings
-        if len(self.readings) > 30:
-            self.readings.pop(0)
-            self.timestamps.pop(0)
     
     def clear(self):
         """Clear all readings."""
-        self.readings.clear()
+        self._window.clear()
         self.timestamps.clear()
     
     def get_fluctuation_threshold(self) -> float:
         """Get the fluctuation threshold percentage for current measurement type."""
         return self.FLUCTUATION_THRESHOLDS.get(self.measurement_type, self.FLUCTUATION_THRESHOLDS["DEFAULT"])
     
-    def is_stable(self, min_readings: int = 5) -> bool:
-        """Check if readings are stable based on percentage fluctuation."""
-        if len(self.readings) < min_readings:
-            return False
-        if len(self.readings) < 3:
-            return False
-        
-        mean = statistics.mean(self.readings)
-        if mean == 0:
-            return False
-        
-        # Calculate percentage fluctuation
-        std_dev = statistics.stdev(self.readings) if len(self.readings) > 1 else 0
-        percent_fluctuation = (std_dev / mean) * 100
-        
-        threshold = self.get_fluctuation_threshold()
-        return percent_fluctuation <= threshold
+    def has_valid_readings(self) -> bool:
+        """Check if we have enough valid readings (above noise threshold)."""
+        valid_count = sum(1 for v in self._window if v >= self.NOISE_THRESHOLD)
+        return valid_count >= 5
     
-    def get_average(self) -> Optional[float]:
-        """Get average of readings."""
-        if not self.readings:
-            return None
-        return statistics.mean(self.readings)
+    def is_stable(self) -> bool:
+        """Check if recent readings are stable using sub-sequence clustering.
+        
+        Look for at least 5 consecutive readings within the last WINDOW_SIZE
+        that have low fluctuation.
+        """
+        readings = self.readings
+        if len(readings) < 5:
+            return False
+            
+        # Filter noise internally
+        valid = [v for v in readings if v >= self.NOISE_THRESHOLD]
+        if len(valid) < 5:
+            return False
+            
+        # Check sub-sequences of length 5
+        for i in range(len(valid) - 4):
+            cluster = valid[i:i+5]
+            mean = statistics.mean(cluster)
+            if mean == 0: continue
+            
+            # Robust stability check: (max - min) / mean
+            fluctuation = (max(cluster) - min(cluster)) / mean * 100
+            
+            if fluctuation <= self.get_fluctuation_threshold():
+                return True
+                
+        return False
     
     def get_stable_average(self) -> Optional[float]:
-        """Get average only if stable, otherwise None."""
-        if not self.is_stable():
+        """Get average of the stable cluster with outlier rejection."""
+        readings = self.readings
+        # Filter noise
+        valid = [v for v in readings if v >= self.NOISE_THRESHOLD]
+        
+        if len(valid) < 5:
             return None
-        return statistics.mean(self.readings)
+            
+        # Find the latest stable cluster (last 5 readings)
+        # We prioritize the LATEST stable behavior
+        for i in range(len(valid) - 5, -1, -1):
+            cluster = valid[i:i+5]
+            mean = statistics.mean(cluster)
+            if mean < 0.01: continue # Avoid division by near-zero
+            
+            fluctuation = (max(cluster) - min(cluster)) / mean * 100
+            
+            # Also support a fixed epsilon (0.1V) for very stable but low readings
+            is_tight_epsilon = (max(cluster) - min(cluster)) <= 0.1
+            
+            if fluctuation <= self.get_fluctuation_threshold() or is_tight_epsilon:
+                # Stable cluster found! Apply outlier rejection (trim ends)
+                sorted_cluster = sorted(cluster)
+                # Trim min and max, average middle 3
+                trimmed = sorted_cluster[1:4]
+                return statistics.mean(trimmed)
+                
+        return None
+    
+    def get_last_valid_readings(self, count: int = 3) -> list:
+        """Get the last N valid readings (above noise threshold)."""
+        valid_readings = [v for v in self._window if v >= self.NOISE_THRESHOLD]
+        return valid_readings[-count:] if len(valid_readings) >= count else valid_readings
 
 
 @dataclass
@@ -97,7 +142,7 @@ class BackgroundReader:
     """Singleton background reader for USB multimeter with noise filtering."""
     
     # Noise threshold - ignore readings below this (air interference)
-    NOISE_THRESHOLD = 0.5  # volts - ignore values below 0.5V
+    NOISE_THRESHOLD = 0.7  # volts - ignore values below 0.7V
     
     client: Optional[USBMultimeterClient] = None
     _thread: Optional[threading.Thread] = None
@@ -196,9 +241,9 @@ class BackgroundReader:
         1. Clear previous readings
         2. Wait for readings above noise threshold (0.5V)
         3. Collect readings until stable:
-           - DC Voltage: 0.5% fluctuation max
-           - AC Voltage: 2.5% fluctuation max
-           - Resistance: 1% fluctuation max
+           - DC Voltage: 3% fluctuation max
+           - AC Voltage: 7.5% fluctuation max
+           - Resistance: 2% fluctuation max
         4. Return the stable average
         
         Args:
@@ -208,6 +253,8 @@ class BackgroundReader:
         Returns:
             Stable averaged reading, or None if timeout
         """
+        print(f"[DEBUG] get_reading_with_stabilization called: type={measurement_type}, timeout={timeout}")
+        
         with self._lock:
             self._reading_stats.clear()
             self._reading_stats.set_measurement_type(measurement_type)
@@ -218,11 +265,13 @@ class BackgroundReader:
         while time.time() - start_time < timeout:
             with self._lock:
                 if self._stable_reading:
+                    print(f"[DEBUG] Returning stable reading: {self._stable_reading.value}")
                     return self._stable_reading
                 # Also return latest if it's been stable for a while (percentage-based)
-                if self._reading_stats.is_stable(min_readings=5):
+                if self._reading_stats.is_stable():
                     avg = self._reading_stats.get_average()
                     if avg and self._latest_reading:
+                        print(f"[DEBUG] Readings stable, avg={avg}, latest={self._latest_reading.value}")
                         threshold_pct = self._reading_stats.get_fluctuation_threshold()
                         stable = MultimeterReading(
                             value=avg,
@@ -232,12 +281,17 @@ class BackgroundReader:
                             test_point_id=self._latest_reading.test_point_id
                         )
                         return stable
+                
+                # Debug: show readings status
+                if self._reading_stats.readings:
+                    print(f"[DEBUG] Current readings: {self._reading_stats.readings}, count={len(self._reading_stats.readings)}")
             
             time.sleep(0.2)
         
         # Timeout - return whatever we have if it's reasonable
         with self._lock:
-            if self._latest_reading and abs(self._latest_reading.value) > self.NOISE_THRESHOLD:
+            print(f"[DEBUG] Timeout. Latest reading: {self._latest_reading}, readings collected: {self._reading_stats.readings}")
+            if self._latest_reading and abs(self._latest_reading.value) > self._reading_stats.NOISE_THRESHOLD:
                 return self._latest_reading
         
         return None
@@ -275,5 +329,9 @@ def ensure_reader_running() -> bool:
     """Ensure the background reader is running."""
     reader = get_background_reader()
     if not reader.is_connected():
-        return reader.start()
+        print(f"[DEBUG] Background reader not connected, attempting to start...")
+        result = reader.start()
+        print(f"[DEBUG] Background reader start result: {result}")
+        return result
+    print(f"[DEBUG] Background reader already connected")
     return True

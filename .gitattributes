@@ -1,0 +1,17 @@
+# Handle line endings properly
+# Use LF for shell scripts (Unix/Linux compatibility)
+*.sh text eol=lf
+
+# Use LF for Python files
+*.py text eol=lf
+
+# Use LF for configuration files
+*.json text eol=lf
+*.yaml text eol=lf
+*.yml text eol=lf
+
+# Binary files - no conversion
+*.jpg binary
+*.jpeg binary
+*.png binary
+*.pckl binary

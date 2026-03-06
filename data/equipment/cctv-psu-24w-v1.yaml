@@ -23,6 +23,12 @@ signals:
     parameter: "voltage_rms"
     unit: "V"
     measurability: "external"
+    physical_description: "Top-left corner of PCB, large blue two-position screw terminal connector with AC LINE and NEUTRAL markings"
+    image_url: "docs/CCTV Power Supply Unit.jpg"
+    pro_tips:
+      - "Use caution - this point carries mains voltage up to 265V AC"
+      - "Set multimeter to AC voltage mode before connecting"
+      - "If reading 0V, check power cord and switch first"
 
   # Primary side
   - signal_id: "bridge_output"
@@ -31,6 +37,12 @@ signals:
     parameter: "voltage_dc"
     unit: "V"
     measurability: "internal"
+    physical_description: "Upper-right corner of PCB, near the four diodes in a black rectangular package (BR1). Look for the large electrolytic capacitor nearby."
+    image_url: "docs/CCTV Power Supply Unit.jpg"
+    pro_tips:
+      - "This point can read up to 380V DC - use extreme caution"
+      - "If reading negative, swap your multimeter probes"
+      - "A healthy reading here confirms the primary side is working"
 
   - signal_id: "input_fuse"
     name: "Input Fuse"
@@ -38,6 +50,12 @@ signals:
     parameter: "resistance"
     unit: "Ω"
     measurability: "internal"
+    physical_description: "Near the AC input connector, white cylindrical component with metal end caps. May have visible fuse symbol printed on PCB."
+    image_url: "docs/CCTV Power Supply Unit.jpg"
+    pro_tips:
+      - "This fuse is a 250V 1A slow-blow type"
+      - "If open, check BR1 and C1 before replacing - there may be a downstream short"
+      - "Use resistance mode with power OFF to test"
 
   # Secondary/Output
   - signal_id: "output_12v"
@@ -46,6 +64,12 @@ signals:
     parameter: "voltage_dc"
     unit: "V"
     measurability: "internal"
+    physical_description: "Bottom-right area of PCB, look for the large output capacitor (C12, 1000μF 16V) with a small test point nearby marked TP2"
+    image_url: "docs/CCTV Power Supply Unit.jpg"
+    pro_tips:
+      - "This is the main output - check here first for no-output faults"
+      - "Load the supply with 12V 1A bulb or resistor to test under load"
+      - "Reading should be 11.4V-12.6V under no-load conditions"
 
   - signal_id: "feedback_ref"
     name: "Feedback Reference"
@@ -53,6 +77,12 @@ signals:
     parameter: "voltage_dc"
     unit: "V"
     measurability: "internal"
+    physical_description: "Center-left of PCB, near U5 (the black IC with 8 pins). Small test point marked TP3 close to the feedback voltage divider."
+    image_url: "docs/CCTV Power Supply Unit.jpg"
+    pro_tips:
+      - "This is the precision 2.5V reference for output regulation"
+      - "If this is wrong, output voltage will be wrong"
+      - "Check R2 (470Ω resistor) if this voltage is off"
 
   - signal_id: "output_current"
     name: "Output Current"
@@ -60,6 +90,12 @@ signals:
     parameter: "current"
     unit: "A"
     measurability: "internal"
+    physical_description: "Near the output connector, look for a small resistor (typically 0.1Ω-0.5Ω) in series with the positive output rail"
+    image_url: "docs/CCTV Power Supply Unit.jpg"
+    pro_tips:
+      - "Use current measurement or measure voltage drop across sense resistor"
+      - "Divide the voltage drop by the resistor value to get current"
+      - "Overcurrent protection triggers around 2.0A-2.5A"
 
   - signal_id: "feedback_resistor"
     name: "Feedback Resistor"
@@ -67,6 +103,12 @@ signals:
     parameter: "resistance"
     unit: "Ω"
     measurability: "internal"
+    physical_description: "Center area of PCB, small beige or blue rectangular component marked R2. Usually a 470Ω 1% metal film resistor."
+    image_url: "docs/CCTV Power Supply Unit.jpg"
+    pro_tips:
+      - "This resistor sets the output voltage - if open, output goes high"
+      - "If shorted, output voltage will drop to near zero"
+      - "Check this if you have overvoltage or no-output conditions"
 
   - signal_id: "output_capacitor_esr"
     name: "Output Capacitor ESR"
@@ -74,6 +116,12 @@ signals:
     parameter: "resistance"
     unit: "Ω"
     measurability: "internal"
+    physical_description: "Bottom-right of PCB, the large electrolytic capacitor (1000μF 16V). Marked C12 on PCB silkscreen."
+    image_url: "docs/CCTV Power Supply Unit.jpg"
+    pro_tips:
+      - "High ESR causes output ripple and voltage droop under load"
+      - "Use an ESR meter for accurate readings - multimeter won't work"
+      - "Replace with low-ESR capacitor if reading above 0.5Ω"
 
   # Thermal
   - signal_id: "u5_temperature"
@@ -82,6 +130,12 @@ signals:
     parameter: "temperature"
     unit: "°C"
     measurability: "internal"
+    physical_description: "Center-right of PCB, black 8-pin IC in rectangular package. This is the buck converter controller IC."
+    image_url: "docs/CCTV Power Supply Unit.jpg"
+    pro_tips:
+      - "Normal operating temperature is 40-60°C under light load"
+      - "Above 80°C indicates thermal issues or overload"
+      - "Use an infrared thermometer or thermal camera for accurate readings"
 
 # =============================================================================
 # THRESHOLDS - Semantic states and numerical boundaries
@@ -364,7 +418,7 @@ strategies:
 # =============================================================================
 images:
   - image_id: "pcb_overview"
-    filename: "cctv-psu-pcb-overview.jpg"
+    filename: "docs/CCTV Power Supply Unit.jpg"
     description: "Full PCB layout overview"
     test_points: ["AC_IN", "TP1", "TP2", "TP3", "F1", "U5", "R2", "C12"]
     annotations:
@@ -376,7 +430,7 @@ images:
         label: "Buck Converter IC"
 
   - image_id: "test_point_tp2"
-    filename: "cctv-psu-tp2-detail.jpg"
+    filename: "docs/CCTV Power Supply Unit.jpg"
     description: "Close-up of TP2 (12V output)"
     test_points: ["TP2"]
 

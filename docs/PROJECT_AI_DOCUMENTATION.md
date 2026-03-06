@@ -482,4 +482,74 @@ ai-agent/
 
 ---
 
+## 11. Visual/Physical RAG Support (NEW)
+
+### 11.1 Overview
+
+The agent now supports **Visual/Physical RAG** to solve the "Where do I poke it?" problem. Engineers receive:
+
+- **Physical descriptions** of where to find test points on the PCB
+- **Image URLs** showing labeled components
+- **Pro-tips** with operational nuances and safety warnings
+
+### 11.2 New Fields in SignalConfig
+
+The `SignalConfig` dataclass now includes:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `physical_description` | Optional[str] | How to find the test point on the PCB |
+| `image_url` | Optional[str] | Link to labeled image of the component |
+| `pro_tips` | List[str] | Operational tips for measurement |
+
+### 11.3 Equipment YAML Example
+
+```yaml
+signals:
+  - signal_id: "bridge_output"
+    name: "Bridge Rectifier Output"
+    test_point: "TP1"
+    parameter: "voltage_dc"
+    unit: "V"
+    physical_description: "Upper-right corner of PCB, near the four diodes in a black rectangular package"
+    image_url: "docs/CCTV Power Supply Unit.jpg#TP1"
+    pro_tips:
+      - "This point can read up to 380V DC - use caution"
+      - "If reading negative, swap your probes"
+```
+
+### 11.4 Agent Output Format
+
+When the agent retrieves test point guidance, it renders:
+
+1. **Image**: `![TP1 - Bridge Output](docs/CCTV Power Supply Unit.jpg#TP1)`
+2. **Physical description BEFORE measurement instructions**
+3. **Pro-tips AFTER instructions**
+
+**Example Output**:
+> "To check the bridge output (TP1), look for the four diodes in the upper-right corner of the PCB. 
+> ![TP1 - Bridge Output](docs/CCTV Power Supply Unit.jpg#TP1)
+> 
+> Now measure the voltage between these two test points.
+> 
+> **Pro-tip**: If your meter reads -310V, don't panic! It just means your probes are swapped."
+
+### 11.5 "Can't Find It" Handling
+
+If the user says they "can't find" a test point, the agent will query the knowledge base for:
+- Alternative descriptors
+- Different camera angles
+- More detailed spatial guidance
+
+### 11.6 Updated Functions
+
+| Function | File | Changes |
+|----------|------|---------|
+| `SignalConfig` | `src/infrastructure/equipment_config.py` | Added physical_description, image_url, pro_tips fields |
+| `get_test_point_guidance` | `src/studio/tools.py` | Returns new physical/visual fields |
+| `get_equipment_configuration` | `src/studio/tools.py` | Includes physical fields in test_points response |
+| SYSTEM_PROMPT | `src/studio/conversational_agent.py` | Instructions for rendering images and physical guidance |
+
+---
+
 *End of Documentation*

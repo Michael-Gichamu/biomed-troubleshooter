@@ -9,6 +9,8 @@ from dataclasses import dataclass, field
 from typing import Optional, Dict, List, Any
 from pathlib import Path
 import yaml
+import base64
+import mimetypes
 
 
 @dataclass
@@ -20,6 +22,9 @@ class SignalConfig:
     parameter: str
     unit: str
     measurability: str = "internal"
+    physical_description: Optional[str] = ""
+    image_url: Optional[str] = ""
+    pro_tips: List[str] = field(default_factory=list)
 
     @classmethod
     def from_dict(cls, data: dict) -> "SignalConfig":
@@ -29,7 +34,10 @@ class SignalConfig:
             test_point=data["test_point"],
             parameter=data["parameter"],
             unit=data["unit"],
-            measurability=data.get("measurability", "internal")
+            measurability=data.get("measurability", "internal"),
+            physical_description=data.get("physical_description", ""),
+            image_url=data.get("image_url", ""),
+            pro_tips=data.get("pro_tips", [])
         )
 
 
@@ -174,6 +182,34 @@ class ImageConfig:
             annotations=data.get("annotations", [])
         )
 
+    def get_base64_data(self) -> Optional[Dict[str, str]]:
+        """Resolve image file and return base64 data and mime type."""
+        try:
+            # Try multiple resolution paths
+            search_paths = [
+                Path(self.filename),                        # CWD or absolute
+                Path("docs") / self.filename,                # in docs/
+                Path("data/equipment/images") / self.filename, # in data/equipment/images/
+                Path("docs") / Path(self.filename).name,      # just filename in docs/
+            ]
+            
+            # If filename already starts with docs/, don't prepend docs/ again
+            if self.filename.startswith("docs/"):
+                search_paths.insert(0, Path(self.filename))
+            
+            for img_path in search_paths:
+                if img_path.exists() and img_path.is_file():
+                    with open(img_path, "rb") as image_file:
+                        encoded_string = base64.b64encode(image_file.read()).decode('utf-8')
+                        mime_type, _ = mimetypes.guess_type(str(img_path))
+                        return {
+                            "base64": encoded_string,
+                            "mime_type": mime_type or "image/jpeg"
+                        }
+        except Exception as e:
+            print(f"[WARN] Could not embed image {self.filename}: {e}")
+        return None
+
     def get_annotation(self, test_point: str) -> Optional[Dict[str, str]]:
         """Get annotation for a specific test point."""
         for ann in self.annotations:
@@ -300,6 +336,42 @@ class EquipmentConfig:
             if test_point in image.test_points:
                 return image
         return None
+
+    def get_test_point_guidance(self, tp_id: str) -> Dict[str, Any]:
+        """
+        Get consolidated guidance for a test point, including a base64 image.
+        """
+        # Find signal
+        signal = self.get_signal(tp_id)
+        if not signal:
+            # Try finding by test_point name if signal_id doesn't match
+            for s in self.signals.values():
+                if s.test_point == tp_id:
+                    signal = s
+                    break
+
+        if not signal:
+            return {"error": f"Test point {tp_id} not found"}
+
+        guidance = {
+            "name": signal.name,
+            "test_point": signal.test_point,
+            "physical_description": signal.physical_description,
+            "pro_tips": signal.pro_tips,
+            "image_url": signal.image_url,
+            "image_base64": None,
+            "mime_type": None
+        }
+
+        # Handle image embedding using common logic
+        # Construct a temporary ImageConfig to reuse the embedding logic
+        temp_img = ImageConfig(image_id="temp", filename=signal.image_url, description="")
+        embed_data = temp_img.get_base64_data()
+        if embed_data:
+            guidance["image_base64"] = embed_data["base64"]
+            guidance["mime_type"] = embed_data["mime_type"]
+
+        return guidance
 
 
 class EquipmentConfigLoader:

@@ -37,28 +37,28 @@ def test_usb_connection():
         print(f"  Found {len(ports)} COM port(s):")
         print()
         
-        ch340_found = False
+        cp210x_found = False
         for port in ports:
             vid_str = f"VID:{port.vid:04X}" if port.vid else "VID:????"
             pid_str = f"PID:{port.pid:04X}" if port.pid else "PID:????"
             
-            # Check if this is a CH340 device
-            is_ch340 = port.vid == 0x1A86 or 'CH340' in port.description.upper()
-            if is_ch340:
-                ch340_found = True
+            # Check if this is a CP210x device (Silicon Labs)
+            is_cp210x = port.vid == 0x10C4 or 'CP210' in port.description.upper()
+            if is_cp210x:
+                cp210x_found = True
                 print(f"  [*] {port.device}")
                 print(f"      Description: {port.description}")
                 print(f"      Hardware ID: {vid_str}:{pid_str}")
-                print(f"      [CH340 DETECTED - This is likely your multimeter!]")
+                print(f"      [CP210x DETECTED - This is your multimeter!]")
             else:
                 print(f"  [ ] {port.device}")
                 print(f"      Description: {port.description}")
                 print(f"      Hardware ID: {vid_str}:{pid_str}")
             print()
         
-        if not ch340_found:
-            print("  [!] No CH340 device detected.")
-            print("  The CH340 driver in your project suggests you have a USB-serial device.")
+        if not cp210x_found:
+            print("  [!] No CP210x device detected.")
+            print("  Your multimeter uses the Silicon Labs CP210x USB to UART Bridge.")
             print("  Check if the device is connected and drivers are installed.")
         
     except ImportError:
@@ -126,7 +126,7 @@ def test_usb_connection():
             print()
             print("Troubleshooting:")
             print("  1. Ensure the multimeter is connected via USB")
-            print("  2. Check if drivers are installed (see CH340_Driver folder)")
+            print("  2. Check if CP210x drivers are installed")
             print("  3. Try a different USB port")
             print("  4. Check Device Manager for COM port assignment")
             return False

@@ -7,5 +7,12 @@
   "python_version": "3.13",
   "dependencies": [
     "."
+  ],
+  "watchdog_ignore": [
+    ".gemini",
+    "docs",
+    "data",
+    "**/__pycache__",
+    "*.md"
   ]
 }

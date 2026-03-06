@@ -42,7 +42,7 @@ test_docker() {
 
 start_services() {
     print_header
-    echo -e "[1/3] ${GREEN}Starting ChromaDB...${NC}"
+    echo -e "[1/2] ${GREEN}Starting ChromaDB...${NC}"
 
     if docker ps -a --format '{{.Names}}' | grep -q 'biomed-chromadb'; then
         if ! docker ps --format '{{.Names}}' | grep -q 'biomed-chromadb'; then
@@ -56,21 +56,7 @@ start_services() {
         echo -e "       ChromaDB started on port 8000"
     fi
 
-    echo -e "[2/3] ${GREEN}Starting Mosquitto MQTT...${NC}"
-
-    if docker ps -a --format '{{.Names}}' | grep -q 'biomed-mosquitto'; then
-        if ! docker ps --format '{{.Names}}' | grep -q 'biomed-mosquitto'; then
-            docker start biomed-mosquitto 2>/dev/null || true
-            echo -e "       Mosquitto started"
-        else
-            echo -e "       Mosquitto already running"
-        fi
-    else
-        docker run -d -p 1883:1883 -p 9001:9001 --name biomed-mosquitto eclipse-mosquitto 2>/dev/null || true
-        echo -e "       Mosquitto started on ports 1883, 9001"
-    fi
-
-    echo -e "[3/3] ${GREEN}Verifying services...${NC}"
+    echo -e "[2/2] ${GREEN}Verifying services...${NC}"
     sleep 3
 
     if curl -s http://localhost:8000/api/v1/heartbeat > /dev/null 2>&1; then
@@ -85,7 +71,6 @@ start_services() {
     echo -e "${CYAN}============================================================${NC}"
     echo ""
     echo "  ChromaDB:  http://localhost:8000"
-    echo "  MQTT:       localhost:1883"
     echo ""
     echo "Run agent in mock mode:"
     echo -e "  ${CYAN}python -m src.interfaces.cli --mock${NC}"
@@ -95,8 +80,8 @@ start_services() {
 stop_services() {
     print_header
     echo -e "${YELLOW}Stopping services...${NC}"
-    docker stop biomed-chromadb biomed-mosquitto 2>/dev/null || true
-    docker rm biomed-chromadb biomed-mosquitto 2>/dev/null || true
+    docker stop biomed-chromadb 2>/dev/null || true
+    docker rm biomed-chromadb 2>/dev/null || true
     echo -e "${GREEN}All services stopped${NC}"
 }
 
@@ -111,12 +96,6 @@ show_status() {
         echo -e "  ChromaDB:  ${RED}✗ Stopped${NC}"
     fi
 
-    if docker ps --format '{{.Names}}' | grep -q 'biomed-mosquitto'; then
-        echo -e "  Mosquitto: ${GREEN}✓ Running${NC}"
-    else
-        echo -e "  Mosquitto: ${RED}✗ Stopped${NC}"
-    fi
-
     echo ""
     echo "Active containers:"
     docker ps --format "  {{.Names}} - {{.Status}} - {{.Ports}}" | grep biomed || echo "  (none)"
@@ -125,10 +104,6 @@ show_status() {
 show_logs() {
     echo -e "${YELLOW}ChromaDB logs:${NC}"
     docker logs biomed-chromadb --tail 20
-
-    echo ""
-    echo -e "${YELLOW}Mosquitto logs:${NC}"
-    docker logs biomed-mosquitto --tail 20
 }
 
 # Main

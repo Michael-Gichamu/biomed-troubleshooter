@@ -38,300 +38,230 @@ from src.studio.tools import get_tools
 # CONVERSATIONAL AGENT STATE
 # =============================================================================
 
+from langgraph.types import interrupt
+from langchain_core.messages import SystemMessage, ToolMessage
+import json
+
+# =============================================================================
+# CONVERSATIONAL AGENT STATE
+# =============================================================================
+
 @dataclass
 class ConversationalAgentState:
     """
     State for conversational LangGraph Studio troubleshooting agent.
-    
-    Uses add_messages reducer for automatic message history management.
     """
-    
-    # === MESSAGES (using add_messages for automatic persistence) ===
     messages: Annotated[list[BaseMessage], add_messages] = field(default_factory=list)
-    
-    # === SESSION METADATA ===
     equipment_model: str = ""
-    equipment_serial: str = ""
-    
-    # === INITIAL PROBLEM ===
-    initial_problem: str = ""
-    confirmed_symptoms: list[str] = field(default_factory=list)
-    
-    # === CONVERSATION TRACKING ===
-    last_agent_message: str = ""
-    is_awaiting_measurement: bool = False
-    
-    # === MEASUREMENT COLLECTION ===
-    collected_measurements: list[dict] = field(default_factory=list)
-    test_points_measured: set[str] = field(default_factory=set)
-    test_points_required: list[str] = field(default_factory=list)
     current_test_point: str = ""
-    current_measurement_type: str = "voltage_dc"
-    
-    # === DIAGNOSIS STATE ===
-    signal_states: dict = field(default_factory=dict)
-    overall_status: str = "unknown"
-    hypothesis: dict = field(default_factory=dict)
-    diagnosis_confidence: float = 0.0
-    
-    # === EVIDENCE & RAG ===
-    retrieved_evidence: list[dict] = field(default_factory=list)
-    guidance_retrieved: list[str] = field(default_factory=list)
-    
-    # === OUTPUT ===
-    recommendations: list[dict] = field(default_factory=list)
-    response: dict = field(default_factory=dict)
-    
-    # === WORKFLOW CONTROL ===
-    workflow_phase: Literal["initial", "clarifying", "measuring", "diagnosing", "complete", "error"] = "initial"
-    
-    # === ERROR HANDLING ===
-    is_valid: bool = True
-    validation_error: str = ""
-    error_count: int = 0
-    
-    # === TIMING ===
-    node_history: list[str] = field(default_factory=list)
-    timestamp: str = ""
-
+    is_awaiting_human: bool = False
+    last_tool_result: dict = field(default_factory=dict)
 
 # =============================================================================
-# AGENT NODE
+# HELPER: IMAGE EMBEDDING
 # =============================================================================
 
-SYSTEM_PROMPT = """You are a helpful electronics troubleshooting assistant.
+def format_message_with_images(content: str, tool_results: list) -> list:
+    """
+    Format a message content to include base64 images if found in tool results.
+    """
+    elements = [{"type": "text", "text": content}]
+    
+    for res in tool_results:
+        if isinstance(res, dict) and res.get("image_base64"):
+            elements.append({
+                "type": "image_url",
+                "image_url": {
+                    "url": f"data:{res.get('mime_type', 'image/jpeg')};base64,{res.get('image_base64')}"
+                }
+            })
+            
+    return elements
 
-When user says hi/hello, respond naturally like a person would.
-When user describes a problem, immediately help them.
+# =============================================================================
+# NODES
+# =============================================================================
 
-YOUR JOB:
-1. Listen to what the engineer tells you
-2. If they mention equipment, get the model if needed  
-3. Query the diagnostic knowledge base for fault probabilities
-4. Guide them through troubleshooting steps in order
+# =============================================================================
+# HELPER: TOKEN MANAGEMENT
+# =============================================================================
 
-TOOLS:
-- query_diagnostic_knowledge: Get fault probabilities
-- get_equipment_configuration: Find test points
-- read_multimeter: Read multimeter
-- enter_manual_reading: Manual entry if USB fails
+import re
+
+def clean_messages_for_llm(messages: list[BaseMessage]) -> list[BaseMessage]:
+    """
+    Strip large base64 data URIs from message history to prevent token limits
+    and state bloat in LangGraph Studio.
+    """
+    cleaned = []
+    # Regex to find markdown image tags with base64 data
+    base64_re = re.compile(r'!\[.*?\]\(data:.*?;base64,.*?\)')
+    
+    for msg in messages:
+        # Clone the message to avoid side effects on the original UI representation
+        new_msg = msg.copy()
+        if hasattr(new_msg, "content") and isinstance(new_msg.content, str):
+            new_msg.content = base64_re.sub("[IMAGE DATA STRIPPED FOR STABILITY]", new_msg.content)
+            
+            # Also check ToolMessage content which might be JSON containing base64
+            if isinstance(new_msg, ToolMessage):
+                try:
+                    data = json.loads(new_msg.content)
+                    if isinstance(data, dict) and "image_base64" in data:
+                        data["image_base64"] = "[SENSITIVE DATA STRIPPED]"
+                        new_msg.content = json.dumps(data)
+                except:
+                    pass
+        cleaned.append(new_msg)
+    return cleaned
+
+# =============================================================================
+# SYSTEM PROMPT
+# =============================================================================
+
+SYSTEM_PROMPT = """You are a professional Biomedical Engineering Diagnostic Assistant. 
+
+DIAGNOSTIC PRINCIPLES:
+1. DOCUMENT-FIRST: Before suggesting any tests, you MUST consult the equipment configuration and diagnostic knowledge base to identify the most probable faults.
+2. ONE STEP AT A TIME: Never provide multiple instructions or measurements in one message. Guide the user through EXACTLY ONE test point, get the result, and then evaluate.
+3. PROACTIVE AUTO-COLLECTION: When you guide a user to a test point, you MUST call the `read_multimeter` tool in the same turn. Do not wait for the user to say "Ready".
+4. NO MARKDOWN TOOLS: Never write tool calls as JSON code blocks in your response. Use the provided tools directly.
+
+INTERACTION STYLE:
+- Be concise and technical.
+- Locating the point: Provide the physical description and image.
+- MUST provide text instructions: Always explain what the user should do in your response content.
+- Polling Feedback: Explicitly state "Polling the meter now... please place your probes on [Test Point]." This text will stay visible while the tool is running.
+- Interpreting: After a tool returns a value, analyze it against the expected range in the docs before moving to the next point.
 
 WORKFLOW:
-1. Get equipment model if not provided
-2. Call get_equipment_configuration with request_type="faults" 
-3. Execute recovery steps in order
-
-Respond naturally.
+1. Identify equipment model.
+2. Call `query_diagnostic_knowledge` and `get_equipment_configuration` (request_type='faults').
+3. Based on probabilities, choose the HIGHEST priority fault and its first signature.
+4. Call `get_test_point_guidance` for that signature's test point.
+5. Provide ONLY that guidance in your message and call `read_multimeter` immediately.
 """
 
 
-def get_system_prompt(state: ConversationalAgentState) -> str:
-    """Generate the system prompt with current state."""
-    return SYSTEM_PROMPT.format(
-        equipment_model=state.equipment_model or "not specified",
-        workflow_phase=state.workflow_phase,
-        measurement_count=len(state.collected_measurements)
-    )
-
-
-def add_measurement(state: ConversationalAgentState, measurement: dict) -> dict:
-    """Add a measurement to the collected measurements."""
-    test_point = measurement.get("test_point", measurement.get("test_point_id", ""))
-    
-    # Determine signal state from threshold if equipment is known
-    signal_state = "unknown"
-    if state.equipment_model and test_point:
-        try:
-            from src.infrastructure.equipment_config import get_equipment_config
-            config = get_equipment_config(state.equipment_model)
-            signal_state = config.interpret_signal(test_point, measurement.get("value", 0))
-        except Exception:
-            pass
-    
-    measurement_with_state = {
-        **measurement,
-        "signal_state": signal_state,
-        "timestamp": datetime.utcnow().isoformat()
-    }
-    
-    return {
-        "collected_measurements": state.collected_measurements + [measurement_with_state],
-        "test_points_measured": state.test_points_measured | {test_point},
-        "signal_states": {**state.signal_states, test_point: signal_state}
-    }
-
-
-# =============================================================================
-# AGENT NODE
-# =============================================================================
-
-def create_agent_node():
-    """Create the agent node that runs the LLM with tools."""
-    from langgraph.prebuilt import create_react_agent
-    import os
-    
-    # Get tools
+def agent_node(state: ConversationalAgentState):
+    """The planning/reasoning node."""
+    from src.infrastructure.llm_client import get_llm
+    llm = get_llm()
     tools = get_tools()
+    llm_with_tools = llm.bind_tools(tools)
     
-    # Get LLM configuration from environment
-    provider = os.getenv("LLM_PROVIDER", "groq").lower()
-    model = os.getenv("LLM_MODEL", "llama-3.3-70b-versatile")
+    # Clean history to keep token count low and prevent UI hangs
+    cleaned_messages = clean_messages_for_llm(state.messages)
     
-    llm = None
+    # System prompt
+    sys_msg = SystemMessage(content=SYSTEM_PROMPT)
     
-    if provider == "groq":
-        from langchain_groq import ChatGroq
-        api_key = os.getenv("GROQ_API_KEY", "")
-        if api_key:
-            llm = ChatGroq(
-                model=model,
-                groq_api_key=api_key,
-                temperature=0.1
-            )
-    elif provider == "openai":
-        from langchain_openai import ChatOpenAI
-        api_key = os.getenv("OPENAI_API_KEY", "")
-        if api_key:
-            llm = ChatOpenAI(
-                model=model,
-                api_key=api_key,
-                temperature=0.1
-            )
-    else:
-        print(f"[WARN] Unknown LLM provider: {provider}, trying Groq")
-        from langchain_groq import ChatGroq
-        api_key = os.getenv("GROQ_API_KEY", "")
-        if api_key:
-            llm = ChatGroq(
-                model=model,
-                groq_api_key=api_key,
-                temperature=0.1
-            )
+    # Run LLM
+    response = llm_with_tools.invoke([sys_msg] + cleaned_messages)
     
-    # Fallback to direct Groq if needed
-    if llm is None:
-        import os
-        provider = os.getenv("LLM_PROVIDER", "groq")
-        model = os.getenv("LLM_MODEL", "llama-3.3-70b-versatile")
+    # IMAGE ENRICHMENT: Find the most recent test point guidance in history
+    # and attach it to the CURRENT response content if applicable.
+    # This ensures images show up even while the multimeter is polling.
+    last_guidance_res = None
+    for m in reversed(state.messages):
+        if isinstance(m, ToolMessage):
+            try:
+                res_data = json.loads(m.content)
+                if isinstance(res_data, dict) and res_data.get("image_base64"):
+                    last_guidance_res = res_data
+                    break
+            except:
+                continue
+    
+    if last_guidance_res:
+        # Check if the current response content already has this image
+        # or if the current response is related to this test point.
+        # To be safe and helpful, we append the image to the response content
+        # so it's guaranteed visible during the "loading/tool" state.
+        image_tag = f"\n\n![{last_guidance_res.get('name', 'Test Point')}](data:{last_guidance_res.get('mime_type', 'image/jpeg')};base64,{last_guidance_res.get('image_base64')})"
+        if image_tag not in response.content:
+             response.content += image_tag
+    
+    # We DO NOT clear response.content anymore. 
+    # The user needs to see the instructions and the "Polling..." message.
+    
+    return {"messages": [response]}
+
+def tool_node(state: ConversationalAgentState):
+    """Standard tool execution node with a twist for images."""
+    last_msg = state.messages[-1]
+    if not hasattr(last_msg, "tool_calls") or not last_msg.tool_calls:
+        return {}
         
-        if provider == "groq":
-            from langchain_groq import ChatGroq
-            api_key = os.getenv("GROQ_API_KEY", "")
-            if not api_key:
-                raise RuntimeError("GROQ_API_KEY not set in environment")
-            llm = ChatGroq(
-                model=model,
-                groq_api_key=api_key,
-                temperature=0.1
-            )
+    tools_map = {t.name: t for t in get_tools()}
+    results = []
     
-    if llm is None:
-        raise RuntimeError(
-            f"Failed to create LLM client. "
-            f"Provider: {provider}, Model: {model}. "
-            f"Please check your .env file - ensure LLM_PROVIDER and LLM_MODEL are set correctly, "
-            f"and the corresponding API_KEY is provided."
-        )
-    
-    # Create the ReAct agent
-    agent = create_react_agent(llm, tools)
-    
-    return agent
+    for tool_call in last_msg.tool_calls:
+        tool = tools_map.get(tool_call["name"])
+        if tool:
+            print(f"[TOOL] Running {tool_call['name']}...")
+            result = tool.invoke(tool_call["args"])
+            
+            # Special handling for guidance images
+            # To prevent state bloat, we strip the image_base64 immediately 
+            # after it's produced to keep the persistent state lightweight.
+            if tool_call["name"] == "get_test_point_guidance" and isinstance(result, dict):
+                # Keep the image data for the NEXT node to use (it's in the ToolMessage content)
+                # But we can strip it here and the agent_node will have to get it 
+                # FROM the tool result if we want to show it in the UI.
+                # Actually, the most robust way is to strip it AFTER the next agent step.
+                pass
+                
+            results.append(ToolMessage(
+                tool_call_id=tool_call["id"],
+                content=json.dumps(result) if isinstance(result, dict) else str(result)
+            ))
+            
+    return {"messages": results}
 
+# =============================================================================
+# ROUTING
+# =============================================================================
 
-def agent_node(state: ConversationalAgentState, config: "RunnableConfig" = None) -> dict:
-    """Run the agent on the current messages.
+def should_continue(state: ConversationalAgentState):
+    """Route after agent node."""
+    last_msg = state.messages[-1]
     
-    With add_messages, LangGraph automatically handles message history.
-    We just need to return the result messages.
-    """
-    if config is None:
-        config = {}
-    
-    # Get the agent
-    agent = create_agent_node()
-    
-    # Add system message - this will be filtered out by add_messages
-    from langchain_core.messages import SystemMessage
-    system_msg = SystemMessage(content=get_system_prompt(state))
-    
-    # Build input: system message + current messages (LangGraph will merge with history)
-    input_messages = [system_msg] + list(state.messages)
-    
-    # Run the agent
-    result = agent.invoke(
-        {"messages": input_messages},
-        config
-    )
-    
-    # Get the messages from result
-    result_messages = result.get("messages", [])
-    
-    # Filter out system message from result
-    ai_messages = []
-    for msg in result_messages:
-        msg_type = getattr(msg, 'type', str(msg))
-        if msg_type not in ('system', 'SystemMessage'):
-            ai_messages.append(msg)
-    
-    # Get last AI message for tracking
-    last_message = ai_messages[-1] if ai_messages else None
-    
-    updates = {
-        "messages": ai_messages,  # add_messages will merge this with history
-        "last_agent_message": last_message.content if hasattr(last_message, "content") else str(last_message) if last_message else ""
-    }
-    
-    # Check if measurement was collected via tool
-    tool_measurements = []
-    for msg in ai_messages:
-        if hasattr(msg, "name") and msg.name in ("enter_manual_reading", "read_multimeter"):
-            if hasattr(msg, "content"):
-                try:
-                    import json
-                    tool_data = json.loads(msg.content)
-                    if "test_point" in tool_data and "value" in tool_data:
-                        tool_measurements.append(tool_data)
-                except:
-                    pass
-    
-    if tool_measurements:
-        for meas in tool_measurements:
-            updates.update(add_measurement(state, meas))
-    
-    return updates
+    if hasattr(last_msg, "tool_calls") and last_msg.tool_calls:
+        return "tools"
+        
+    return END
 
+def post_tool_route(state: ConversationalAgentState):
+    """Route after tools node."""
+    return "agent"
 
 # =============================================================================
 # GRAPH CONSTRUCTION
 # =============================================================================
 
 def create_conversational_graph():
-    """
-    Create the conversational LangGraph for LangGraph Studio.
-    
-    Uses single-node architecture: agent_node handles everything.
-    add_messages handles message history automatically.
-    """
-    from langgraph.graph import StateGraph, START, END
-    from typing import Literal
-    
-    # Build the state graph
+    """Build the custom interactive graph."""
     builder = StateGraph(ConversationalAgentState)
     
-    # Single node - the agent handles everything
     builder.add_node("agent", agent_node)
+    builder.add_node("tools", tool_node)
     
-    # Add edges
     builder.add_edge(START, "agent")
-    builder.add_edge("agent", END)
     
-    # Compile with checkpointer for LangGraph Studio
+    builder.add_conditional_edges(
+        "agent",
+        should_continue,
+        {
+            "tools": "tools",
+            END: END
+        }
+    )
+    
+    builder.add_edge("tools", "agent")
+    
     checkpointer = MemorySaver()
-    graph = builder.compile(checkpointer=checkpointer)
-    
-    return graph
-
+    return builder.compile(checkpointer=checkpointer)
 
 # =============================================================================
 # GRAPH FACTORY FOR LANGGRAPH STUDIO
@@ -352,7 +282,6 @@ def graph():
 
 if __name__ == "__main__":
     # Test the graph creation
-    print("Creating conversational graph...")
+    print("Creating interactive graph...")
     g = create_conversational_graph()
-    print("Graph created successfully!")
-    print(f"Graph nodes: {list(g.nodes.keys())}")
+    print("Success!")

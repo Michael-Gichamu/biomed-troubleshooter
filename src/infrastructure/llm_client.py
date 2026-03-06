@@ -149,10 +149,9 @@ Return ONLY the JSON, no other text."""
         return "\n".join(lines) if lines else "No measurements available"
 
 
-def create_llm_client() -> Optional[LLMClient]:
-    """Factory function to create LLM client."""
-    try:
-        return LLMClient()
-    except Exception as e:
-        print(f"[WARN] Could not create LLM client: {e}")
-        return None
+
+def get_llm():
+    """Get the LangChain LLM instance."""
+    client = LLMClient()
+    client.initialize()
+    return client._client

@@ -132,6 +132,9 @@ def get_equipment_configuration(
                 "parameter": signal.parameter,
                 "unit": signal.unit,
                 "measurability": signal.measurability,
+                "physical_description": signal.physical_description,
+                "image_url": signal.image_url,
+                "pro_tips": signal.pro_tips,
                 "visual_guide": annotations if annotations else None
             })
         return {"test_points": test_points, "equipment_model": equipment_model}
@@ -192,17 +195,20 @@ def get_equipment_configuration(
     elif request_type == "images":
         """Return reference images with test point locations."""
         images = []
-        for img in config.images:
+        for img in config.images.values():  # Use .values() to get ImageConfig objects
+            embed = img.get_base64_data()
             images.append({
                 "image_id": img.image_id,
                 "filename": img.filename,
                 "description": img.description,
                 "test_points": img.test_points,
+                "image_base64": embed["base64"] if embed else None,
+                "mime_type": embed["mime_type"] if embed else None,
                 "annotations": [
                     {
-                        "target": a.target,
-                        "position": a.position,
-                        "label": a.label
+                        "target": a.get("target", ""),
+                        "position": a.get("position", ""),
+                        "label": a.get("label", "")
                     }
                     for a in (img.annotations or [])
                 ]
@@ -236,6 +242,8 @@ def get_equipment_configuration(
                     "filename": img.filename,
                     "description": img.description,
                     "test_points": img.test_points,
+                    "image_base64": (embed := img.get_base64_data())["base64"] if embed else None,
+                    "mime_type": embed["mime_type"] if embed else None,
                     "annotations": [
                         {
                             "target": a.get("target", ""),
@@ -290,69 +298,22 @@ def get_test_point_guidance(
     """
     try:
         config = get_equipment_config(equipment_model)
-    except FileNotFoundError:
-        return {"error": f"Equipment configuration not found for {equipment_model}"}
-    
-    # Find test point in signals
-    test_point_signal = None
-    for signal in config.signals.values():
-        if signal.test_point == test_point_id or signal.signal_id == test_point_id:
-            test_point_signal = signal
-            break
-    
-    if not test_point_signal:
-        # Check if it's a signal_id directly
-        test_point_signal = config.signals.get(test_point_id)
-    
-    if not test_point_signal:
-        return {"error": f"Test point {test_point_id} not found"}
-    
-    # Get threshold info
-    threshold = config.thresholds.get(test_point_signal.signal_id)
-    threshold_info = None
-    if threshold:
-        threshold_info = {
-            "signal_id": threshold.signal_id,
-            "states": {}
-        }
-        for state_name, state in threshold.states.items():
-            threshold_info["states"][state_name] = {
-                "min": state.min_value,
-                "max": state.max_value,
-                "description": state.description
-            }
-    
-    # Get fault signatures that include this test point
-    relevant_faults = []
-    for fault_id, fault in config.faults.items():
-        for sig in fault.signatures:
-            if sig.get("signal_id") == test_point_signal.signal_id:
-                relevant_faults.append({
-                    "fault_id": fault_id,
-                    "fault_name": fault.name,
-                    "state": sig.get("state")
-                })
-                break
-    
-    return {
-        "test_point_id": test_point_id,
-        "signal_id": test_point_signal.signal_id,
-        "name": test_point_signal.name,
-        "test_point": test_point_signal.test_point,
-        "parameter": test_point_signal.parameter,
-        "unit": test_point_signal.unit,
-        "measurability": test_point_signal.measurability,
-        "threshold": threshold_info,
-        "relevant_faults": relevant_faults,
-        "equipment_model": equipment_model
-    }
+        guidance = config.get_test_point_guidance(test_point_id)
+        if "error" in guidance:
+            return guidance
+        
+        # Add extra context for the agent
+        guidance["equipment_model"] = equipment_model
+        return guidance
+    except Exception as e:
+        return {"error": str(e)}
 
 
 @tool
 def read_multimeter(
     test_point_id: str,
     measurement_type: str = "voltage_dc",
-    timeout: float = 10.0
+    timeout: float = 15.0
 ) -> dict:
     """
     Read a measurement from the USB multimeter with automatic noise filtering.
@@ -409,20 +370,27 @@ def read_multimeter(
         result = reading.to_dict()
         result["measurement_type_requested"] = measurement_type
         result["note"] = "Stable reading - automatically collected from multimeter"
+        result["is_stable"] = True
         return result
     
-    # Timeout - no stable reading
-    latest = reader.get_latest_reading()
-    if latest and abs(latest.value) > 0.5:
-        # Return latest if it's above noise threshold
-        latest.test_point_id = test_point_id
-        result = latest.to_dict()
-        result["measurement_type_requested"] = measurement_type
-        result["note"] = "Reading collected (not fully stable)"
-        return result
+    # Timeout - no stable reading - return last valid readings
+    last_valid = reader._reading_stats.get_last_valid_readings(3) if hasattr(reader, '_reading_stats') else []
+    
+    if last_valid:
+        avg = sum(last_valid) / len(last_valid)
+        return {
+            "test_point": test_point_id,
+            "value": round(avg, 2),
+            "unit": "V",
+            "measurement_type": mtype_enum,
+            "raw_values": last_valid,
+            "measurement_type_requested": measurement_type,
+            "note": f"Unstable readings around {avg:.1f}V - make sure probes have good contact",
+            "is_stable": False
+        }
     
     return {
-        "error": "No stable reading received",
+        "error": "No reading received",
         "test_point": test_point_id,
         "timeout_seconds": timeout,
         "instruction": "Position your multimeter probes on the test point - the agent will automatically read the stable value"
