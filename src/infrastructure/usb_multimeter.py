@@ -114,31 +114,31 @@ class MastechMS8250DParser:
             
             value *= multiplier
 
-            # Functions
+            # Functions (Ordered by specificity to prevent misclassification)
             is_ac = bool(buf[1] & 0x10)
             is_dc = bool(buf[2] & 0x02)
             
-            if buf[9] & 0x10: 
-                unit = "V"
-                m_type = "AC_VOLTAGE" if is_ac else "DC_VOLTAGE"
-            elif buf[9] & 0x40:
-                unit = "Ω"
-                m_type = "RESISTANCE"
-            elif buf[10] & 0x01:
-                unit = "A"
-                m_type = "AC_CURRENT" if is_ac else "DC_CURRENT"
-            elif buf[10] & 0x04:
-                unit = "Hz"
-                m_type = "FREQUENCY"
-            elif buf[10] & 0x02:
-                unit = "F"
-                m_type = "CAPACITANCE"
-            elif buf[12] & 0x01: # Diode
-                unit = "V"
-                m_type = "DIODE"
-            elif buf[11] & 0x40: # Continuity
+            if buf[11] & 0x40: # Continuity (Specific bit)
                 unit = "Ω"
                 m_type = "CONTINUITY"
+            elif buf[12] & 0x01: # Diode (Specific bit)
+                unit = "V"
+                m_type = "DIODE"
+            elif buf[9] & 0x40: # Resistance
+                unit = "Ω"
+                m_type = "RESISTANCE"
+            elif buf[9] & 0x10: # Voltage
+                unit = "V"
+                m_type = "AC_VOLTAGE" if is_ac else "DC_VOLTAGE"
+            elif buf[10] & 0x01: # Current
+                unit = "A"
+                m_type = "AC_CURRENT" if is_ac else "DC_CURRENT"
+            elif buf[10] & 0x04: # Frequency
+                unit = "Hz"
+                m_type = "FREQUENCY"
+            elif buf[10] & 0x02: # Capacitance
+                unit = "F"
+                m_type = "CAPACITANCE"
 
             # Secondary Display (Bytes 12-15)
             s1 = cls.parse_sec_digit(buf[12])

@@ -51,6 +51,17 @@ class TestMS8250DParser(unittest.TestCase):
         # Digit 1 was '5', others '0'. With DP1: 5.000
         self.assertAlmostEqual(reading.value, 5.0)
 
+    def test_continuity_prioritization(self):
+        """Test that Continuity bit (buf[11]&0x40) is prioritized over Voltage bit (buf[9]&0x10)."""
+        buf = bytearray(18)
+        buf[9] = 0x10  # Voltage bit (potentially set by stray or dual-mode)
+        buf[11] = 0x40 # Continuity bit
+        
+        reading = MastechMS8250DParser.parse_frame(bytes(buf))
+        self.assertIsNotNone(reading)
+        self.assertEqual(reading.unit, "Ω")
+        self.assertEqual(reading.measurement_type, "CONTINUITY")
+
     def test_resistance_megaohm(self):
         buf = bytearray(18)
         buf[9] = 0x40 # Ohm

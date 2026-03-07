@@ -186,10 +186,14 @@ class BackgroundReader:
                     if reading and reading.value is not None:
                         value = abs(reading.value)  # Use absolute value
                         
-                        # Filter noise - ignore very low values (air interference)
-                        if value < self.NOISE_THRESHOLD:
-                            # Too low - likely noise from air or probe handling
-                            # Reset the reading stats to start fresh
+                        # Filter noise based on measurement type
+                        # For Voltage: Ignore < 0.5V (air interference)
+                        # For Resistance/Continuity: Do NOT filter low values
+                        is_voltage = "VOLTAGE" in reading.measurement_type
+                        threshold = self.NOISE_THRESHOLD if is_voltage else 0.01
+
+                        if value < threshold:
+                            # Too low - likely noise
                             with self._lock:
                                 self._reading_stats.clear()
                             continue

@@ -123,28 +123,17 @@ def clean_messages_for_llm(messages: list[BaseMessage]) -> list[BaseMessage]:
 SYSTEM_PROMPT = """You are a professional Biomedical Engineering Diagnostic Assistant. 
 
 DIAGNOSTIC PRINCIPLES:
-1. DOCUMENT-FIRST: Before suggesting any tests, you MUST consult the equipment configuration and diagnostic knowledge base to identify the most probable faults.
-2. ONE STEP AT A TIME: Never provide multiple instructions or measurements in one message. Guide the user through EXACTLY ONE test point, get the result, and then evaluate.
-3. PROACTIVE AUTO-COLLECTION: When you guide a user to a test point, you MUST call the `read_multimeter` tool in the same message turn. NEVER provide guidance without a tool call.
-4. SESSION CONTINUITY: After every tool result, analyze it against thresholds. If an anomaly is found, immediately move to the next logical step in the fault signature sequence. DO NOT stop the diagnostic session until a final "SESSION COMPLETED" status is reached.
+1. EQUIPMENT FIRST: You MUST identify the equipment model before providing any diagnostic guidance. If the `equipment_model` is not provided in your state, your ONLY goal is to ask the user for the model identifier (e.g., "cctv-psu-24w-v1"). NEVER assume a model.
+2. DOCUMENT-FIRST: Once a model is identified, you MUST consult the equipment configuration and diagnostic knowledge base to identify probable faults before suggesting tests.
+3. ONE STEP AT A TIME: Never provide multiple instructions or measurements in one message. Guide the user through EXACTLY ONE test point, get the result, and then evaluate.
+4. PROACTIVE AUTO-COLLECTION: When you guide a user to a test point, you MUST call the `read_multimeter` tool in the same message turn. NEVER provide guidance without a tool call.
+5. SESSION CONTINUITY: After every tool result, analyze it against thresholds. If an anomaly is found, immediately move to the next logical step. DO NOT stop until "SESSION COMPLETED" is reached.
 
 INTERACTION STYLE:
 - Be concise and technical.
-- Locating the point: Provide the physical description and image.
-- MUST provide text instructions: Always explain what the user should do in your response content.
-- Polling Feedback: Explicitly state "Polling the meter now... please place your probes on [Test Point]." This text must be in the final message content.
-- Interpreting: After a tool returns a value, analyze it against the expected range in the docs before moving to the next point.
-
-WORKFLOW:
-1. Identify equipment model.
-2. Call `query_diagnostic_knowledge` and `get_equipment_configuration` (request_type='faults').
-3. Based on probabilities, choose the HIGHEST priority fault and its signatures.
-4. For each signature:
-   a. Call `get_test_point_guidance`.
-   b. Provide guidance + "Polling..." message.
-   c. Call `read_multimeter` immediately in the same turn.
-   d. Analyze result. If missing/degraded, continue to next signature or diagnose.
-5. When diagnosis is clear, provide final repair instructions and state "SESSION COMPLETED".
+- Locating the point: Provide description and image.
+- Text instructions: Always explain what the user should do.
+- Polling Feedback: Explicitly state "Polling the meter now... please place your probes on [Test Point]."
 """
 
 
@@ -155,18 +144,32 @@ def agent_node(state: ConversationalAgentState):
     tools = get_tools()
     llm_with_tools = llm.bind_tools(tools)
     
-    # Clean history to keep token count low and prevent UI hangs
+    # Clean history to keep token count low
     cleaned_messages = clean_messages_for_llm(state.messages)
     
-    # System prompt
-    sys_msg = SystemMessage(content=SYSTEM_PROMPT)
+    # Detect equipment model from history if not in state
+    equipment_model = state.equipment_model
+    if not equipment_model:
+        for m in reversed(state.messages):
+            if isinstance(m, (HumanMessage, AIMessage, ToolMessage)):
+                content = m.content if isinstance(m.content, str) else str(m.content)
+                # Simple regex for model pattern or look for tool calls
+                match = re.search(r"cctv-psu-[a-z0-9-]+", content.lower())
+                if match:
+                    equipment_model = match.group(0)
+                    break
+    
+    # System prompt enrichment with state
+    sys_content = SYSTEM_PROMPT
+    if equipment_model:
+        sys_content += f"\n\nCURRENT EQUIPMENT: {equipment_model}"
+    
+    sys_msg = SystemMessage(content=sys_content)
     
     # Run LLM
     response = llm_with_tools.invoke([sys_msg] + cleaned_messages)
     
-    # IMAGE ENRICHMENT: Find the most recent test point guidance in history
-    # and attach it to the CURRENT response content if applicable.
-    # This ensures images show up even while the multimeter is polling.
+    # Image Enrichment: Find latest guidance image
     image_data = None
     for m in reversed(state.messages):
         if isinstance(m, ToolMessage):
@@ -178,21 +181,21 @@ def agent_node(state: ConversationalAgentState):
             except:
                 continue
     
-    # Format as multimodal content blocks if image exists
+    # Format content blocks. LangGraph Studio renders image_url blocks 
+    # as expandable if they are standalone, but we want them to be prominent.
     response.content = format_message_content(response.content, image_data)
     
     # Session completion check
     is_complete = False
-    if isinstance(response.content, str):
-        if "SESSION COMPLETED" in response.content:
-            is_complete = True
-    elif isinstance(response.content, list):
-        for block in response.content:
-            if block.get("type") == "text" and "SESSION COMPLETED" in block.get("text", ""):
-                is_complete = True
-                break
+    content_str = str(response.content)
+    if "SESSION COMPLETED" in content_str:
+        is_complete = True
                 
-    return {"messages": [response], "is_session_complete": is_complete}
+    return {
+        "messages": [response], 
+        "is_session_complete": is_complete,
+        "equipment_model": equipment_model
+    }
 
 def tool_node(state: ConversationalAgentState):
     """Standard tool execution node with a twist for images."""
