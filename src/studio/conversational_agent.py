@@ -15,7 +15,7 @@ Workflow Phases:
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Optional, Literal, Sequence, Annotated
+from typing import Any, Optional, Literal, Sequence, Annotated
 import uuid
 import os
 
@@ -55,6 +55,7 @@ class ConversationalAgentState:
     equipment_model: str = ""
     current_test_point: str = ""
     is_awaiting_human: bool = False
+    is_session_complete: bool = False
     last_tool_result: dict = field(default_factory=dict)
 
 # =============================================================================
@@ -180,7 +181,18 @@ def agent_node(state: ConversationalAgentState):
     # Format as multimodal content blocks if image exists
     response.content = format_message_content(response.content, image_data)
     
-    return {"messages": [response]}
+    # Session completion check
+    is_complete = False
+    if isinstance(response.content, str):
+        if "SESSION COMPLETED" in response.content:
+            is_complete = True
+    elif isinstance(response.content, list):
+        for block in response.content:
+            if block.get("type") == "text" and "SESSION COMPLETED" in block.get("text", ""):
+                is_complete = True
+                break
+                
+    return {"messages": [response], "is_session_complete": is_complete}
 
 def tool_node(state: ConversationalAgentState):
     """Standard tool execution node with a twist for images."""
@@ -220,8 +232,10 @@ def tool_node(state: ConversationalAgentState):
 
 def should_continue(state: ConversationalAgentState):
     """Route after agent node."""
+    if state.is_session_complete:
+        return END
+
     last_msg = state.messages[-1]
-    
     if hasattr(last_msg, "tool_calls") and last_msg.tool_calls:
         return "tools"
         
