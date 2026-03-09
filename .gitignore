@@ -157,6 +157,7 @@ backups/
 # LangChain cache
 .cache/
 .langchain/
+.langgraph_api
 
 # Model artifacts
 models/

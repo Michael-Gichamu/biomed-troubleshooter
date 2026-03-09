@@ -57,6 +57,8 @@ class ConversationalAgentState:
     is_awaiting_human: bool = False
     is_session_complete: bool = False
     last_tool_result: dict = field(default_factory=dict)
+    iteration_count: int = 0  # Track iterations to prevent infinite loops
+    measurements: list = field(default_factory=list)  # Track all measurements taken
 
 # =============================================================================
 # HELPER: IMAGE EMBEDDING
@@ -64,19 +66,19 @@ class ConversationalAgentState:
 
 def format_message_content(text: str, image_data: Optional[dict] = None) -> Any:
     """
-    Format message content as a list of blocks for LangGraph Studio rendering.
+    Format message content with the image PROMINENTLY as the first block.
     """
     if not image_data:
         return text
         
     return [
-        {"type": "text", "text": text},
         {
             "type": "image_url", 
             "image_url": {
                 "url": f"data:{image_data.get('mime_type', 'image/jpeg')};base64,{image_data.get('image_base64')}"
             }
-        }
+        },
+        {"type": "text", "text": text}
     ]
 
 # =============================================================================
@@ -101,18 +103,33 @@ def clean_messages_for_llm(messages: list[BaseMessage]) -> list[BaseMessage]:
     for msg in messages:
         # Clone the message to avoid side effects on the original UI representation
         new_msg = msg.copy()
-        if hasattr(new_msg, "content") and isinstance(new_msg.content, str):
+        
+        if isinstance(new_msg.content, str):
             new_msg.content = base64_re.sub("[IMAGE DATA STRIPPED FOR STABILITY]", new_msg.content)
+        elif isinstance(new_msg.content, list):
+            # Clean multimodal content blocks
+            new_content = []
+            for block in new_msg.content:
+                if isinstance(block, dict) and block.get("type") == "image_url":
+                    new_content.append({"type": "text", "text": "[IMAGE ATTACHMENT STRIPPED FROM CONTEXT]"})
+                else:
+                    new_content.append(block)
+            new_msg.content = new_content
             
-            # Also check ToolMessage content which might be JSON containing base64
-            if isinstance(new_msg, ToolMessage):
-                try:
-                    data = json.loads(new_msg.content)
-                    if isinstance(data, dict) and "image_base64" in data:
+        # Also check ToolMessage content which might be JSON containing base64
+        if isinstance(new_msg, ToolMessage):
+            try:
+                data = json.loads(new_msg.content)
+                if isinstance(data, dict):
+                    if "image_base64" in data:
                         data["image_base64"] = "[SENSITIVE DATA STRIPPED]"
-                        new_msg.content = json.dumps(data)
-                except:
-                    pass
+                    if "images" in data:
+                        for img in data["images"]:
+                            if isinstance(img, dict) and "image_base64" in img:
+                                img["image_base64"] = "[SENSITIVE DATA STRIPPED]"
+                    new_msg.content = json.dumps(data)
+            except:
+                pass
         cleaned.append(new_msg)
     return cleaned
 
@@ -127,14 +144,20 @@ DIAGNOSTIC PRINCIPLES:
 2. DOCUMENT-FIRST: Once a model is identified, you MUST consult the equipment configuration and diagnostic knowledge base to identify probable faults before suggesting tests.
 3. ONE STEP AT A TIME: Never provide multiple instructions or measurements in one message. Guide the user through EXACTLY ONE test point, get the result, and then evaluate.
 4. PROACTIVE AUTO-COLLECTION: When you guide a user to a test point, you MUST call the `read_multimeter` tool in the same message turn. NEVER provide guidance without a tool call.
-5. SESSION CONTINUITY: After every tool result, analyze it against thresholds. If an anomaly is found, immediately move to the next logical step. DO NOT stop until "SESSION COMPLETED" is reached.
+5. SMART TERMINATION - CRITICAL: After each measurement, analyze against expected thresholds. If a reading is OUT OF RANGE or indicates a fault, IMMEDIATELY conclude with diagnosis and recommendations. DO NOT continue to additional test points if you've already identified the fault. State "SESSION COMPLETED" when done.
+6. ITERATION LIMIT: The session will auto-terminate after 10 measurement iterations. Provide your best diagnosis with available data if you reach this limit.
 
 INTERACTION STYLE:
 - Be concise and technical.
-- Locating the point: Provide description and image.
-- Text instructions: Always explain what the user should do.
+- Locating the point: ALWAYS provide visual guidance.
+- Text instructions: Explain what the user should do.
 - Polling Feedback: Explicitly state "Polling the meter now... please place your probes on [Test Point]."
+- IMAGE PROVIDER: You ARE capable of showing images. When the user asks for one, or when you are guiding them to a test point, ALWAYS call a tool that provides image data (e.g., `get_equipment_configuration` with `request_type="all"` or `get_test_point_guidance`). 
+- RENDER POLICY: The system will automatically attach and render the image from the latest tool output as the primary visual block. Do NOT include markdown links or base64 text in your response; just say "Here is the layout view..." or similar.
 """
+
+# Maximum iterations to prevent infinite loops
+MAX_ITERATIONS = 10
 
 
 def agent_node(state: ConversationalAgentState):
@@ -169,20 +192,35 @@ def agent_node(state: ConversationalAgentState):
     # Run LLM
     response = llm_with_tools.invoke([sys_msg] + cleaned_messages)
     
-    # Image Enrichment: Find latest guidance image
+    # Image Enrichment: Find latest guidance image or reference image
     image_data = None
+    # We look through history to find the most recent ToolMessage that contains image data.
+    # We search the ORIGINAL state.messages which have the base64 data.
+    # We increase search depth to ensure images from early steps are still available.
     for m in reversed(state.messages):
         if isinstance(m, ToolMessage):
             try:
                 res_data = json.loads(m.content)
-                if isinstance(res_data, dict) and res_data.get("image_base64"):
-                    image_data = res_data
-                    break
+                if isinstance(res_data, dict):
+                    # Priority 1: Direct test point image
+                    if res_data.get("image_base64"):
+                        image_data = res_data
+                        break
+                    # Priority 2: Visual guide annotations from test point guidance
+                    elif res_data.get("visual_guide") and isinstance(res_data["visual_guide"], list) and res_data["visual_guide"]:
+                        # Fallback if image_base64 is present
+                        if res_data.get("image_base64"):
+                            image_data = res_data
+                            break
+                    # Priority 3: Bulk image list
+                    elif "images" in res_data and res_data["images"]:
+                        overview = next((img for img in res_data["images"] if "overview" in str(img.get("description", "")).lower() or "overview" in str(img.get("filename", "")).lower()), None)
+                        image_data = overview or res_data["images"][0]
+                        break
             except:
                 continue
     
-    # Format content blocks. LangGraph Studio renders image_url blocks 
-    # as expandable if they are standalone, but we want them to be prominent.
+    # Format content blocks. Place image FIRST for maximum prominence.
     response.content = format_message_content(response.content, image_data)
     
     # Session completion check
@@ -194,7 +232,8 @@ def agent_node(state: ConversationalAgentState):
     return {
         "messages": [response], 
         "is_session_complete": is_complete,
-        "equipment_model": equipment_model
+        "equipment_model": equipment_model,
+        "iteration_count": state.iteration_count + 1
     }
 
 def tool_node(state: ConversationalAgentState):
@@ -205,6 +244,7 @@ def tool_node(state: ConversationalAgentState):
         
     tools_map = {t.name: t for t in get_tools()}
     results = []
+    measurements = []
     
     for tool_call in last_msg.tool_calls:
         tool = tools_map.get(tool_call["name"])
@@ -227,17 +267,37 @@ def tool_node(state: ConversationalAgentState):
                 content=json.dumps(result) if isinstance(result, dict) else str(result)
             ))
             
-    return {"messages": results}
+            # Track measurements for diagnostic analysis
+            if tool_call["name"] in ("read_multimeter", "enter_manual_reading") and isinstance(result, dict):
+                if "value" in result and "test_point" in result:
+                    measurement = {
+                        "test_point": result.get("test_point"),
+                        "value": result.get("value"),
+                        "unit": result.get("unit", "V"),
+                        "measurement_type": result.get("measurement_type", "unknown"),
+                        "is_stable": result.get("is_stable", True)
+                    }
+                    measurements.append(measurement)
+    
+    return {
+        "messages": results,
+        "measurements": state.measurements + measurements
+    }
 
 # =============================================================================
 # ROUTING
 # =============================================================================
 
 def should_continue(state: ConversationalAgentState):
-    """Route after agent node."""
+    """Route after agent node - checks for session completion or max iterations."""
+    # Check if session is complete
     if state.is_session_complete:
         return END
-
+    
+    # Check if we've exceeded max iterations - force diagnose
+    if state.iteration_count >= MAX_ITERATIONS:
+        return "diagnose"
+    
     last_msg = state.messages[-1]
     if hasattr(last_msg, "tool_calls") and last_msg.tool_calls:
         return "tools"
@@ -249,6 +309,57 @@ def post_tool_route(state: ConversationalAgentState):
     return "agent"
 
 # =============================================================================
+# DIAGNOSE NODE - Provides diagnosis when max iterations reached
+# =============================================================================
+
+def diagnose_node(state: ConversationalAgentState):
+    """
+    Diagnose node that provides final analysis when max iterations reached.
+    This node analyzes accumulated measurements and provides a conclusion.
+    """
+    from src.infrastructure.llm_client import get_llm
+    from langchain_core.messages import SystemMessage
+    
+    llm = get_llm()
+    
+    # Build measurement summary for diagnosis
+    measurement_summary = ""
+    if state.measurements:
+        measurement_summary = "\n".join([
+            f"- {m.get('test_point')}: {m.get('value')} {m.get('unit')} ({m.get('measurement_type')})"
+            for m in state.measurements
+        ])
+    else:
+        measurement_summary = "No measurements recorded."
+    
+    # Create diagnosis prompt
+    diagnose_prompt = f"""You have reached the maximum number of diagnostic iterations (10). 
+
+Based on the accumulated evidence, provide a final diagnosis:
+
+MEASUREMENTS COLLECTED:
+{measurement_summary}
+
+Please provide:
+1. Your best assessment of the fault
+2. Recommended next steps or actions
+3. Any additional tests that might help (if applicable)
+
+End your response with "SESSION COMPLETED" to close this session.
+"""
+    
+    response = llm.invoke([SystemMessage(content=diagnose_prompt)])
+    
+    # Add measurement summary as context
+    response.content = f"[Diagnostic Summary - {len(state.measurements)} measurements taken]\n\n" + str(response.content)
+    
+    return {
+        "messages": [response],
+        "is_session_complete": True
+    }
+
+
+# =============================================================================
 # GRAPH CONSTRUCTION
 # =============================================================================
 
@@ -258,6 +369,7 @@ def create_conversational_graph():
     
     builder.add_node("agent", agent_node)
     builder.add_node("tools", tool_node)
+    builder.add_node("diagnose", diagnose_node)
     
     builder.add_edge(START, "agent")
     
@@ -266,11 +378,13 @@ def create_conversational_graph():
         should_continue,
         {
             "tools": "tools",
+            "diagnose": "diagnose",
             END: END
         }
     )
     
     builder.add_edge("tools", "agent")
+    builder.add_edge("diagnose", END)
     
     checkpointer = MemorySaver()
     return builder.compile(checkpointer=checkpointer)

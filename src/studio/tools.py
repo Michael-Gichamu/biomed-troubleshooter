@@ -195,7 +195,7 @@ def get_equipment_configuration(
     elif request_type == "images":
         """Return reference images with test point locations."""
         images = []
-        for img in config.images.values():  # Use .values() to get ImageConfig objects
+        for img in config.images.values():
             embed = img.get_base64_data()
             images.append({
                 "image_id": img.image_id,
@@ -217,6 +217,26 @@ def get_equipment_configuration(
     
     elif request_type == "all":
         # Return complete config
+        images = []
+        for img in config.images.values():
+            embed = img.get_base64_data()
+            images.append({
+                "image_id": img.image_id,
+                "filename": img.filename,
+                "description": img.description,
+                "test_points": img.test_points,
+                "image_base64": embed["base64"] if embed else None,
+                "mime_type": embed["mime_type"] if embed else None,
+                "annotations": [
+                    {
+                        "target": a.get("target", ""),
+                        "position": a.get("position", ""),
+                        "label": a.get("label", "")
+                    }
+                    for a in (img.annotations or [])
+                ]
+            })
+
         return {
             "equipment_model": equipment_model,
             "metadata": {
@@ -236,46 +256,8 @@ def get_equipment_configuration(
                 }
                 for s in config.signals.values()
             ],
-            "images": [
-                {
-                    "image_id": img.image_id,
-                    "filename": img.filename,
-                    "description": img.description,
-                    "test_points": img.test_points,
-                    "image_base64": (embed := img.get_base64_data())["base64"] if embed else None,
-                    "mime_type": embed["mime_type"] if embed else None,
-                    "annotations": [
-                        {
-                            "target": a.get("target", ""),
-                            "position": a.get("position", ""),
-                            "label": a.get("label", "")
-                        }
-                        for a in (img.annotations or [])
-                    ]
-                }
-                for img in config.images.values()
-            ]
+            "images": images
         }
-    
-    elif request_type == "images":
-        """Return reference images with test point locations."""
-        images = []
-        for img in config.images.values():
-            images.append({
-                "image_id": img.image_id,
-                "filename": img.filename,
-                "description": img.description,
-                "test_points": img.test_points,
-                "annotations": [
-                    {
-                        "target": a.get("target", ""),
-                        "position": a.get("position", ""),
-                        "label": a.get("label", "")
-                    }
-                    for a in (img.annotations or [])
-                ]
-            })
-        return {"images": images, "equipment_model": equipment_model}
     
     else:
         return {"error": f"Unknown request_type: {request_type}. Valid types: test_points, thresholds, faults, images, all"}
