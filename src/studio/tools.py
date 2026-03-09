@@ -271,12 +271,18 @@ def get_test_point_guidance(
     """
     Get detailed guidance for measuring a specific test point.
     
+    This tool retrieves:
+    1. Test point location and physical description
+    2. Expected values and thresholds from RAG
+    3. Image of the test point location (inline for LangGraph Studio)
+    
     Args:
         equipment_model: Equipment model identifier (e.g., "cctv-psu-24w-v1")
         test_point_id: Test point identifier (e.g., "TP2", "TP3")
         
     Returns:
-        Test point details including location, nominal values, safety warnings
+        Test point details including location, nominal values, safety warnings,
+        and an inline image for visual guidance.
     """
     try:
         config = get_equipment_config(equipment_model)
@@ -286,6 +292,53 @@ def get_test_point_guidance(
         
         # Add extra context for the agent
         guidance["equipment_model"] = equipment_model
+        
+        # Load and embed the image for inline display in LangGraph Studio
+        image_url = guidance.get("image_url", "")
+        if image_url:
+            # Try to load the image and convert to base64
+            try:
+                from pathlib import Path
+                import base64
+                
+                # The image_url is relative to the data directory
+                image_path = Path("data") / image_url if not Path(image_url).is_absolute() else Path(image_url)
+                
+                if image_path.exists():
+                    with open(image_path, "rb") as f:
+                        image_data = base64.b64encode(f.read()).decode("utf-8")
+                    
+                    # Determine mime type from extension
+                    ext = image_path.suffix.lower()
+                    mime_type = "image/jpeg" if ext in [".jpg", ".jpeg"] else "image/png" if ext == ".png" else "image/jpeg"
+                    
+                    guidance["image_base64"] = image_data
+                    guidance["mime_type"] = mime_type
+                    guidance["image_filename"] = image_path.name
+                    guidance["location_description"] = f"Test point {test_point_id} location - {guidance.get('name', '')}"
+                else:
+                    # Image file not found, use the reference image from config
+                    pass
+            except Exception as e:
+                # Silently fail if image loading fails
+                print(f"[DEBUG] Could not load image for {test_point_id}: {e}")
+        
+        # If no image found yet, try to get from config.images
+        if not guidance.get("image_base64"):
+            try:
+                # Get the first image from config that has annotations for this test point
+                for img in config.images.values():
+                    if test_point_id in (img.test_points or []):
+                        embed = img.get_base64_data()
+                        if embed:
+                            guidance["image_base64"] = embed["base64"]
+                            guidance["mime_type"] = embed["mime_type"]
+                            guidance["image_filename"] = img.filename
+                            guidance["location_description"] = f"Test point {test_point_id} location"
+                            break
+            except Exception as e:
+                print(f"[DEBUG] Could not get image from config: {e}")
+        
         return guidance
     except Exception as e:
         return {"error": str(e)}
@@ -298,26 +351,30 @@ def read_multimeter(
     timeout: float = 15.0
 ) -> dict:
     """
-    Read a measurement from the USB multimeter with automatic noise filtering.
+    Read a measurement from the USB multimeter with automatic noise filtering and polling.
     
-    The agent continuously listens for readings and applies:
+    This tool WAITS and POLLS for a stable reading:
     1. Noise filtering: Ignores values below 0.5V (air interference)
     2. Stabilization: Waits for stable readings (std dev <= 5V)
-    3. Averaging: Returns the average of stable readings
+    3. Polling: Continuously polls for up to 15 seconds until stable reading is obtained
+    4. Returns explicit status: "success", "timeout", or "error"
     
     Args:
         test_point_id: The test point identifier (e.g., "TP2")
         measurement_type: Type of measurement - "voltage_dc", "voltage_ac", 
                          "resistance", "current_dc", "continuity"
-        timeout: Maximum time to wait for stable reading in seconds (default 10s)
+        timeout: Maximum time to wait for stable reading in seconds (default 15s)
         
     Returns:
         Dict with measurement value, unit, and metadata.
-        Includes test_point_id for correlation.
+        Returns explicit "status" field: "success", "timeout", or "error"
         
     Example:
         read_multimeter(test_point_id="TP2", measurement_type="voltage_dc")
-        returns: {"test_point": "TP2", "value": 224.5, "unit": "V", "measurement_type": "DC_VOLTAGE", "note": "Stable average of 5 readings"}
+        returns: {"status": "success", "test_point": "TP2", "value": 224.5, "unit": "V", ...}
+        
+        If timeout:
+        returns: {"status": "timeout", "test_point": "TP2", "message": "No stable reading after 15 seconds", ...}
     """
     from src.studio.background_usb_reader import ensure_reader_running, get_background_reader
     
@@ -325,6 +382,7 @@ def read_multimeter(
     if not ensure_reader_running():
         available_ports = USBMultimeterClient.list_available_ports()
         return {
+            "status": "error",
             "error": "Could not connect to multimeter",
             "available_ports": available_ports,
             "instruction": "Please connect the multimeter via USB",
@@ -344,7 +402,7 @@ def read_multimeter(
     }
     mtype_enum = measurement_type_map.get(measurement_type.lower(), "DC_VOLTAGE")
     
-    # Wait for stable reading
+    # Wait for stable reading with polling
     reading = reader.get_reading_with_stabilization(timeout=timeout, measurement_type=mtype_enum)
     
     if reading:
@@ -353,14 +411,16 @@ def read_multimeter(
         result["measurement_type_requested"] = measurement_type
         result["note"] = "Stable reading - automatically collected from multimeter"
         result["is_stable"] = True
+        result["status"] = "success"  # Explicit success status
         return result
     
-    # Timeout - no stable reading - return last valid readings
+    # Timeout - no stable reading after polling
     last_valid = reader._reading_stats.get_last_valid_readings(3) if hasattr(reader, '_reading_stats') else []
     
     if last_valid:
         avg = sum(last_valid) / len(last_valid)
         return {
+            "status": "timeout_unstable",  # Timeout but had some readings
             "test_point": test_point_id,
             "value": round(avg, 2),
             "unit": "V",
@@ -368,14 +428,18 @@ def read_multimeter(
             "raw_values": last_valid,
             "measurement_type_requested": measurement_type,
             "note": f"Unstable readings around {avg:.1f}V - make sure probes have good contact",
-            "is_stable": False
+            "is_stable": False,
+            "message": "Readings were unstable. Please ensure probes have good contact and try again."
         }
     
+    # Complete timeout - no readings at all
     return {
+        "status": "timeout",  # Explicit timeout status
         "error": "No reading received",
         "test_point": test_point_id,
         "timeout_seconds": timeout,
-        "instruction": "Position your multimeter probes on the test point - the agent will automatically read the stable value"
+        "instruction": "Position your multimeter probes on the test point - I will automatically read the stable value",
+        "message": f"I couldn't detect a reading after {timeout} seconds. Are the probes connected?"
     }
 
 

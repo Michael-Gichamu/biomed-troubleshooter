@@ -202,6 +202,16 @@ HUMAN-IN-THE-LOOP WORKFLOW - CRITICAL:
 - If user says "next", you will receive control back and should continue to the next step.
 - ITERATION LIMIT: The session will auto-terminate after 10 measurement iterations. Provide your best diagnosis with available data if you reach this limit.
 
+**TALK-BEFORE-ACT - CRITICAL FOR UX:**
+Before calling ANY tool, ALWAYS provide a brief conversational update to the user. This ensures the user sees text in the LangGraph Studio UI even when "Show Tool Calls" is toggled off.
+
+Example workflow:
+1. "I'm going to check the voltage at TP1 now..." (user sees this text)
+2. Then call `get_test_point_guidance` to show where to probe
+3. Then call `read_multimeter` to collect the reading
+
+NEVER call a tool without first speaking to the user. Your response message content and tool_calls should appear together.
+
 **PROACTIVE AUTO-COLLECTION - CRITICAL REQUIREMENT:**
 When you guide a user to a test point (after calling `get_test_point_guidance` or `get_equipment_configuration`), you MUST immediately call the `read_multimeter` tool in the SAME message turn to automatically collect the reading. Do NOT ask the user to manually report the value. The workflow is:
 1. Call `get_test_point_guidance` to show WHERE to probe (with image)
@@ -210,6 +220,12 @@ When you guide a user to a test point (after calling `get_test_point_guidance` o
 4. Interpret the result and ask user to say "next"
 
 NEVER ask the user to manually report a reading - always use `read_multimeter` or `enter_manual_reading` tools.
+
+**TIMEOUT HANDLING:**
+If `read_multimeter` returns status "timeout", the agent should:
+- Ask the user: "I couldn't detect a reading. Are the probes connected? Please type 'retry' or enter the value manually using `enter_manual_reading`"
+- Do NOT proceed to next step until a valid reading is obtained
+- Offer the user options: retry the measurement or enter manually
 
 INTERACTION STYLE:
 - Be conversational and instructional - guide the user like a mentor.
@@ -512,33 +528,90 @@ def should_continue(state: ConversationalAgentState):
 
 
 def post_tool_route(state: ConversationalAgentState):
-    """Route after tools node - check if we should pause for human or continue."""
+    """
+    Route after tools node - check if we should pause for human, handle timeout, or continue.
+    
+    Logic:
+    - If read_multimeter returns "success" → route to agent to interpret result, then pause for "next"
+    - If read_multimeter returns "timeout" → use interrupt to ask user for retry/manual entry
+    - If read_multimeter returns "timeout_unstable" → use interrupt to ask user to retry
+    - If fault detected → route to agent for diagnosis
+    """
     # After tools run, check if this was a measurement tool
     last_msg = state.messages[-1]
     
     # Check if last tool was a measurement
-    cleared_auto_reading = False
     if isinstance(last_msg, ToolMessage):
         try:
             result = json.loads(last_msg.content)
-            if isinstance(result, dict) and "value" in result:
-                # This was a measurement - we should pause for human
-                # Clear the auto-reading flag since we collected the measurement
-                cleared_auto_reading = True
+            if isinstance(result, dict):
+                # Check for measurement status
+                status = result.get("status", "")
                 
-                # Check if a fault was found
-                is_fault = result.get("is_out_of_range", False) or result.get("fault_detected", False)
+                # Handle timeout cases - interrupt to ask for retry/manual
+                if status in ("timeout", "timeout_unstable"):
+                    # Return special routing to trigger timeout handling
+                    return "handle_timeout"
                 
-                if is_fault:
-                    # Fault found - don't pause, let agent provide diagnosis
-                    return "agent"
-                else:
-                    # No fault - pause for human confirmation
-                    return "pause_for_human"
+                # Handle success - check for fault
+                if status == "success" or "value" in result:
+                    # Check if a fault was found
+                    is_fault = result.get("is_out_of_range", False) or result.get("fault_detected", False)
+                    
+                    if is_fault:
+                        # Fault found - route to agent for diagnosis
+                        return "agent"
+                    else:
+                        # No fault - pause for human confirmation (ask for "next")
+                        return "pause_for_human"
         except:
             pass
     
     return "agent"
+
+
+def handle_timeout_node(state: ConversationalAgentState):
+    """
+    Handle timeout from read_multimeter.
+    Uses interrupt to ask user: "I couldn't detect a reading. Are the probes connected? 
+    Please type 'retry' or enter the value manually."
+    
+    This allows the user to:
+    - Type "retry" to try again
+    - Use enter_manual_reading to input the value manually
+    - Or the agent can call read_multimeter again
+    """
+    last_msg = state.messages[-1]
+    test_point = "unknown"
+    
+    # Get test point from the timeout result
+    if isinstance(last_msg, ToolMessage):
+        try:
+            result = json.loads(last_msg.content)
+            test_point = result.get("test_point", "unknown")
+        except:
+            pass
+    
+    # Use interrupt to pause and wait for user response
+    instruction = (
+        f"I couldn't detect a stable reading at {test_point} after 15 seconds. "
+        "Are the multimeter probes properly connected? "
+        "Please do one of the following:\n"
+        "- Type 'retry' and I will try again\n"
+        "- Enter the value manually using 'enter_manual_reading' tool\n"
+        "- Describe any issues you're seeing"
+    )
+    
+    human_response = interrupt({
+        "instruction": instruction,
+        "test_point": test_point,
+        "reason": "timeout"
+    })
+    
+    # This code only runs after interrupt resumes
+    return {
+        "is_paused_for_human": False
+    }
 
 # =============================================================================
 # DIAGNOSE NODE - Provides diagnosis when max iterations reached
@@ -605,6 +678,7 @@ def create_conversational_graph():
     builder.add_node("diagnose", diagnose_node)
     builder.add_node("wait_for_human", wait_for_human)
     builder.add_node("resume_from_human", resume_from_human)
+    builder.add_node("handle_timeout", handle_timeout_node)
     
     # Start at agent
     builder.add_edge(START, "agent")
@@ -621,19 +695,23 @@ def create_conversational_graph():
         }
     )
     
-    # Tools routing: after measurement, either pause for human or continue to agent
+    # Tools routing: after measurement, either pause for human, handle timeout, or continue to agent
     builder.add_conditional_edges(
         "tools",
         post_tool_route,
         {
             "agent": "agent",
-            "pause_for_human": "wait_for_human"
+            "pause_for_human": "wait_for_human",
+            "handle_timeout": "handle_timeout"
         }
     )
     
     # After waiting for human, resume processing
     builder.add_edge("wait_for_human", "resume_from_human")
     builder.add_edge("resume_from_human", "agent")
+    
+    # After timeout handling, resume to agent to process user response
+    builder.add_edge("handle_timeout", "resume_from_human")
     
     # Final edges
     builder.add_edge("diagnose", END)
