@@ -50,15 +50,23 @@ import json
 class ConversationalAgentState:
     """
     State for conversational LangGraph Studio troubleshooting agent.
+    Includes step tracking for human-in-the-loop diagnostic workflow.
     """
     messages: Annotated[list[BaseMessage], add_messages] = field(default_factory=list)
     equipment_model: str = ""
     current_test_point: str = ""
     is_awaiting_human: bool = False
     is_session_complete: bool = False
+    is_paused_for_human: bool = False  # Flag to indicate we're waiting for user confirmation
     last_tool_result: dict = field(default_factory=dict)
     iteration_count: int = 0  # Track iterations to prevent infinite loops
     measurements: list = field(default_factory=list)  # Track all measurements taken
+    
+    # Step tracking for human-in-the-loop
+    current_step: int = 1  # Current step number (1-indexed)
+    total_steps: int = 5  # Total steps planned for diagnosis
+    step_description: str = ""  # Description of current step
+    pending_instruction: str = ""  # Instruction to show user after resume
 
 # =============================================================================
 # HELPER: IMAGE EMBEDDING
@@ -142,18 +150,33 @@ SYSTEM_PROMPT = """You are a professional Biomedical Engineering Diagnostic Assi
 DIAGNOSTIC PRINCIPLES:
 1. EQUIPMENT FIRST: You MUST identify the equipment model before providing any diagnostic guidance. If the `equipment_model` is not provided in your state, your ONLY goal is to ask the user for the model identifier (e.g., "cctv-psu-24w-v1"). NEVER assume a model.
 2. DOCUMENT-FIRST: Once a model is identified, you MUST consult the equipment configuration and diagnostic knowledge base to identify probable faults before suggesting tests.
-3. ONE STEP AT A TIME: Never provide multiple instructions or measurements in one message. Guide the user through EXACTLY ONE test point, get the result, and then evaluate.
-4. PROACTIVE AUTO-COLLECTION: When you guide a user to a test point, you MUST call the `read_multimeter` tool in the same message turn. NEVER provide guidance without a tool call.
-5. SMART TERMINATION - CRITICAL: After each measurement, analyze against expected thresholds. If a reading is OUT OF RANGE or indicates a fault, IMMEDIATELY conclude with diagnosis and recommendations. DO NOT continue to additional test points if you've already identified the fault. State "SESSION COMPLETED" when done.
-6. ITERATION LIMIT: The session will auto-terminate after 10 measurement iterations. Provide your best diagnosis with available data if you reach this limit.
+
+HUMAN-IN-THE-LOOP WORKFLOW - CRITICAL:
+- ONE DIAGNOSIS PER TURN: Complete exactly one test, wait for result, interpret it, then ask user to say 'next' to continue.
+- STEP TRACKING: Always show current step like "Step X of Y: [Description]"
+- INLINE IMAGES: Show images inline as the FIRST content block for visibility.
+- AFTER EACH MEASUREMENT: Interpret the result against RAG thresholds. If a reading is OUT OF RANGE or indicates a fault, IMMEDIATELY conclude with diagnosis and recommendations. DO NOT continue to additional test points if you've already identified the fault.
+- WAIT FOR HUMAN: After each measurement, ALWAYS say "Reply 'next' to continue diagnosis" or "Reply 'next' to proceed to the next test" and then call the interrupt.
+- If user says "next", you will receive control back and should continue to the next step.
+- ITERATION LIMIT: The session will auto-terminate after 10 measurement iterations. Provide your best diagnosis with available data if you reach this limit.
 
 INTERACTION STYLE:
-- Be concise and technical.
-- Locating the point: ALWAYS provide visual guidance.
-- Text instructions: Explain what the user should do.
-- Polling Feedback: Explicitly state "Polling the meter now... please place your probes on [Test Point]."
-- IMAGE PROVIDER: You ARE capable of showing images. When the user asks for one, or when you are guiding them to a test point, ALWAYS call a tool that provides image data (e.g., `get_equipment_configuration` with `request_type="all"` or `get_test_point_guidance`). 
-- RENDER POLICY: The system will automatically attach and render the image from the latest tool output as the primary visual block. Do NOT include markdown links or base64 text in your response; just say "Here is the layout view..." or similar.
+- Be conversational and instructional - guide the user like a mentor.
+- Before each test: Explain WHAT to test and WHY it matters.
+- Provide clear step-by-step instructions: "Step 1 of 5: Testing the Input Fuse"
+- Locating the point: ALWAYS provide visual guidance with inline images.
+- Text instructions: Explain what the user should do in simple terms.
+- After measurement: Interpret the reading against expected thresholds.
+- End each turn with: "Reply 'next' to continue diagnosis" or "SESSION COMPLETED" if done.
+
+IMAGE RENDERING:
+- You ARE capable of showing images. When the user asks for one, or when you are guiding them to a test point, ALWAYS call a tool that provides image data (e.g., `get_equipment_configuration` with `request_type="all"` or `get_test_point_guidance`). 
+- The image will be shown inline as the first content block. Do NOT include markdown links or base64 text in your response.
+
+STATE TRACKING:
+- current_step: Tracks which diagnostic step you're on (1, 2, 3, etc.)
+- total_steps: Total planned steps for this diagnosis
+- Update these values as you progress through the diagnosis.
 """
 
 # Maximum iterations to prevent infinite loops
@@ -186,6 +209,11 @@ def agent_node(state: ConversationalAgentState):
     sys_content = SYSTEM_PROMPT
     if equipment_model:
         sys_content += f"\n\nCURRENT EQUIPMENT: {equipment_model}"
+    
+    # Add step tracking info to system prompt
+    sys_content += f"\n\nDIAGNOSIS PROGRESS: Step {state.current_step} of {state.total_steps}"
+    if state.step_description:
+        sys_content += f" - {state.step_description}"
     
     sys_msg = SystemMessage(content=sys_content)
     
@@ -228,12 +256,23 @@ def agent_node(state: ConversationalAgentState):
     content_str = str(response.content)
     if "SESSION COMPLETED" in content_str:
         is_complete = True
-                
+    
+    # Check if agent called a measurement tool - if so, we'll pause after tools run
+    is_awaiting_measurement = False
+    if hasattr(response, "tool_calls") and response.tool_calls:
+        for tc in response.tool_calls:
+            if tc.get("name") in ("read_multimeter", "enter_manual_reading"):
+                is_awaiting_measurement = True
+                break
+    
     return {
         "messages": [response], 
         "is_session_complete": is_complete,
         "equipment_model": equipment_model,
-        "iteration_count": state.iteration_count + 1
+        "iteration_count": state.iteration_count + 1,
+        "is_paused_for_human": is_awaiting_measurement,
+        "current_step": state.current_step,
+        "total_steps": state.total_steps
     }
 
 def tool_node(state: ConversationalAgentState):
@@ -285,14 +324,91 @@ def tool_node(state: ConversationalAgentState):
     }
 
 # =============================================================================
+# HUMAN-IN-THE-LOOP NODES
+# =============================================================================
+
+def wait_for_human(state: ConversationalAgentState):
+    """
+    Wait for human confirmation before continuing.
+    This node uses interrupt() to pause the graph and wait for user input.
+    
+    The interrupt message tells the user what to do next (e.g., 'Reply next to continue').
+    """
+    # Get the last AI message to include in the interrupt
+    last_msg = state.messages[-1]
+    
+    # Determine the step context for the interrupt message
+    step_context = f"Step {state.current_step} of {state.total_steps}"
+    if state.step_description:
+        step_context += f": {state.step_description}"
+    
+    # Create a clear instruction message
+    instruction = (
+        f"{step_context} - Measurement complete. "
+        "Reply 'next' to continue diagnosis, or describe any issues you're seeing."
+    )
+    
+    # Use interrupt to pause and wait for human
+    # The human's response will be passed to resume_from_human
+    human_response = interrupt({
+        "instruction": instruction,
+        "current_step": state.current_step,
+        "total_steps": state.total_steps,
+        "measurements_taken": len(state.measurements)
+    })
+    
+    # This code only runs after interrupt resumes
+    return {
+        "is_paused_for_human": False
+    }
+
+
+def resume_from_human(state: ConversationalAgentState):
+    """
+    Resume from human interruption.
+    This node processes the user's "next" response and continues the diagnosis.
+    """
+    # Get the last human message
+    last_msg = state.messages[-1]
+    
+    # Extract user response
+    user_response = ""
+    if isinstance(last_msg, HumanMessage):
+        if isinstance(last_msg.content, str):
+            user_response = last_msg.content.strip().lower()
+        elif isinstance(last_msg.content, list):
+            for block in last_msg.content:
+                if isinstance(block, dict) and block.get("type") == "text":
+                    user_response = block.get("text", "").strip().lower()
+                    break
+    
+    # Check if user wants to continue
+    if "next" in user_response or "continue" in user_response:
+        # Increment step counter
+        return {
+            "is_paused_for_human": False,
+            "current_step": state.current_step + 1
+        }
+    else:
+        # User provided other input - let agent handle it
+        return {
+            "is_paused_for_human": False
+        }
+
+
+# =============================================================================
 # ROUTING
 # =============================================================================
 
 def should_continue(state: ConversationalAgentState):
-    """Route after agent node - checks for session completion or max iterations."""
+    """Route after agent node - checks for session completion, human interrupt, or max iterations."""
     # Check if session is complete
     if state.is_session_complete:
         return END
+    
+    # Check if we're in a paused state - route to wait_for_human
+    if state.is_paused_for_human:
+        return "wait_for_human"
     
     # Check if we've exceeded max iterations - force diagnose
     if state.iteration_count >= MAX_ITERATIONS:
@@ -304,8 +420,30 @@ def should_continue(state: ConversationalAgentState):
         
     return END
 
+
 def post_tool_route(state: ConversationalAgentState):
-    """Route after tools node."""
+    """Route after tools node - check if we should pause for human or continue."""
+    # After tools run, check if this was a measurement tool
+    last_msg = state.messages[-1]
+    
+    # Check if last tool was a measurement
+    if isinstance(last_msg, ToolMessage):
+        try:
+            result = json.loads(last_msg.content)
+            if isinstance(result, dict) and "value" in result:
+                # This was a measurement - we should pause for human
+                # Check if a fault was found
+                is_fault = result.get("is_out_of_range", False) or result.get("fault_detected", False)
+                
+                if is_fault:
+                    # Fault found - don't pause, let agent provide diagnosis
+                    return "agent"
+                else:
+                    # No fault - pause for human confirmation
+                    return "pause_for_human"
+        except:
+            pass
+    
     return "agent"
 
 # =============================================================================
@@ -364,26 +502,46 @@ End your response with "SESSION COMPLETED" to close this session.
 # =============================================================================
 
 def create_conversational_graph():
-    """Build the custom interactive graph."""
+    """Build the custom interactive graph with human-in-the-loop support."""
     builder = StateGraph(ConversationalAgentState)
     
+    # Add all nodes
     builder.add_node("agent", agent_node)
     builder.add_node("tools", tool_node)
     builder.add_node("diagnose", diagnose_node)
+    builder.add_node("wait_for_human", wait_for_human)
+    builder.add_node("resume_from_human", resume_from_human)
     
+    # Start at agent
     builder.add_edge(START, "agent")
     
+    # Agent node routing: tools, diagnose, wait_for_human, or END
     builder.add_conditional_edges(
         "agent",
         should_continue,
         {
             "tools": "tools",
             "diagnose": "diagnose",
+            "wait_for_human": "wait_for_human",
             END: END
         }
     )
     
-    builder.add_edge("tools", "agent")
+    # Tools routing: after measurement, either pause for human or continue to agent
+    builder.add_conditional_edges(
+        "tools",
+        post_tool_route,
+        {
+            "agent": "agent",
+            "pause_for_human": "wait_for_human"
+        }
+    )
+    
+    # After waiting for human, resume processing
+    builder.add_edge("wait_for_human", "resume_from_human")
+    builder.add_edge("resume_from_human", "agent")
+    
+    # Final edges
     builder.add_edge("diagnose", END)
     
     checkpointer = MemorySaver()
