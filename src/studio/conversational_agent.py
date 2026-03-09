@@ -67,6 +67,10 @@ class ConversationalAgentState:
     total_steps: int = 5  # Total steps planned for diagnosis
     step_description: str = ""  # Description of current step
     pending_instruction: str = ""  # Instruction to show user after resume
+    
+    # Auto-measurement tracking - forces read_multimeter after guidance
+    awaiting_test_point_guidance: bool = False  # Set to True after showing guidance
+    last_guidance_test_point: str = ""  # The test point we just showed guidance for
 
 # =============================================================================
 # HELPER: IMAGE EMBEDDING
@@ -75,19 +79,57 @@ class ConversationalAgentState:
 def format_message_content(text: str, image_data: Optional[dict] = None) -> Any:
     """
     Format message content with the image PROMINENTLY as the first block.
+    
+    Returns a list of content blocks compatible with LangGraph Studio:
+    - Image block: {"type": "image_url", "image_url": {"url": "data:image/jpeg;base64,..."}}
+    - Text block: {"type": "text", "text": "..."}
+    
+    Or returns the original text string if no image_data is provided.
     """
     if not image_data:
         return text
-        
-    return [
+    
+    # Extract image data
+    image_base64 = image_data.get('image_base64')
+    mime_type = image_data.get('mime_type', 'image/jpeg')
+    
+    if not image_base64:
+        return text
+    
+    # Build the content list with image FIRST (for prominence in LangGraph Studio)
+    # Also add descriptive text as a fallback
+    test_point_info = image_data.get('test_point', '')
+    location_desc = image_data.get('location_description', '')
+    
+    # Create image URL with proper data URI format
+    image_url = f"data:{mime_type};base64,{image_base64}"
+    
+    # Build content blocks
+    content_blocks = [
         {
-            "type": "image_url", 
+            "type": "image_url",
             "image_url": {
-                "url": f"data:{image_data.get('mime_type', 'image/jpeg')};base64,{image_data.get('image_base64')}"
+                "url": image_url
             }
-        },
-        {"type": "text", "text": text}
+        }
     ]
+    
+    # Add text content - include location info as header
+    header = ""
+    if test_point_info:
+        header = f"### {test_point_info}"
+        if location_desc:
+            header += f" - {location_desc}"
+        header += "\n\n"
+    
+    # Append to the text
+    full_text = header + text
+    content_blocks.append({
+        "type": "text",
+        "text": full_text
+    })
+    
+    return content_blocks
 
 # =============================================================================
 # NODES
@@ -160,6 +202,15 @@ HUMAN-IN-THE-LOOP WORKFLOW - CRITICAL:
 - If user says "next", you will receive control back and should continue to the next step.
 - ITERATION LIMIT: The session will auto-terminate after 10 measurement iterations. Provide your best diagnosis with available data if you reach this limit.
 
+**PROACTIVE AUTO-COLLECTION - CRITICAL REQUIREMENT:**
+When you guide a user to a test point (after calling `get_test_point_guidance` or `get_equipment_configuration`), you MUST immediately call the `read_multimeter` tool in the SAME message turn to automatically collect the reading. Do NOT ask the user to manually report the value. The workflow is:
+1. Call `get_test_point_guidance` to show WHERE to probe (with image)
+2. IMMEDIATELY call `read_multimeter` tool with the test_point_id
+3. The reading will be automatically collected and displayed to the user
+4. Interpret the result and ask user to say "next"
+
+NEVER ask the user to manually report a reading - always use `read_multimeter` or `enter_manual_reading` tools.
+
 INTERACTION STYLE:
 - Be conversational and instructional - guide the user like a mentor.
 - Before each test: Explain WHAT to test and WHY it matters.
@@ -177,6 +228,7 @@ STATE TRACKING:
 - current_step: Tracks which diagnostic step you're on (1, 2, 3, etc.)
 - total_steps: Total planned steps for this diagnosis
 - Update these values as you progress through the diagnosis.
+- awaiting_test_point_guidance: Set to True after showing guidance - MUST call read_multimeter next
 """
 
 # Maximum iterations to prevent infinite loops
@@ -214,6 +266,20 @@ def agent_node(state: ConversationalAgentState):
     sys_content += f"\n\nDIAGNOSIS PROGRESS: Step {state.current_step} of {state.total_steps}"
     if state.step_description:
         sys_content += f" - {state.step_description}"
+    
+    # CRITICAL: If we just showed test point guidance, FORCE the LLM to call read_multimeter
+    # This implements the auto-collection requirement
+    if state.awaiting_test_point_guidance:
+        sys_content += """
+        
+        **MANDATORY NEXT ACTION - AUTO-COLLECTION REQUIRED:**
+        You just showed the user where to probe (test point guidance was provided). 
+        You MUST now call the `read_multimeter` tool IMMEDIATELY to collect the measurement.
+        Do NOT ask the user to report the value manually - use the read_multimeter tool.
+        
+        Extract the test_point_id from the previous guidance (from state.last_guidance_test_point or the tool result)
+        and call read_multimeter with that test_point_id.
+        """
     
     sys_msg = SystemMessage(content=sys_content)
     
@@ -259,11 +325,18 @@ def agent_node(state: ConversationalAgentState):
     
     # Check if agent called a measurement tool - if so, we'll pause after tools run
     is_awaiting_measurement = False
+    needs_auto_reading = False  # Will be set True if we need to auto-collect next turn
+    
     if hasattr(response, "tool_calls") and response.tool_calls:
         for tc in response.tool_calls:
             if tc.get("name") in ("read_multimeter", "enter_manual_reading"):
                 is_awaiting_measurement = True
+                # After a measurement is taken, clear the auto-read flag
+                needs_auto_reading = False
                 break
+            elif tc.get("name") == "get_test_point_guidance":
+                # Mark that we need to auto-collect after this guidance
+                needs_auto_reading = True
     
     return {
         "messages": [response], 
@@ -272,7 +345,9 @@ def agent_node(state: ConversationalAgentState):
         "iteration_count": state.iteration_count + 1,
         "is_paused_for_human": is_awaiting_measurement,
         "current_step": state.current_step,
-        "total_steps": state.total_steps
+        "total_steps": state.total_steps,
+        "awaiting_test_point_guidance": needs_auto_reading,
+        "last_guidance_test_point": state.last_guidance_test_point
     }
 
 def tool_node(state: ConversationalAgentState):
@@ -285,6 +360,10 @@ def tool_node(state: ConversationalAgentState):
     results = []
     measurements = []
     
+    # Track if we just showed test point guidance
+    showed_guidance_test_point = None
+    measurement_collected = False
+    
     for tool_call in last_msg.tool_calls:
         tool = tools_map.get(tool_call["name"])
         if tool:
@@ -295,11 +374,18 @@ def tool_node(state: ConversationalAgentState):
             # To prevent state bloat, we strip the image_base64 immediately 
             # after it's produced to keep the persistent state lightweight.
             if tool_call["name"] == "get_test_point_guidance" and isinstance(result, dict):
+                # Track the test point we just showed guidance for
+                if result.get("test_point"):
+                    showed_guidance_test_point = result.get("test_point")
                 # Keep the image data for the NEXT node to use (it's in the ToolMessage content)
                 # But we can strip it here and the agent_node will have to get it 
                 # FROM the tool result if we want to show it in the UI.
                 # Actually, the most robust way is to strip it AFTER the next agent step.
                 pass
+            
+            # Track if we just collected a measurement
+            if tool_call["name"] in ("read_multimeter", "enter_manual_reading"):
+                measurement_collected = True
                 
             results.append(ToolMessage(
                 tool_call_id=tool_call["id"],
@@ -318,9 +404,13 @@ def tool_node(state: ConversationalAgentState):
                     }
                     measurements.append(measurement)
     
+    # After measurement is collected, clear the auto-read flag
+    # After guidance is shown, set the auto-read flag
     return {
         "messages": results,
-        "measurements": state.measurements + measurements
+        "measurements": state.measurements + measurements,
+        "awaiting_test_point_guidance": False if measurement_collected else (showed_guidance_test_point is not None),
+        "last_guidance_test_point": showed_guidance_test_point or state.last_guidance_test_point
     }
 
 # =============================================================================
@@ -427,11 +517,15 @@ def post_tool_route(state: ConversationalAgentState):
     last_msg = state.messages[-1]
     
     # Check if last tool was a measurement
+    cleared_auto_reading = False
     if isinstance(last_msg, ToolMessage):
         try:
             result = json.loads(last_msg.content)
             if isinstance(result, dict) and "value" in result:
                 # This was a measurement - we should pause for human
+                # Clear the auto-reading flag since we collected the measurement
+                cleared_auto_reading = True
+                
                 # Check if a fault was found
                 is_fault = result.get("is_out_of_range", False) or result.get("fault_detected", False)
                 
