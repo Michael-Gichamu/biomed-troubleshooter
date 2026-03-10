@@ -70,12 +70,22 @@ def query_diagnostic_knowledge(
         top_k=top_k
     )
     
+    # Process results to include Markdown images if available
+    processed_results = []
+    for r in results:
+        data = r.to_dict()
+        image_url = data.get("metadata", {}).get("image_url")
+        if image_url:
+            # Append markdown image to content for inline rendering in Studio
+            data["content"] = f"{data['content']}\n\n![Guidance]({image_url})"
+        processed_results.append(data)
+    
     return {
         "query": query,
         "equipment_model": equipment_model,
         "category": category,
-        "results": [r.to_dict() for r in results],
-        "result_count": len(results),
+        "results": processed_results,
+        "result_count": len(processed_results),
         "rag_available": True
     }
 
@@ -444,6 +454,64 @@ def read_multimeter(
 
 
 @tool
+def wait_for_multimeter_reading(
+    test_point_id: str,
+    timeout: int = 15
+) -> dict:
+    """
+    Poll the multimeter for a stable reading at a specific test point.
+    
+    This tool actively WAITS for a stable reading by polling the background reader
+    every second for up to the specified timeout.
+    
+    Args:
+        test_point_id: The test point identifier (e.g., "TP2")
+        timeout: Maximum time to poll in seconds (default 15)
+        
+    Returns:
+        Dict with status ("success" or "timeout") and the reading data if successful.
+    """
+    from src.studio.background_usb_reader import get_background_reader, ensure_reader_running
+    
+    if not ensure_reader_running():
+        return {
+            "status": "error",
+            "message": "Multimeter background reader failed to start.",
+            "test_point": test_point_id
+        }
+        
+    reader = get_background_reader()
+    start_time = time.time()
+    
+    print(f"[TOOL] Polling for stable reading at {test_point_id} (timeout={timeout}s)...")
+    
+    while time.time() - start_time < timeout:
+        # Check for latest stable reading
+        # Note: background_usb_reader.py has get_stable_reading()
+        reading = reader.get_stable_reading()
+        
+        if reading:
+            # We found a stable reading!
+            reading.test_point_id = test_point_id
+            result = reading.to_dict()
+            result["status"] = "success"
+            result["polling_duration"] = round(time.time() - start_time, 1)
+            print(f"[TOOL] Stable reading obtained: {result['value']} {result['unit']}")
+            return result
+            
+        time.sleep(1.0) # Poll every 1 second
+        
+    # If we reached here, it's a timeout
+    print(f"[TOOL] Polling timed out for {test_point_id}")
+    return {
+        "status": "timeout",
+        "test_point": test_point_id,
+        "timeout": timeout,
+        "message": f"I couldn't detect a stable reading at {test_point_id} after {timeout} seconds."
+    }
+
+
+@tool
 def enter_manual_reading(
     test_point_id: str,
     value: float,
@@ -507,6 +575,7 @@ TOOLS = [
     get_equipment_configuration,
     get_test_point_guidance,
     read_multimeter,
+    wait_for_multimeter_reading,
     enter_manual_reading,
 ]
 

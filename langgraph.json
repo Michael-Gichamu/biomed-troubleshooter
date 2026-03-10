@@ -1,7 +1,7 @@
 {
   "dockerfile_lines": [],
   "graphs": {
-    "conversational_agent": "./src/studio/conversational_agent.py:graph"
+    "conversational_agent": "./src/application/conversational_agent.py:graph"
   },
   "env": "./.env",
   "python_version": "3.13",
