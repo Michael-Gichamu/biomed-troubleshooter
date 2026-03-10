@@ -8,7 +8,6 @@ import re
 import json
 import uuid
 from typing import Any, Optional, Annotated, Sequence
-from dataclasses import dataclass, field
 from datetime import datetime
 
 from dotenv import load_dotenv
@@ -28,23 +27,21 @@ from src.studio.tools import get_tools
 # CONVERSATIONAL AGENT STATE
 # =============================================================================
 
-@dataclass
-class ConversationalAgentState:
+from typing import TypedDict
+
+class ConversationalAgentState(TypedDict):
     """State for the Diag conversational agent."""
-    messages: Annotated[list[BaseMessage], add_messages] = field(default_factory=list)
-    equipment_model: str = ""
-    current_test_point: str = ""
-    is_session_complete: bool = False
-    measurements: list = field(default_factory=list)
-    
-    # Workflow tracking
-    current_step: int = 1
-    total_steps: int = 5
-    step_description: str = ""
-    
-    # Flag to force specific behavior
-    awaiting_stabilization: bool = False
-    last_poll_status: str = ""
+    messages: Annotated[list[BaseMessage], add_messages]
+    equipment_model: str
+    current_test_point: str
+    is_session_complete: bool
+    measurements: list
+    current_step: int
+    total_steps: int
+    step_description: str
+    awaiting_stabilization: bool
+    last_poll_status: str
+    next_node: str
 
 # =============================================================================
 # SYSTEM PROMPT
@@ -54,14 +51,14 @@ SYSTEM_PROMPT = """You are "Diag", a professional Biomedical Engineering Diagnos
 
 DIAGNOSTIC PRINCIPLES:
 1. EQUIPMENT FIRST: Identify the equipment model first (e.g., "cctv-psu-24w-v1").
-2. TALK-BEFORE-ACT: Always provide a brief conversational update BEFORE calling any tool. Explain what you are doing.
-3. VISUAL GUIDANCE: Use `get_test_point_guidance` to show the user where to probe.
+2. TALK-BEFORE-ACT: Always provide a brief conversational update BEFORE calling any tool. Explain what you are doing (e.g., "I will now get the guidance for TP1...").
+3. VISUAL GUIDANCE: Use `get_test_point_guidance` to show the user where to probe. You MUST mention the image in your response for it to render (e.g., "Here is the guidance image:").
 4. INTERACTIVE POLLING: Use `wait_for_multimeter_reading` to collect stable measurements.
 5. ONE STEP AT A TIME: Guide the user through exactly one test point at a time.
 
 INTERACTION STYLE:
 - Be concise, technical, yet helpful.
-- For images: When you provide guidance, the user will see the image inline.
+- For images: MD images returned by tools will render automatically if you include them in your response or if they are part of the tool output history.
 - Polling: Specifically tell the user: "I'm polling the meter now... please place your probes on [Test Point]."
 
 HARDWARE ERROR HANDLING:
@@ -84,13 +81,13 @@ def agent_node(state: ConversationalAgentState):
     
     # Enrichment
     sys_content = SYSTEM_PROMPT
-    if state.equipment_model:
-        sys_content += f"\n\nCURRENT EQUIPMENT: {state.equipment_model}"
+    if state.get("equipment_model"):
+        sys_content += f"\n\nCURRENT EQUIPMENT: {state['equipment_model']}"
     
     # Progress info
-    sys_content += f"\n\nDIAGNOSIS PROGRESS: Step {state.current_step}"
+    sys_content += f"\n\nDIAGNOSIS PROGRESS: Step {state.get('current_step', 1)}"
     
-    messages = [SystemMessage(content=sys_content)] + state.messages
+    messages = [SystemMessage(content=sys_content)] + state.get("messages", [])
     response = llm_with_tools.invoke(messages)
     
     # Check for session completion in text or tool calls
@@ -112,9 +109,13 @@ def tool_node(state: ConversationalAgentState):
 
 def analyze_and_route_node(state: ConversationalAgentState):
     """Analyzes the latest tool result and determines graph path."""
-    last_msg = state.messages[-1]
+    messages = state.get("messages", [])
+    if not messages:
+        return {"next_node": "agent"}
+        
+    last_msg = messages[-1]
     if not isinstance(last_msg, ToolMessage):
-        return {"next": "agent"}
+        return {"next_node": "agent"}
     
     try:
         result = json.loads(last_msg.content)
@@ -124,6 +125,7 @@ def analyze_and_route_node(state: ConversationalAgentState):
             # If polling success, go directly to analysis (agent)
             if status == "success":
                 # Add to measurements
+                measurements = state.get("measurements", [])
                 new_measurement = {
                     "test_point": result.get("test_point_id"),
                     "value": result.get("value"),
@@ -131,25 +133,25 @@ def analyze_and_route_node(state: ConversationalAgentState):
                     "timestamp": datetime.now().isoformat()
                 }
                 return {
-                    "measurements": state.measurements + [new_measurement],
-                    "next": "agent", # Succeed -> Agent analyzes
-                    "current_step": state.current_step + 1
+                    "measurements": measurements + [new_measurement],
+                    "next_node": "agent", # Succeed -> Agent analyzes
+                    "current_step": state.get("current_step", 1) + 1
                 }
             
             # If timeout, trigger interrupt
             if status == "timeout":
                 return {
-                    "next": "timeout_interrupt",
+                    "next_node": "timeout_interrupt",
                     "last_poll_status": "timeout"
                 }
     except:
         pass
         
-    return {"next": "agent"}
+    return {"next_node": "agent"}
 
 def timeout_interrupt_node(state: ConversationalAgentState):
     """Pauses graph for user troubleshooting on hardware timeout."""
-    test_point = state.current_test_point or "the component"
+    test_point = state.get("current_test_point") or "the component"
     
     # Trigger graph interrupt
     answer = interrupt({
@@ -171,10 +173,14 @@ def timeout_interrupt_node(state: ConversationalAgentState):
 # =============================================================================
 
 def should_continue_after_agent(state: ConversationalAgentState):
-    last_msg = state.messages[-1]
+    messages = state.get("messages", [])
+    if not messages:
+        return END
+        
+    last_msg = messages[-1]
     if hasattr(last_msg, "tool_calls") and last_msg.tool_calls:
         return "tools"
-    if state.is_session_complete:
+    if state.get("is_session_complete"):
         return END
     return END
 
@@ -210,7 +216,7 @@ def create_diag_graph():
     
     builder.add_conditional_edges(
         "analyze",
-        lambda x: x.get("next", "agent"),
+        lambda x: x.get("next_node", "agent"),
         {
             "agent": "agent",
             "timeout_interrupt": "timeout_interrupt"

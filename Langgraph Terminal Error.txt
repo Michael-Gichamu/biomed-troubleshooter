@@ -1,602 +1,437 @@
-[DEBUG] Unknown mode! mode_byte=0x00, unit_byte=0x00 - defaulting to DC_VOLTAGE
-[DEBUG _parse_um24c_frame] frame=40020000003035250340, len=10
-[DEBUG] digit1=0 (0x30), digit2=5 (0x35)
-[DEBUG PARSE] frame=40020000003035250340, digit1=0, digit2=5, decimal_pos=0x25
-[DEBUG] Calculated value=5, mode_byte=0x00, unit_byte=0x00
-[DEBUG] Unknown mode! mode_byte=0x00, unit_byte=0x00 - defaulting to DC_VOLTAGE
-[DEBUG _parse_um24c_frame] frame=40020000003035250340, len=10
-[DEBUG] digit1=0 (0x30), digit2=5 (0x35)
-[DEBUG PARSE] frame=40020000003035250340, digit1=0, digit2=5, decimal_pos=0x25
-[DEBUG] Calculated value=5, mode_byte=0x00, unit_byte=0x00
-[DEBUG] Unknown mode! mode_byte=0x00, unit_byte=0x00 - defaulting to DC_VOLTAGE
-[DEBUG _parse_um24c_frame] frame=40020000003035250340, len=10
-[DEBUG] digit1=0 (0x30), digit2=5 (0x35)
-[DEBUG PARSE] frame=40020000003035250340, digit1=0, digit2=5, decimal_pos=0x25
-[DEBUG] Calculated value=5, mode_byte=0x00, unit_byte=0x00
-[DEBUG] Unknown mode! mode_byte=0x00, unit_byte=0x00 - defaulting to DC_VOLTAGE
-[DEBUG _parse_um24c_frame] frame=40020000003035250340, len=10
-[DEBUG] digit1=0 (0x30), digit2=5 (0x35)
-[DEBUG PARSE] frame=40020000003035250340, digit1=0, digit2=5, decimal_pos=0x25
-[DEBUG] Calculated value=5, mode_byte=0x00, unit_byte=0x00
-[DEBUG] Unknown mode! mode_byte=0x00, unit_byte=0x00 - defaulting to DC_VOLTAGE
-[DEBUG _parse_um24c_frame] frame=40020000003035250340, len=10
-[DEBUG] digit1=0 (0x30), digit2=5 (0x35)
-[DEBUG PARSE] frame=40020000003035250340, digit1=0, digit2=5, decimal_pos=0x25
-[DEBUG] Calculated value=5, mode_byte=0x00, unit_byte=0x00
-[DEBUG] Unknown mode! mode_byte=0x00, unit_byte=0x00 - defaulting to DC_VOLTAGE
-[DEBUG _parse_um24c_frame] frame=40020000003035250340, len=10
-[DEBUG] digit1=0 (0x30), digit2=5 (0x35)
-[DEBUG PARSE] frame=40020000003035250340, digit1=0, digit2=5, decimal_pos=0x25
-[DEBUG] Calculated value=5, mode_byte=0x00, unit_byte=0x00
-[DEBUG] Unknown mode! mode_byte=0x00, unit_byte=0x00 - defaulting to DC_VOLTAGE
-[DEBUG _parse_um24c_frame] frame=40020000003035250340, len=10
-[DEBUG] digit1=0 (0x30), digit2=5 (0x35)
-[DEBUG PARSE] frame=40020000003035250340, digit1=0, digit2=5, decimal_pos=0x25
-[DEBUG] Calculated value=5, mode_byte=0x00, unit_byte=0x00
-[DEBUG] Unknown mode! mode_byte=0x00, unit_byte=0x00 - defaulting to DC_VOLTAGE
-[DEBUG _parse_um24c_frame] frame=40020000003035250340, len=10
-[DEBUG] digit1=0 (0x30), digit2=5 (0x35)
-[DEBUG PARSE] frame=40020000003035250340, digit1=0, digit2=5, decimal_pos=0x25
-[DEBUG] Calculated value=5, mode_byte=0x00, unit_byte=0x00
-[DEBUG] Unknown mode! mode_byte=0x00, unit_byte=0x00 - defaulting to DC_VOLTAGE
-2026-03-07T22:11:18.517299Z [info     ] 4 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:11:20.062738Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:11:28.516389Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:11:28.878460Z [info     ] 3 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:11:30.336900Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:11:38.580894Z [info     ] HTTP Request: POST https://api.smith.langchain.com/v1/metadata/submit "HTTP/1.1 204 No Content" [httpx] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:11:38.650177Z [info     ] Successfully submitted metadata to LangSmith instance [langgraph_api.metadata] api_variant=local_dev langgraph_api_version=0.7.67 n_nodes=0 n_runs=0 thread_name=MainThread
-2026-03-07T22:11:38.843937Z [info     ] 4 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:11:40.432464Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:11:48.992264Z [info     ] 4 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:11:50.440169Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:11:59.059759Z [info     ] 4 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:12:00.506820Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:12:06.053184Z [info     ] Worker stats                   [langgraph_runtime_inmem.queue] active=0 api_variant=local_dev available=1 langgraph_api_version=0.7.67 max=1 thread_name=asyncio_2
-2026-03-07T22:12:06.556172Z [info     ] Queue stats                    [langgraph_runtime_inmem.queue] api_variant=local_dev langgraph_api_version=0.7.67 n_pending=0 n_running=0 pending_runs_wait_time_max_secs=None pending_runs_wait_time_med_secs=None pending_unblocked_runs_wait_time_max_secs=None thread_name=asyncio_0
-2026-03-07T22:12:09.198496Z [info     ] 4 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:12:10.699669Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:12:19.301861Z [info     ] 4 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:12:20.786901Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:12:29.432930Z [info     ] 4 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:12:30.844863Z [info     ] Created run                    [langgraph_api.models.run] after_seconds=0 api_variant=local_dev assistant_id=8b48b208-c421-5445-8e18-2e98882f6e8b checkpoint_id=None if_not_exists=reject langgraph_api_version=0.7.67 method=POST multitask_strategy=enqueue path=/threads/{thread_id}/runs/stream request_id=d7851892-e2c9-4b3f-bd24-2b29543359ed run_create_ms=26 run_id=019cca5b-f7f2-7011-9a5d-0aeb800ccb56 run_put_ms=5 stream_mode=['messages-tuple', 'values'] stream_resumable=True temporary=False thread_id=96f37130-131d-4684-a4e4-d656bffc6d60 thread_name=MainThread
-2026-03-07T22:12:30.930735Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:12:31.437599Z [info     ] Starting background run        [langgraph_api.worker] api_variant=local_dev assistant_id=8b48b208-c421-5445-8e18-2e98882f6e8b graph_id=conversational_agent langgraph_api_version=0.7.67 request_id=d7851892-e2c9-4b3f-bd24-2b29543359ed resumable=True run_attempt=1 run_creation_ms=24 run_id=019cca5b-f7f2-7011-9a5d-0aeb800ccb56 run_queue_ms=594 run_started_at=2026-03-07T22:12:31.437105+00:00 run_stream_start_ms=0 temporary=False thread_id=96f37130-131d-4684-a4e4-d656bffc6d60 thread_name=asyncio_2
-2026-03-07T22:12:39.437274Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:12:39.811038Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:12:40.177060Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:12:40.556343Z [info     ] 4 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:12:42.341486Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:12:49.960631Z [info     ] HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK" [httpx] api_variant=local_dev assistant_id=8b48b208-c421-5445-8e18-2e98882f6e8b graph_id=conversational_agent langgraph_api_version=0.7.67 langgraph_node=agent request_id=d7851892-e2c9-4b3f-bd24-2b29543359ed run_attempt=1 run_id=019cca5b-f7f2-7011-9a5d-0aeb800ccb56 thread_id=96f37130-131d-4684-a4e4-d656bffc6d60 thread_name=asyncio_0
-2026-03-07T22:12:50.775731Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:12:51.222244Z [info     ] 4 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:12:52.575107Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-[DEBUG _parse_um24c_frame] frame=440000000000000000C8, len=10
-[DEBUG] digit1=-48 (0x00), digit2=-48 (0x00)
-[TOOL] Running read_multimeter...
-[DEBUG] Background reader already connected
-[DEBUG] get_reading_with_stabilization called: type=RESISTANCE, timeout=15.0
-[DEBUG _parse_um24c_frame] frame=440000000000000000C8, len=10
-[DEBUG] digit1=-48 (0x00), digit2=-48 (0x00)
-[DEBUG _parse_um24c_frame] frame=440000000000000000C8, len=10
-[DEBUG] digit1=-48 (0x00), digit2=-48 (0x00)
-[DEBUG _parse_um24c_frame] frame=440000000000000000C8, len=10
-[DEBUG] digit1=-48 (0x00), digit2=-48 (0x00)
-[DEBUG _parse_um24c_frame] frame=440000000000000000C8, len=10
-[DEBUG] digit1=-48 (0x00), digit2=-48 (0x00)
-[DEBUG _parse_um24c_frame] frame=440000000000000000C8, len=10
-[DEBUG] digit1=-48 (0x00), digit2=-48 (0x00)
-[DEBUG _parse_um24c_frame] frame=440000000000000000C8, len=10
-[DEBUG] digit1=-48 (0x00), digit2=-48 (0x00)
-[DEBUG _parse_um24c_frame] frame=440000000000000000C8, len=10
-[DEBUG] digit1=-48 (0x00), digit2=-48 (0x00)
-[DEBUG _parse_um24c_frame] frame=440000000000000000C8, len=10
-[DEBUG] digit1=-48 (0x00), digit2=-48 (0x00)
-[DEBUG _parse_um24c_frame] frame=440000000000000000C8, len=10
-[DEBUG] digit1=-48 (0x00), digit2=-48 (0x00)
-[DEBUG] Current readings: [659.0], count=1
-[DEBUG] Current readings: [659.0], count=1
-[DEBUG] Current readings: [659.0], count=1
-[DEBUG] Current readings: [659.0], count=1
-[DEBUG] Current readings: [659.0], count=1
-[DEBUG] Current readings: [659.0], count=1
-[DEBUG] Current readings: [659.0], count=1
-[DEBUG] Current readings: [659.0], count=1
-[DEBUG] Current readings: [659.0], count=1
-[DEBUG] Current readings: [659.0], count=1
-[DEBUG] Current readings: [659.0], count=1
-[DEBUG] Current readings: [659.0], count=1
-2026-03-07T22:13:00.994172Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-[DEBUG] Current readings: [659.0], count=1
-[DEBUG] Current readings: [659.0], count=1
-2026-03-07T22:13:01.375645Z [info     ] 2 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-[DEBUG] Current readings: [659.0], count=1
-2026-03-07T22:13:01.741463Z [info     ] 7 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-[DEBUG] Current readings: [659.0], count=1
-[DEBUG] Current readings: [659.0], count=1
-2026-03-07T22:13:02.118352Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:13:02.475594Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:13:02.921883Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:13:09.792727Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-[DEBUG] Current readings: [659.0], count=1
-[DEBUG] Timeout. Latest reading: MultimeterReading(raw_value='C80630757312277103440000000000000000', value=659.0, unit='Ω', measurement_type='RESISTANCE', timestamp='2026-03-07T22:13:11.311484', test_point_id='', secondary_value=None, secondary_unit=''), readings collected: [659.0]
-2026-03-07T22:13:12.827867Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:13:13.198173Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:13:13.613078Z [info     ] 2 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:13:14.454166Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:13:15.032084Z [info     ] 2 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:13:15.395932Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:13:16.035172Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:13:23.958138Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-[DEBUG _parse_um24c_frame] frame=440000000000000000C8, len=10
-[DEBUG] digit1=-48 (0x00), digit2=-48 (0x00)
-2026-03-07T22:13:24.514364Z [info     ] 4 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-[DEBUG _parse_um24c_frame] frame=440000000000000000C8, len=10
-[DEBUG] digit1=-48 (0x00), digit2=-48 (0x00)
-[DEBUG _parse_um24c_frame] frame=440000000000000000C8, len=10
-[DEBUG] digit1=-48 (0x00), digit2=-48 (0x00)
-2026-03-07T22:13:27.430753Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:13:33.536436Z [info     ] HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK" [httpx] api_variant=local_dev assistant_id=8b48b208-c421-5445-8e18-2e98882f6e8b graph_id=conversational_agent langgraph_api_version=0.7.67 langgraph_node=agent request_id=d7851892-e2c9-4b3f-bd24-2b29543359ed run_attempt=1 run_id=019cca5b-f7f2-7011-9a5d-0aeb800ccb56 thread_id=96f37130-131d-4684-a4e4-d656bffc6d60 thread_name=asyncio_0
-2026-03-07T22:13:34.586532Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:13:35.041140Z [info     ] 3 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:13:36.687479Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
+=_graph_from_spec path=./src/studio/conversational_agent.py thread_name=asyncio_0
+2026-03-09T19:26:18.021669Z [info     ] Application started up in 4.579s [langgraph_api.timing.timer] api_variant=local_dev elapsed=4.578994299999977 langgraph_api_version=0.7.67 thread_name=MainThread
+2026-03-09T19:26:18.149384Z [info     ] Starting cron scheduler        [langgraph_api.cron_scheduler] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
+2026-03-09T19:26:18.149862Z [info     ] Starting queue with shared loop [langgraph_runtime_inmem.queue] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=asyncio_1
+2026-03-09T19:26:18.152798Z [info     ] Starting 1 background workers  [langgraph_runtime_inmem.queue] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=asyncio_0
+2026-03-09T19:26:18.154616Z [info     ] Worker stats                   [langgraph_runtime_inmem.queue] active=0 api_variant=local_dev available=1 langgraph_api_version=0.7.67 max=1 thread_name=asyncio_1
+2026-03-09T19:26:18.658010Z [info     ] Queue stats                    [langgraph_runtime_inmem.queue] api_variant=local_dev langgraph_api_version=0.7.67 n_pending=0 n_running=0 pending_runs_wait_time_max_secs=None pending_runs_wait_time_med_secs=None pending_unblocked_runs_wait_time_max_secs=None thread_name=asyncio_0
+2026-03-09T19:26:21.767589Z [info     ] HTTP Request: POST https://api.smith.langchain.com/v1/metadata/submit "HTTP/1.1 204 No Content" [httpx] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
+2026-03-09T19:26:21.769976Z [info     ] Successfully submitted metadata to LangSmith instance [langgraph_api.metadata] api_variant=local_dev
+ langgraph_api_version=0.7.67 n_nodes=0 n_runs=0 thread_name=MainThread
+2026-03-09T19:26:24.922566Z [info     ] 8 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
+2026-03-09T19:26:25.281113Z [info     ] 3 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
+2026-03-09T19:26:29.157561Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
+2026-03-09T19:26:35.260830Z [info     ] 8 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
+2026-03-09T19:26:35.627164Z [info     ] 2 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
+2026-03-09T19:26:36.290504Z [info     ] 2 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
+2026-03-09T19:26:46.372470Z [info     ] 8 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
+2026-03-09T19:26:46.744990Z [info     ] 3 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
+2026-03-09T19:26:49.600951Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
+2026-03-09T19:26:56.784858Z [info     ] 8 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
+2026-03-09T19:26:57.148356Z [info     ] 3 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
+2026-03-09T19:27:07.150439Z [info     ] 8 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
+2026-03-09T19:27:07.509428Z [info     ] 3 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
+2026-03-09T19:27:17.504694Z [info     ] 8 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
+2026-03-09T19:27:17.859708Z [info     ] 3 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
+2026-03-09T19:27:18.278901Z [info     ] Worker stats                   [langgraph_runtime_inmem.queue] active=0 api_variant=local_dev available=1 langgraph_api_version=0.7.67 max=1 thread_name=asyncio_1
+2026-03-09T19:27:18.797029Z [info     ] Queue stats                    [langgraph_runtime_inmem.queue] api_variant=local_dev langgraph_api_version=0.7.67 n_pending=0 n_running=0 pending_runs_wait_time_max_secs=None pending_runs_wait_time_med_secs=None pending_unblocked_runs_wait_time_max_secs=None thread_name=asyncio_0
+2026-03-09T19:27:20.446104Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
+Exception in thread Thread-1:
+2026-03-09T19:27:27.776850Z [info     ] 2 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
+Traceback (most recent call last):
+  File "C:\Users\Michael\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\LocalCache\local-packages\Python313\site-packages\blockbuster\blockbuster.py", line 78, in wrapper
+    asyncio.get_running_loop()
+    ~~~~~~~~~~~~~~~~~~~~~~~~^^
+RuntimeError: no running event loop
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\shutil.py", line 856, in move  
+    os.rename(src, real_dst)
+    ~~~~~~~~~^^^^^^^^^^^^^^^
+  File "C:\Users\Michael\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\LocalCache\local-packages\Python313\site-packages\blockbuster\blockbuster.py", line 80, in wrapper
+    return func(*args, **kwargs)
+FileExistsError: [WinError 183] Cannot create a file when that file already exists: '.langgraph_api\\.langgraph_ops.pckl.tmp' -> '.langgraph_api\\.langgraph_ops.pckl'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\threading.py", line 1044, in _bootstrap_inner
+    self.run()
+    ~~~~~~~~^^
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\threading.py", line 995, in run
+    self._target(*self._args, **self._kwargs)
+    ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Michael\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\LocalCache\local-packages\Python313\site-packages\langgraph_runtime_inmem\_persistence.py", line 57, in _flush_loop
+    store.sync()
+    ~~~~~~~~~~^^
+  File "C:\Users\Michael\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\LocalCache\local-packages\Python313\site-packages\langgraph\checkpoint\memory\__init__.py", line 569, in sync
+    shutil.move(tempname, self.filename)  # atomic commit
+    ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\shutil.py", line 876, in move  
+    copy_function(src, real_dst)
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\shutil.py", line 453, in copy2 
+    _winapi.CopyFile2(src_, dst_, flags)
+    ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+OSError: [WinError 1224] The requested operation cannot be performed on a file with a user-mapped section open
+2026-03-09T19:27:30.144676Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
+2026-03-09T19:27:30.147099Z [warning  ] WatchFiles detected changes in 'src\studio\conversational_agent.py'. Reloading... [uvicorn.error] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
+ 2026-03-09T19:27:30.261790Z [info     ] Shutting down background workers [langgraph_runtime_inmem.queue] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
+2026-03-09T19:27:30.266666Z [info     ] Shutting down remote graphs    [langgraph_api.graph] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
+2026-03-09T19:27:30.362382Z [info     ] Stopping dev persistence flush loop [langgraph_runtime_inmem._persistence] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
+2026-03-09T19:27:32.010924Z [info     ] 23 changes detected            [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
+2026-03-09T19:27:32.014656Z [warning  ] WatchFiles detected changes in 'src\studio\conversational_agent.py'. Reloading... [uvicorn.error] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
+ Traceback (most recent call last):
+  File "<string>", line 1, in <module>
+    from multiprocessing.spawn import spawn_main; spawn_main(parent_pid=580, pipe_handle=1920)
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\multiprocessing\__init__.py", line 16, in <module>
+    from . import context
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\multiprocessing\context.py", line 6, in <module>
+    from . import reduction
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\multiprocessing\reduction.py", line 16, in <module>
+    import socket
+  File "<frozen importlib._bootstrap>", line 1360, in _find_and_load
+  File "<frozen importlib._bootstrap>", line 1331, in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 935, in _load_unlocked
+  File "<frozen importlib._bootstrap_external>", line 1019, in exec_module
+  File "<frozen importlib._bootstrap_external>", line 1132, in get_code
+  File "<frozen importlib._bootstrap_external>", line 1214, in get_data
+KeyboardInterrupt
+2026-03-09T19:27:37.640458Z [info     ] Starting dev persistence flush loop [langgraph_runtime_inmem._persistence] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
+2026-03-09T19:27:37.710810Z [info     ] Using langgraph_runtime_inmem  [langgraph_runtime] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
+2026-03-09T19:27:37.771524Z [info     ] Using auth of type=noop        [langgraph_api.auth.middleware] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
+2026-03-09T19:27:37.787155Z [info     ] Starting In-Memory runtime with langgraph-api=0.7.67 and in-memory runtime=0.26.0 [langgraph_runtime_inmem.lifespan] api_variant=local_dev langgraph_api_version=0.7.67 langgraph_runtime_inmem_version=0.26.0 thread_name=asyncio_0 version=0.7.67
+2026-03-09T19:27:39.312272Z [info     ] Starting metadata loop         [langgraph_api.metadata] api_variant=local_dev endpoint=https://api.smith.langchain.com/v1/metadata/submit langgraph_api_version=0.7.67 thread_name=MainThread
+2026-03-09T19:27:39.314655Z [info     ] Getting auth instance: None    [langgraph_api.auth.custom] api_variant=local_dev langgraph_api_version=0.7.67 langgraph_auth=None thread_name=MainThread
+2026-03-09T19:27:39.458558Z [info     ] 5 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
+2026-03-09T19:27:39.798604Z [info     ] Importing graph with id conversational_agent [langgraph_api.timing.timer] api_variant=local_dev elapsed_seconds=0.4864035000000513 graph_id=conversational_agent langgraph_api_version=0.7.67 module=None name=_graph_from_spec path=./src/studio/conversational_agent.py thread_name=asyncio_0
+2026-03-09T19:27:39.817015Z [info     ] Application started up in 3.797s [langgraph_api.timing.timer] api_variant=local_dev elapsed=3.7974019000002954 langgraph_api_version=0.7.67 thread_name=MainThread
+2026-03-09T19:27:39.966437Z [info     ] Starting cron scheduler        [langgraph_api.cron_scheduler] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
+2026-03-09T19:27:39.966975Z [info     ] Starting queue with shared loop [langgraph_runtime_inmem.queue] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=asyncio_1
+2026-03-09T19:27:39.974815Z [info     ] Starting 1 background workers  [langgraph_runtime_inmem.queue] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=asyncio_0
+2026-03-09T19:27:39.977607Z [info     ] Worker stats                   [langgraph_runtime_inmem.queue] active=0 api_variant=local_dev available=1 langgraph_api_version=0.7.67 max=1 thread_name=asyncio_1
+2026-03-09T19:27:40.329873Z [info     ] HTTP Request: POST https://api.smith.langchain.com/v1/metadata/submit "HTTP/1.1 204 No Content" [httpx] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
+2026-03-09T19:27:40.332085Z [info     ] Successfully submitted metadata to LangSmith instance [langgraph_api.metadata] api_variant=local_dev
+ langgraph_api_version=0.7.67 n_nodes=0 n_runs=0 thread_name=MainThread
+2026-03-09T19:27:40.494994Z [info     ] Queue stats                    [langgraph_runtime_inmem.queue] api_variant=local_dev langgraph_api_version=0.7.67 n_pending=0 n_running=0 pending_runs_wait_time_max_secs=None pending_runs_wait_time_med_secs=None pending_unblocked_runs_wait_time_max_secs=None thread_name=asyncio_0
+2026-03-09T19:27:47.884128Z [info     ] 8 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
+2026-03-09T19:27:48.248495Z [info     ] 2 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
+2026-03-09T19:27:48.809389Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
+2026-03-09T19:27:49.933024Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
+2026-03-09T19:27:58.868735Z [info     ] 8 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
+2026-03-09T19:27:59.264158Z [info     ] 2 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
+2026-03-09T19:27:59.827338Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
+2026-03-09T19:28:09.894395Z [info     ] 8 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
+2026-03-09T19:28:10.247377Z [info     ] 2 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
+2026-03-09T19:28:10.608963Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
+2026-03-09T19:28:11.070650Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
+2026-03-09T19:28:15.066267Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
+2026-03-09T19:28:21.146013Z [info     ] 8 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
+2026-03-09T19:28:21.498612Z [info     ] 2 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
+2026-03-09T19:28:21.861072Z [info     ] 2 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
+2026-03-09T19:28:31.693796Z [info     ] 8 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
+2026-03-09T19:28:32.055805Z [info     ] 2 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
+2026-03-09T19:28:32.769208Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
+2026-03-09T19:28:40.097806Z [info     ] Worker stats                   [langgraph_runtime_inmem.queue] active=0 api_variant=local_dev available=1 langgraph_api_version=0.7.67 max=1 thread_name=asyncio_1
+2026-03-09T19:28:40.602657Z [info     ] Queue stats                    [langgraph_runtime_inmem.queue] api_variant=local_dev langgraph_api_version=0.7.67 n_pending=0 n_running=0 pending_runs_wait_time_max_secs=None pending_runs_wait_time_med_secs=None pending_unblocked_runs_wait_time_max_secs=None thread_name=asyncio_0
+2026-03-09T19:28:42.821596Z [info     ] 8 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
+2026-03-09T19:28:43.189487Z [info     ] 3 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
+2026-03-09T19:28:44.265072Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
+2026-03-09T19:28:53.203519Z [info     ] 8 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
+2026-03-09T19:28:53.559139Z [info     ] 3 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
+2026-03-09T19:29:00.686700Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
+2026-03-09T19:29:03.536874Z [info     ] 8 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
+2026-03-09T19:29:03.981222Z [info     ] 2 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
+2026-03-09T19:29:04.344314Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
+2026-03-09T19:29:04.704864Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
+2026-03-09T19:29:06.101334Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
+2026-03-09T19:29:06.103657Z [warning  ] WatchFiles detected changes in 'src\studio\conversational_agent.py'. Reloading... [uvicorn.error] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
+ 2026-03-09T19:29:06.293650Z [info     ] Shutting down background workers [langgraph_runtime_inmem.queue] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
+2026-03-09T19:29:06.297957Z [info     ] Shutting down remote graphs    [langgraph_api.graph] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
+2026-03-09T19:29:06.435387Z [info     ] Stopping dev persistence flush loop [langgraph_runtime_inmem._persistence] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
+2026-03-09T19:29:06.449954Z [info     ] dev persistence flush loop exiting [langgraph_runtime_inmem._persistence] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=Thread-1
+2026-03-09T19:29:07.934924Z [info     ] 22 changes detected            [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
+2026-03-09T19:29:12.535922Z [info     ] Starting dev persistence flush loop [langgraph_runtime_inmem._persistence] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
+2026-03-09T19:29:12.621321Z [info     ] Using langgraph_runtime_inmem  [langgraph_runtime] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
+2026-03-09T19:29:12.690048Z [info     ] Using auth of type=noop        [langgraph_api.auth.middleware] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
+2026-03-09T19:29:12.724726Z [info     ] Starting In-Memory runtime with langgraph-api=0.7.67 and in-memory runtime=0.26.0 [langgraph_runtime_inmem.lifespan] api_variant=local_dev langgraph_api_version=0.7.67 langgraph_runtime_inmem_version=0.26.0 thread_name=asyncio_0 version=0.7.67
+2026-03-09T19:29:15.148778Z [info     ] Starting metadata loop         [langgraph_api.metadata] api_variant=local_dev endpoint=https://api.smith.langchain.com/v1/metadata/submit langgraph_api_version=0.7.67 thread_name=MainThread
+2026-03-09T19:29:15.152622Z [info     ] Getting auth instance: None    [langgraph_api.auth.custom] api_variant=local_dev langgraph_api_version=0.7.67 langgraph_auth=None thread_name=MainThread
+2026-03-09T19:29:15.299935Z [info     ] 5 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
+2026-03-09T19:29:15.606161Z [info     ] Importing graph with id conversational_agent [langgraph_api.timing.timer] api_variant=local_dev elapsed_seconds=0.45764429999962886 graph_id=conversational_agent langgraph_api_version=0.7.67 module=None name=_graph_from_spec path=./src/studio/conversational_agent.py thread_name=asyncio_0
+2026-03-09T19:29:15.618039Z [info     ] Application started up in 4.647s [langgraph_api.timing.timer] api_variant=local_dev elapsed=4.646617200000037 langgraph_api_version=0.7.67 thread_name=MainThread
+2026-03-09T19:29:15.733811Z [info     ] Starting cron scheduler        [langgraph_api.cron_scheduler] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
+2026-03-09T19:29:15.734263Z [info     ] Starting queue with shared loop [langgraph_runtime_inmem.queue] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=asyncio_1
+2026-03-09T19:29:15.736968Z [info     ] Starting 1 background workers  [langgraph_runtime_inmem.queue] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=asyncio_0
+2026-03-09T19:29:15.738849Z [info     ] Worker stats                   [langgraph_runtime_inmem.queue] active=0 api_variant=local_dev available=1 langgraph_api_version=0.7.67 max=1 thread_name=asyncio_1
+2026-03-09T19:29:16.244352Z [info     ] Queue stats                    [langgraph_runtime_inmem.queue] api_variant=local_dev langgraph_api_version=0.7.67 n_pending=0 n_running=0 pending_runs_wait_time_max_secs=None pending_runs_wait_time_med_secs=None pending_unblocked_runs_wait_time_max_secs=None thread_name=asyncio_0
+2026-03-09T19:29:16.896925Z [info     ] HTTP Request: POST https://api.smith.langchain.com/v1/metadata/submit "HTTP/1.1 204 No Content" [httpx] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
+2026-03-09T19:29:16.899278Z [info     ] Successfully submitted metadata to LangSmith instance [langgraph_api.metadata] api_variant=local_dev
+ langgraph_api_version=0.7.67 n_nodes=0 n_runs=0 thread_name=MainThread
+2026-03-09T19:29:22.697086Z [info     ] 8 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
+2026-03-09T19:29:23.072273Z [info     ] 3 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
+2026-03-09T19:29:26.825333Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
+2026-03-09T19:29:30.404906Z [info     ] 5 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
+2026-03-09T19:29:30.927028Z [info     ] 5 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
+2026-03-09T19:29:33.175883Z [info     ] 8 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
+2026-03-09T19:29:33.528301Z [info     ] 2 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
+2026-03-09T19:29:34.492306Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
+2026-03-09T19:29:35.404752Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
+2026-03-09T19:29:45.456994Z [info     ] 8 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
+2026-03-09T19:29:45.823623Z [info     ] 2 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
+2026-03-09T19:29:46.584777Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
+2026-03-09T19:29:56.337981Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
+2026-03-09T19:29:56.702417Z [info     ] 8 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
+2026-03-09T19:29:57.057406Z [info     ] 3 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
+2026-03-09T19:29:58.532570Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
+2026-03-09T19:30:01.782410Z [info     ] 13 changes detected            [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
+2026-03-09T19:30:02.195369Z [info     ] 38 changes detected            [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
+2026-03-09T19:30:07.046825Z [info     ] 8 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
+2026-03-09T19:30:07.405930Z [info     ] 3 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
+2026-03-09T19:30:10.464615Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
+2026-03-09T19:30:15.856019Z [info     ] Worker stats                   [langgraph_runtime_inmem.queue] active=0 api_variant=local_dev available=1 langgraph_api_version=0.7.67 max=1 thread_name=asyncio_1
+2026-03-09T19:30:16.360642Z [info     ] Queue stats                    [langgraph_runtime_inmem.queue] api_variant=local_dev langgraph_api_version=0.7.67 n_pending=0 n_running=0 pending_runs_wait_time_max_secs=None pending_runs_wait_time_med_secs=None pending_unblocked_runs_wait_time_max_secs=None thread_name=asyncio_0
+2026-03-09T19:30:17.379435Z [info     ] 8 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
+2026-03-09T19:30:17.740212Z [info     ] 3 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
+2026-03-09T19:30:18.166926Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
+2026-03-09T19:30:18.526437Z [info     ] 5 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
+2026-03-09T19:30:21.456448Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
+2026-03-09T19:30:27.789703Z [info     ] 8 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
+2026-03-09T19:30:28.154491Z [info     ] 3 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
+2026-03-09T19:30:31.904522Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
+2026-03-09T19:30:38.151332Z [info     ] 8 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
+2026-03-09T19:30:38.509396Z [info     ] 2 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
+2026-03-09T19:30:38.871368Z [info     ] 2 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
+2026-03-09T19:30:48.904927Z [info     ] 8 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
+2026-03-09T19:30:49.313825Z [info     ] 3 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
+2026-03-09T19:30:59.392949Z [info     ] 8 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
+2026-03-09T19:30:59.752999Z [info     ] 2 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
+2026-03-09T19:31:00.113486Z [info     ] 2 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
+2026-03-09T19:31:04.477746Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
+2026-03-09T19:31:10.095668Z [info     ] 8 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
+2026-03-09T19:31:10.457391Z [info     ] 3 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
+2026-03-09T19:31:16.033559Z [info     ] Worker stats                   [langgraph_runtime_inmem.queue] active=0 api_variant=local_dev available=1 langgraph_api_version=0.7.67 max=1 thread_name=asyncio_1
+2026-03-09T19:31:16.540176Z [info     ] Queue stats                    [langgraph_runtime_inmem.queue] api_variant=local_dev langgraph_api_version=0.7.67 n_pending=0 n_running=0 pending_runs_wait_time_max_secs=None pending_runs_wait_time_med_secs=None pending_unblocked_runs_wait_time_max_secs=None thread_name=asyncio_0
+2026-03-09T19:31:20.237202Z [info     ] 2 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
+2026-03-09T19:31:20.701719Z [info     ] 10 changes detected            [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
+2026-03-09T19:31:30.890365Z [info     ] 8 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
+2026-03-09T19:31:31.280431Z [info     ] 3 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
+2026-03-09T19:31:31.641893Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
+2026-03-09T19:31:41.304394Z [info     ] 8 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
+2026-03-09T19:31:41.673867Z [info     ] 3 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
+2026-03-09T19:31:47.772750Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
+2026-03-09T19:31:51.654777Z [info     ] 8 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
+2026-03-09T19:31:52.006791Z [info     ] 3 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
+2026-03-09T19:31:53.094463Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
+Exception in thread Thread-1:
+Traceback (most recent call last):
+  File "C:\Users\Michael\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\LocalCache\local-packages\Python313\site-packages\blockbuster\blockbuster.py", line 78, in wrapper
+    asyncio.get_running_loop()
+    ~~~~~~~~~~~~~~~~~~~~~~~~^^
+RuntimeError: no running event loop
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\shutil.py", line 856, in move  
+    os.rename(src, real_dst)
+    ~~~~~~~~~^^^^^^^^^^^^^^^
+  File "C:\Users\Michael\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\LocalCache\local-packages\Python313\site-packages\blockbuster\blockbuster.py", line 80, in wrapper
+    return func(*args, **kwargs)
+FileExistsError: [WinError 183] Cannot create a file when that file already exists: '.langgraph_api\\.langgraph_ops.pckl.tmp' -> '.langgraph_api\\.langgraph_ops.pckl'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\threading.py", line 1044, in _bootstrap_inner
+    self.run()
+    ~~~~~~~~^^
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\threading.py", line 995, in run
+    self._target(*self._args, **self._kwargs)
+    ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Michael\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\LocalCache\local-packages\Python313\site-packages\langgraph_runtime_inmem\_persistence.py", line 57, in _flush_loop
+    store.sync()
+    ~~~~~~~~~~^^
+  File "C:\Users\Michael\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\LocalCache\local-packages\Python313\site-packages\langgraph\checkpoint\memory\__init__.py", line 569, in sync
+    shutil.move(tempname, self.filename)  # atomic commit
+    ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\shutil.py", line 876, in move  
+    copy_function(src, real_dst)
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\shutil.py", line 453, in copy2 
+    _winapi.CopyFile2(src_, dst_, flags)
+    ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+OSError: [WinError 1224] The requested operation cannot be performed on a file with a user-mapped section open
+2026-03-09T19:32:02.042698Z [info     ] 2 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
+2026-03-09T19:32:16.194356Z [info     ] Worker stats                   [langgraph_runtime_inmem.queue] active=0 api_variant=local_dev available=1 langgraph_api_version=0.7.67 max=1 thread_name=asyncio_1
+2026-03-09T19:32:16.699652Z [info     ] Queue stats                    [langgraph_runtime_inmem.queue] api_variant=local_dev langgraph_api_version=0.7.67 n_pending=0 n_running=0 pending_runs_wait_time_max_secs=None pending_runs_wait_time_med_secs=None pending_unblocked_runs_wait_time_max_secs=None thread_name=asyncio_0
+2026-03-09T19:32:28.828952Z [info     ] 3 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
+2026-03-09T19:33:16.618554Z [info     ] Worker stats                   [langgraph_runtime_inmem.queue] active=0 api_variant=local_dev available=1 langgraph_api_version=0.7.67 max=1 thread_name=asyncio_1
+2026-03-09T19:33:17.139188Z [info     ] Queue stats                    [langgraph_runtime_inmem.queue] api_variant=local_dev langgraph_api_version=0.7.67 n_pending=0 n_running=0 pending_runs_wait_time_max_secs=None pending_runs_wait_time_med_secs=None pending_unblocked_runs_wait_time_max_secs=None thread_name=asyncio_0
+2026-03-09T19:34:03.346846Z [info     ] 10 changes detected            [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
+2026-03-09T19:34:17.094128Z [info     ] Worker stats                   [langgraph_runtime_inmem.queue] active=0 api_variant=local_dev available=1 langgraph_api_version=0.7.67 max=1 thread_name=asyncio_0
+2026-03-09T19:34:17.599082Z [info     ] Queue stats                    [langgraph_runtime_inmem.queue] api_variant=local_dev langgraph_api_version=0.7.67 n_pending=0 n_running=0 pending_runs_wait_time_max_secs=None pending_runs_wait_time_med_secs=None pending_unblocked_runs_wait_time_max_secs=None thread_name=asyncio_0
+2026-03-09T19:34:17.816492Z [info     ] HTTP Request: POST https://api.smith.langchain.com/v1/metadata/submit "HTTP/1.1 204 No Content" [httpx] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
+2026-03-09T19:34:17.819216Z [info     ] Successfully submitted metadata to LangSmith instance [langgraph_api.metadata] api_variant=local_dev
+ langgraph_api_version=0.7.67 n_nodes=0 n_runs=0 thread_name=MainThread
+2026-03-09T19:35:17.567777Z [info     ] Worker stats                   [langgraph_runtime_inmem.queue] active=0 api_variant=local_dev available=1 langgraph_api_version=0.7.67 max=1 thread_name=asyncio_1
+2026-03-09T19:35:18.072803Z [info     ] Queue stats                    [langgraph_runtime_inmem.queue] api_variant=local_dev langgraph_api_version=0.7.67 n_pending=0 n_running=0 pending_runs_wait_time_max_secs=None pending_runs_wait_time_med_secstime_max_secs=None thread_name=asyncio_0
+2026-03-09T19:35:40.713964Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
+2026-03-09T19:35:42.606717Z [info     ] 13 changes detected            [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
+2026-03-09T19:36:18.053137Z [info     ] Worker stats                   [langgraph_runtime_inmem.queue] active=0 api_variant=local_dev available=1 langgraph_api_version=0.7.67 max=1 thread_name=asyncio_1
+2026-03-09T19:36:18.565985Z [info     ] Queue stats                    [langgraph_runtime_inmem.queue] api_variant=local_dev langgraph_api_version=0.7.67 n_pending=0 n_running=0 pending_runs_wait_time_max_secs=None pending_runs_wait_time_med_secs=None pending_unblocked_runs_wait_time_max_secs=None thread_name=asyncio_0
+2026-03-09T19:37:18.446943Z [info     ] Worker stats                   [langgraph_runtime_inmem.queue] active=0 api_variant=local_dev available=1 langgraph_api_version=0.7.67 max=1 thread_name=asyncio_1
+2026-03-09T19:37:18.958032Z [info     ] Queue stats                    [langgraph_runtime_inmem.queue] api_variant=local_dev langgraph_api_version=0.7.67 n_pending=0 n_running=0 pending_runs_wait_time_max_secs=None pending_runs_wait_time_med_secs=None pending_unblocked_runs_wait_time_max_secs=None thread_name=asyncio_0
+2026-03-09T19:38:18.590120Z [info     ] Worker stats                   [langgraph_runtime_inmem.queue] active=0 api_variant=local_dev available=1 langgraph_api_version=0.7.67 max=1 thread_name=asyncio_1
+2026-03-09T19:38:19.107349Z [info     ] Queue stats                    [langgraph_runtime_inmem.queue] api_variant=local_dev langgraph_api_version=0.7.67 n_pending=0 n_running=0 pending_runs_wait_time_max_secs=None pending_runs_wait_time_med_secs=None pending_unblocked_runs_wait_time_max_secs=None thread_name=asyncio_0
+2026-03-09T19:39:18.575852Z [info     ] HTTP Request: POST https://api.smith.langchain.com/v1/metadata/submit "HTTP/1.1 204 No Content" [httpx] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
+2026-03-09T19:39:18.578669Z [info     ] Successfully submitted metadata to LangSmith instance [langgraph_api.metadata] api_variant=local_dev langgraph_api_version=0.7.67 n_nodes=0 n_runs=0 thread_name=MainThread
+2026-03-09T19:39:19.035976Z [info     ] Worker stats                   [langgraph_runtime_inmem.queue] active=0 api_variant=local_dev available=1 langgraph_api_version=0.7.67 max=1 thread_name=asyncio_0
+2026-03-09T19:39:19.552073Z [info     ] Queue stats                    [langgraph_runtime_inmem.queue] api_variant=local_dev langgraph_api_version=0.7.67 n_pending=0 n_running=0 pending_runs_wait_time_max_secs=None pending_runs_wait_time_med_secs=None pending_unblocked_runs_wait_time_max_secs=None thread_name=asyncio_1
+2026-03-09T19:40:19.156380Z [info     ] Worker stats                   [langgraph_runtime_inmem.queue] active=0 api_variant=local_dev available=1 langgraph_api_version=0.7.67 max=1 thread_name=asyncio_0
+2026-03-09T19:40:19.660723Z [info     ] Queue stats                    [langgraph_runtime_inmem.queue] api_variant=local_dev langgraph_api_version=0.7.67 n_pending=0 n_running=0 pending_runs_wait_time_max_secs=None pending_runs_wait_time_med_secs=None pending_unblocked_runs_wait_time_max_secs=None thread_name=asyncio_1
+2026-03-09T19:41:19.448124Z [info     ] Worker stats                   [langgraph_runtime_inmem.queue] active=0 api_variant=local_dev available=1 langgraph_api_version=0.7.67 max=1 thread_name=asyncio_0
+2026-03-09T19:41:19.965346Z [info     ] Queue stats                    [langgraph_runtime_inmem.queue] api_variant=local_dev langgraph_api_version=0.7.67 n_pending=0 n_running=0 pending_runs_wait_time_max_secs=None pending_runs_wait_time_med_secs=None pending_unblocked_runs_wait_time_max_secs=None thread_name=asyncio_1
+2026-03-09T19:42:19.834458Z [info     ] Worker stats                   [langgraph_runtime_inmem.queue] active=0 api_variant=local_dev available=1 langgraph_api_version=0.7.67 max=1 thread_name=asyncio_0
+2026-03-09T19:42:20.350898Z [info     ] Queue stats                    [langgraph_runtime_inmem.queue] api_variant=local_dev langgraph_api_version=0.7.67 n_pending=0 n_running=0 pending_runs_wait_time_max_secs=None pending_runs_wait_time_med_secs=None pending_unblocked_runs_wait_time_max_secs=None thread_name=asyncio_1
+2026-03-09T19:43:20.174533Z [info     ] Worker stats                   [langgraph_runtime_inmem.queue] active=0 api_variant=local_dev available=1 langgraph_api_version=0.7.67 max=1 thread_name=asyncio_0
+2026-03-09T19:43:20.688408Z [info     ] Queue stats                    [langgraph_runtime_inmem.queue] api_variant=local_dev langgraph_api_version=0.7.67 n_pending=0 n_running=0 pending_runs_wait_time_max_secs=None pending_runs_wait_time_med_secs=None pending_unblocked_runs_wait_time_max_secs=None thread_name=asyncio_1
+2026-03-09T19:44:20.310503Z [info     ] Worker stats                   [langgraph_runtime_inmem.queue] active=0 api_variant=local_dev available=1 langgraph_api_version=0.7.67 max=1 thread_name=asyncio_1
+2026-03-09T19:44:20.827752Z [info     ] Queue stats                    [langgraph_runtime_inmem.queue] api_variant=local_dev langgraph_api_version=0.7.67 n_pending=0 n_running=0 pending_runs_wait_time_max_secs=None pending_runs_wait_time_med_secs=None pending_unblocked_runs_wait_time_max_secs=None thread_name=asyncio_0
+2026-03-09T19:44:21.428661Z [info     ] HTTP Request: POST https://api.smith.langchain.com/v1/metadata/submit "HTTP/1.1 204 No Content" [httpx] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
+2026-03-09T19:44:21.431478Z [info     ] Successfully submitted metadata to LangSmith instance [langgraph_api.metadata] api_variant=local_dev langgraph_api_version=0.7.67 n_nodes=0 n_runs=0 thread_name=MainThread
+2026-03-09T19:45:20.406973Z [info     ] Worker stats                   [langgraph_runtime_inmem.queue] active=0 api_variant=local_dev available=1 langgraph_api_version=0.7.67 max=1 thread_name=asyncio_1
+2026-03-09T19:45:20.911426Z [info     ] Queue stats                    [langgraph_runtime_inmem.queue] api_variant=local_dev langgraph_api_version=0.7.67 n_pending=0 n_running=0 pending_runs_wait_time_max_secs=None pending_runs_wait_time_med_secs=None pending_unblocked_runs_wait_time_max_secs=None thread_name=asyncio_0
+2026-03-09T19:46:20.474714Z [info     ] Worker stats                   [langgraph_runtime_inmem.queue] active=0 api_variant=local_dev available=1 langgraph_api_version=0.7.67 max=1 thread_name=asyncio_1
+2026-03-09T19:46:20.978748Z [info     ] Queue stats                    [langgraph_runtime_inmem.queue] api_variant=local_dev langgraph_api_version=0.7.67 n_pending=0 n_running=0 pending_runs_wait_time_max_secs=None pending_runs_wait_time_med_secs=None pending_unblocked_runs_wait_time_max_secs=None thread_name=asyncio_0
+2026-03-09T19:47:20.477283Z [info     ] Worker stats                   [langgraph_runtime_inmem.queue] active=0 api_variant=local_dev available=1 langgraph_api_version=0.7.67 max=1 thread_name=asyncio_1
+2026-03-09T19:47:20.994582Z [info     ] Queue stats                    [langgraph_runtime_inmem.queue] api_variant=local_dev langgraph_api_version=0.7.67 n_pending=0 n_running=0 pending_runs_wait_time_max_secs=None pending_runs_wait_time_med_secs=None pending_unblocked_runs_wait_time_max_secs=None thread_name=asyncio_0
+2026-03-09T19:48:20.963935Z [info     ] Worker stats                   [langgraph_runtime_inmem.queue] active=0 api_variant=local_dev available=1 langgraph_api_version=0.7.67 max=1 thread_name=asyncio_1
+2026-03-09T19:48:21.477661Z [info     ] Queue stats                    [langgraph_runtime_inmem.queue] api_variant=local_dev langgraph_api_version=0.7.67 n_pending=0 n_running=0 pending_runs_wait_time_max_secs=None pending_runs_wait_time_med_secs=None pending_unblocked_runs_wait_time_max_secs=None thread_name=asyncio_0
+2026-03-09T19:49:07.788916Z [info     ] Created run                    [langgraph_api.models.run] after_seconds=0 api_variant=local_dev assistant_id=8b48b208-c421-5445-8e18-2e98882f6e8b checkpoint_id=None if_not_exists=reject langgraph_api_version=0.7.67 method=POST multitask_strategy=rollback path=/threads/{thread_id}/runs/stream request_id=98dca071-8bb3-49a1-9182-a0cae96414a6 run_create_ms=13 run_id=019cd425-6a49-7ab3-8807-bb2f5bbd9239 run_put_ms=1 stream_mode=['debug', 'messages'] stream_resumable=False temporary=False thread_id=44a3d07b-585b-4795-84ed-a87dfe49c34a thread_name=MainThread
+2026-03-09T19:49:08.345832Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
+2026-03-09T19:49:08.653041Z [info     ] Starting background run        [langgraph_api.worker] api_variant=local_dev assistant_id=8b48b208-c421-5445-8e18-2e98882f6e8b graph_id=conversational_agent langgraph_api_version=0.7.67 request_id=98dca071-8bb3-49a1-9182-a0cae96414a6 resumable=False run_attempt=1 run_creation_ms=13 run_id=019cd425-6a49-7ab3-8807-bb2f5bbd9239 run_queue_ms=863 run_started_at=2026-03-09T19:49:08.652316+00:00 run_stream_start_ms=0 temporary=False thread_id=44a3d07b-585b-4795-84ed-a87dfe49c34a thread_name=asyncio_1
+2026-03-09T19:49:09.789803Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
+2026-03-09T19:49:10.155570Z [info     ] 2 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
+2026-03-09T19:49:16.826188Z [info     ] HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK" [httpx] api_variant=local_dev assistant_id=8b48b208-c421-5445-8e18-2e98882f6e8b graph_id=conversational_agent langgraph_api_version=0.7.67 langgraph_node=agent request_id=98dca071-8bb3-49a1-9182-a0cae96414a6 run_attempt=1 run_id=019cd425-6a49-7ab3-8807-bb2f5bbd9239 thread_id=44a3d07b-585b-4795-84ed-a87dfe49c34a thread_name=asyncio_0
+2026-03-09T19:49:17.541016Z [info     ] Background run succeeded       [langgraph_api.worker] api_variant=local_dev assistant_id=8b48b208-c421-5445-8e18-2e98882f6e8b graph_id=conversational_agent langgraph_api_version=0.7.67 request_id=98dca071-8bb3-49a1-9182-a0cae96414a6 run_attempt=1 run_completed_in_ms=9765 run_created_at=2026-03-09T19:49:07.788518+00:00 run_ended_at=2026-03-09T19:49:17.540653+00:00 run_exec_ms=8888 run_id=019cd425-6a49-7ab3-8807-bb2f5bbd9239 run_started_at=2026-03-09T19:49:08.652316+00:00 run_wait_time_ms=863 thread_id=44a3d07b-585b-4795-84ed-a87dfe49c34a thread_name=asyncio_0
+2026-03-09T19:49:21.396783Z [info     ] Worker stats                   [langgraph_runtime_inmem.queue] active=0 api_variant=local_dev available=1 langgraph_api_version=0.7.67 max=1 thread_name=asyncio_0
+2026-03-09T19:49:21.909496Z [info     ] Queue stats                    [langgraph_runtime_inmem.queue] api_variant=local_dev langgraph_api_version=0.7.67 n_pending=0 n_running=0 pending_runs_wait_time_max_secs=None pending_runs_wait_time_med_secs=None pending_unblocked_runs_wait_time_max_secs=None thread_name=asyncio_0
+2026-03-09T19:49:22.141291Z [info     ] HTTP Request: POST https://api.smith.langchain.com/v1/metadata/submit "HTTP/1.1 204 No Content" [httpx] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
+2026-03-09T19:49:22.142783Z [info     ] Successfully submitted metadata to LangSmith instance [langgraph_api.metadata] api_variant=local_dev langgraph_api_version=0.7.67 n_nodes=1 n_runs=1 thread_name=MainThread
+2026-03-09T19:50:21.411443Z [info     ] Worker stats                   [langgraph_runtime_inmem.queue] active=0 api_variant=local_dev available=1 langgraph_api_version=0.7.67 max=1 thread_name=asyncio_0
+2026-03-09T19:50:21.929245Z [info     ] Queue stats                    [langgraph_runtime_inmem.queue] api_variant=local_dev langgraph_api_version=0.7.67 n_pending=0 n_running=0 pending_runs_wait_time_max_secs=None pending_runs_wait_time_med_secs=None pending_unblocked_runs_wait_time_max_secs=None thread_name=asyncio_1
+2026-03-09T19:50:53.581875Z [info     ] Created run                    [langgraph_api.models.run] after_seconds=0 api_variant=local_dev assistant_id=8b48b208-c421-5445-8e18-2e98882f6e8b checkpoint_id=None if_not_exists=reject langgraph_api_version=0.7.67 method=POST multitask_strategy=enqueue path=/threads/{thread_id}/runs/stream request_id=7610f2aa-8388-4f93-9837-0c4b54eb71ac run_create_ms=4 run_id=019cd427-078c-73d3-925f-1a3d9af77b5f run_put_ms=1 stream_mode=['messages-tuple', 'values'] stream_resumable=True temporary=False thread_id=44a3d07b-585b-4795-84ed-a87dfe49c34a thread_name=MainThread
+2026-03-09T19:50:54.390455Z [info     ] Starting background run        [langgraph_api.worker] api_variant=local_dev assistant_id=8b48b208-c421-5445-8e18-2e98882f6e8b graph_id=conversational_agent langgraph_api_version=0.7.67 request_id=7610f2aa-8388-4f93-9837-0c4b54eb71ac resumable=True run_attempt=1 run_creation_ms=4 run_id=019cd427-078c-73d3-925f-1a3d9af77b5f run_queue_ms=808 run_started_at=2026-03-09T19:50:54.389895+00:00 run_stream_start_ms=0 temporary=False thread_id=44a3d07b-585b-4795-84ed-a87dfe49c34a thread_name=asyncio_1
+2026-03-09T19:50:58.923501Z [info     ] HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK" [httpx] api_variant=local_dev assistant_id=8b48b208-c421-5445-8e18-2e98882f6e8b graph_id=conversational_agent langgraph_api_version=0.7.67 langgraph_node=agent request_id=7610f2aa-8388-4f93-9837-0c4b54eb71ac run_attempt=1 run_id=019cd427-078c-73d3-925f-1a3d9af77b5f thread_id=44a3d07b-585b-4795-84ed-a87dfe49c34a thread_name=asyncio_0
 [TOOL] Running query_diagnostic_knowledge...
-2026-03-07T22:13:44.870015Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:13:45.943888Z [info     ] 3 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-[DEBUG _parse_um24c_frame] frame=440000000000000000C8, len=10
-[DEBUG] digit1=-48 (0x00), digit2=-48 (0x00)
-[DEBUG _parse_um24c_frame] frame=440000000000000000C8, len=10
-[DEBUG] digit1=-48 (0x00), digit2=-48 (0x00)
-[DEBUG _parse_um24c_frame] frame=440000000000000000C8, len=10
-[DEBUG] digit1=-48 (0x00), digit2=-48 (0x00)
-2026-03-07T22:13:46.337388Z [info     ] 2 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:13:46.704077Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-[DEBUG _parse_um24c_frame] frame=440000000000000000C8, len=10
-[DEBUG] digit1=-48 (0x00), digit2=-48 (0x00)
-2026-03-07T22:13:56.110085Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:13:58.886774Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:13:59.346391Z [info     ] 4 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:14:00.261403Z [info     ] 2 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:14:00.616154Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:14:01.001888Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:14:01.740408Z [info     ] 2 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-[DEBUG _parse_um24c_frame] frame=440000000000000000C8, len=10
-[DEBUG] digit1=-48 (0x00), digit2=-48 (0x00)
-2026-03-07T22:14:08.628678Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:14:17.051724Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:14:17.417624Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:14:17.812341Z [info     ] 2 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:14:20.251608Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:14:20.932575Z [warning  ] Failed to send compressed multipart ingest: Connection error caused failure to POST https://api.smith.langchain.com/runs/multipart in LangSmith API. The content length of 29339522 bytes exceeds the maximum size limit of 20971520 bytes. ConnectionError(MaxRetryError("HTTPSConnectionPool(host='api.smith.langchain.com', port=443): Max retries exceeded with url: /runs/multipart (Caused by ProtocolError('Connection aborted.', ConnectionResetError(10054, 'An existing connection was forcibly closed by the remote host', None, 10054, None)))"))
-Content-Length: 29339522
-API Key: lsv2_********************************************fftrace=019cca5b-f7f2-7011-9a5d-0aeb800ccb56,id=019cca5c-3943-7b60-8351-60793543fff8; trace=019cca5b-f7f2-7011-9a5d-0aeb800ccb56,id=019cca5c-4429-7732-b882-ffc0f7d491ae [langsmith.client] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=ThreadPoolExecutor-0_2
-2026-03-07T22:14:27.879574Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:14:28.786840Z [info     ] 3 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:14:28.898879Z [warning  ] Failed to send compressed multipart ingest: Connection error caused failure to POST https://api.smith.langchain.com/runs/multipart in LangSmith API. The content length of 27759581 bytes exceeds the maximum size limit of 20971520 bytes. ConnectionError(MaxRetryError("HTTPSConnectionPool(host='api.smith.langchain.com', port=443): Max retries exceeded with url: /runs/multipart (Caused by ProtocolError('Connection aborted.', ConnectionResetError(10054, 'An existing connection was forcibly closed by the remote host', None, 10054, None)))"))
-Content-Length: 27759581
-API Key: lsv2_********************************************fftrace=019cca5b-f7f2-7011-9a5d-0aeb800ccb56,id=019cca5c-1e8e-7101-9f8f-4efd753c9866 [langsmith.client] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=ThreadPoolExecutor-0_0
-2026-03-07T22:14:29.334453Z [info     ] 2 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-[DEBUG _parse_um24c_frame] frame=440000000000000000C8, len=10
-[DEBUG] digit1=-48 (0x00), digit2=-48 (0x00)
-[DEBUG _parse_um24c_frame] frame=440000000000000000C8, len=10
-[DEBUG] digit1=-48 (0x00), digit2=-48 (0x00)
-[DEBUG _parse_um24c_frame] frame=440000000000000000C8, len=10
-[DEBUG] digit1=-48 (0x00), digit2=-48 (0x00)
-[DEBUG _parse_um24c_frame] frame=440000000000000000C8, len=10
-[DEBUG] digit1=-48 (0x00), digit2=-48 (0x00)
-[DEBUG _parse_um24c_frame] frame=440000000000000000C8, len=10
-[DEBUG] digit1=-48 (0x00), digit2=-48 (0x00)
-[DEBUG _parse_um24c_frame] frame=440000000000000000C8, len=10
-[DEBUG] digit1=-48 (0x00), digit2=-48 (0x00)
-2026-03-07T22:14:31.533510Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:14:35.365282Z [info     ] HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK" [httpx] api_variant=local_dev assistant_id=8b48b208-c421-5445-8e18-2e98882f6e8b graph_id=conversational_agent langgraph_api_version=0.7.67 langgraph_node=agent request_id=d7851892-e2c9-4b3f-bd24-2b29543359ed run_attempt=1 run_id=019cca5b-f7f2-7011-9a5d-0aeb800ccb56 thread_id=96f37130-131d-4684-a4e4-d656bffc6d60 thread_name=asyncio_2
-2026-03-07T22:14:39.211774Z [info     ] 3 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:14:39.878598Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:14:41.911839Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-[DEBUG _parse_um24c_frame] frame=440000000000000000C8, len=10
-[DEBUG] digit1=-48 (0x00), digit2=-48 (0x00)
-[DEBUG _parse_um24c_frame] frame=440000000000000000C8, len=10
-[DEBUG] digit1=-48 (0x00), digit2=-48 (0x00)
-[DEBUG _parse_um24c_frame] frame=440000000000000000C8, len=10
-[DEBUG] digit1=-48 (0x00), digit2=-48 (0x00)
-2026-03-07T22:14:45.663312Z [info     ] Background run succeeded       [langgraph_api.worker] api_variant=local_dev assistant_id=8b48b208-c421-5445-8e18-2e98882f6e8b graph_id=conversational_agent langgraph_api_version=0.7.67 request_id=d7851892-e2c9-4b3f-bd24-2b29543359ed run_attempt=1 run_completed_in_ms=134844 run_created_at=2026-03-07T22:12:30.842556+00:00 run_ended_at=2026-03-07T22:14:45.662353+00:00 run_exec_ms=134225 run_id=019cca5b-f7f2-7011-9a5d-0aeb800ccb56 run_started_at=2026-03-07T22:12:31.437105+00:00 run_wait_time_ms=594 thread_id=96f37130-131d-4684-a4e4-d656bffc6d60 thread_name=asyncio_2    
-2026-03-07T22:14:45.678142Z [info     ] Worker stats                   [langgraph_runtime_inmem.queue] active=0 api_variant=local_dev available=1 langgraph_api_version=0.7.67 max=1 thread_name=asyncio_3
-2026-03-07T22:14:45.681549Z [info     ] Queue stats                    [langgraph_runtime_inmem.queue] api_variant=local_dev langgraph_api_version=0.7.67 n_pending=0 n_running=0 pending_runs_wait_time_max_secs=None pending_runs_wait_time_med_secs=None pending_unblocked_runs_wait_time_max_secs=None thread_name=asyncio_0
-2026-03-07T22:14:50.119735Z [info     ] 3 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:14:50.590341Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:14:50.966464Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-[DEBUG _parse_um24c_frame] frame=40023075000337710344, len=10
-[DEBUG] digit1=-45 (0x03), digit2=7 (0x37)
-[DEBUG _parse_um24c_frame] frame=40023075000337710344, len=10
-[DEBUG] digit1=-45 (0x03), digit2=7 (0x37)
-[DEBUG _parse_um24c_frame] frame=40023075000337710344, len=10
-[DEBUG] digit1=-45 (0x03), digit2=7 (0x37)
-[DEBUG _parse_um24c_frame] frame=40023075000337710344, len=10
-[DEBUG] digit1=-45 (0x03), digit2=7 (0x37)
-[DEBUG _parse_um24c_frame] frame=40023075003327710244, len=10
-[DEBUG] digit1=3 (0x33), digit2=-9 (0x27)
-2026-03-07T22:14:53.101102Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:15:00.783582Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:15:01.271856Z [info     ] 3 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:15:01.699187Z [error    ] Failed to load file: .langgraph_api\.langgraph_checkpoint.1.pckl [langgraph.checkpoint.memory] api_variant=local_dev langgraph_api_version=0.7.67 method=POST path=/threads/{thread_id}/history request_id=171f6704-37d2-4835-a2ea-71a7fd755ced thread_name=asyncio_2     
-2026-03-07T22:15:01.723411Z [info     ] 4 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:15:01.839706Z [error    ] Failed to load cached data: pickle data was truncated [langgraph_runtime_inmem.checkpoint] api_variant=local_dev langgraph_api_version=0.7.67 method=POST path=/threads/{thread_id}/history request_id=171f6704-37d2-4835-a2ea-71a7fd755ced thread_name=asyncio_2
-2026-03-07T22:15:02.179228Z [info     ] 2 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:15:11.943357Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:15:12.371296Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:15:12.818315Z [info     ] 2 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:15:24.520266Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:15:25.232527Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:15:25.590030Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:15:25.947079Z [info     ] 2 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-[DEBUG _parse_um24c_frame] frame=440000000000000000C8, len=10
-[DEBUG] digit1=-48 (0x00), digit2=-48 (0x00)
-2026-03-07T22:15:30.551167Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:15:30.910997Z [info     ] 2 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:15:39.471892Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:15:45.841912Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:15:46.323175Z [info     ] 4 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:15:47.557928Z [info     ] Worker stats                   [langgraph_runtime_inmem.queue] active=0 api_variant=local_dev available=1 langgraph_api_version=0.7.67 max=1 thread_name=asyncio_3
-[DEBUG _parse_um24c_frame] frame=440000000000000000C8, len=10
-[DEBUG] digit1=-48 (0x00), digit2=-48 (0x00)
-2026-03-07T22:15:48.376471Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:15:49.508496Z [info     ] Queue stats                    [langgraph_runtime_inmem.queue] api_variant=local_dev langgraph_api_version=0.7.67 n_pending=0 n_running=0 pending_runs_wait_time_max_secs=None pending_runs_wait_time_med_secs=None pending_unblocked_runs_wait_time_max_secs=None thread_name=asyncio_0
-2026-03-07T22:15:55.334869Z [warning  ] Failed to send compressed multipart ingest: Connection error caused failure to POST https://api.smith.langchain.com/runs/multipart in LangSmith API. The content length of 360391040 bytes exceeds the maximum size limit of 20971520 bytes. ConnectionError(MaxRetryError("HTTPSConnectionPool(host='api.smith.langchain.com', port=443): Max retries exceeded with url: /runs/multipart (Caused by ProtocolError('Connection aborted.', ConnectionResetError(10054, 'An existing connection was forcibly closed by the remote host', None, 10054, None)))"))
-Content-Length: 360391040
-API Key: lsv2_********************************************fftrace=019cca5b-f7f2-7011-9a5d-0aeb800ccb56,id=019cca5c-4429-7732-b882-ffc0f7d491ae; trace=019cca5b-f7f2-7011-9a5d-0aeb800ccb56,id=019cca5c-1e8e-7101-9f8f-4efd753c9866; trace=019cca5b-f7f2-7011-9a5d-0aeb800ccb56,id=019cca5c-51e5-72c2-af1c-10af2b0ab1bc; trace=019cca5b-f7f2-7011-9a5d-0aeb800ccb56,id=019cca5c-5513-76f2-ad21-001a0c716e18; trace=019cca5b-f7f2-7011-9a5d-0aeb800ccb56,id=019cca5c-5513-76f2-ad21-001a0c716e18; trace=019cca5b-f7f2-7011-9a5d-0aeb800ccb56,id=019cca5c-51e5-72c2-af1c-10af2b0ab1bc; trace=019cca5b-f7f2-7011-9a5d-0aeb800ccb56,id=019cca5c-a82e-7531-8922-40ae3f84e3f0; trace=019cca5b-f7f2-7011-9a5d-0aeb800ccb56,id=019cca5c-de4c-7e03-ac01-76dc77f614f3; trace=019cca5b-f7f2-7011-9a5d-0aeb800ccb56,id=019cca5c-de4c-7e03-ac01-76dc77f614f3; trace=019cca5b-f7f2-7011-9a5d-0aeb800ccb56,id=019cca5c-f57a-76c0-8c14-ea24be5091b5; trace=019cca5b-f7f2-7011-9a5d-0aeb800ccb56,id=019cca5c-f57a-76c0-8c14-ea24be5091b5; trace=019cca5b-f7f2-7011-9a5d-0aeb800ccb56,id=019cca5c-a82e-7531-8922-40ae3f84e3f0; trace=019cca5b-f7f2-7011-9a5d-0aeb800ccb56,id=019cca5d-0a58-7b22-ae70-c04cdb5459cf; trace=019cca5b-f7f2-7011-9a5d-0aeb800ccb56,id=019cca5d-174e-7bf3-a879-6b044edc135b; trace=019cca5b-f7f2-7011-9a5d-0aeb800ccb56,id=019cca5d-174e-7bf3-a879-6b044edc135b; trace=019cca5b-f7f2-7011-9a5d-0aeb800ccb56,id=019cca5d-0a58-7b22-ae70-c04cdb5459cf; trace=019cca5b-f7f2-7011-9a5d-0aeb800ccb56,id=019cca5d-9be4-7db2-9778-b16e033c51b6 [langsmith.client] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=ThreadPoolExecutor-0_1
-2026-03-07T22:15:56.468429Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:15:56.862863Z [info     ] 4 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:15:58.428213Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:16:06.703089Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:16:06.829666Z [warning  ] Failed to send compressed multipart ingest: Connection error caused failure to POST https://api.smith.langchain.com/runs/multipart in LangSmith API. The content length of 34581103 bytes exceeds the maximum size limit of 20971520 bytes. ConnectionError(MaxRetryError("HTTPSConnectionPool(host='api.smith.langchain.com', port=443): Max retries exceeded with url: /runs/multipart (Caused by ProtocolError('Connection aborted.', ConnectionAbortedError(10053, 'An established connection was aborted by the software in your host machine', None, 10053, None)))"))
-Content-Length: 34581103
-API Key: lsv2_********************************************fftrace=019cca5b-f7f2-7011-9a5d-0aeb800ccb56,id=019cca5d-d2cb-7d30-99ba-e9c84706dffc; trace=019cca5b-f7f2-7011-9a5d-0aeb800ccb56,id=019cca5d-f689-7ea2-9bf8-c8cbacf8de71 [langsmith.client] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=ThreadPoolExecutor-0_0
-2026-03-07T22:16:07.076951Z [info     ] 4 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:16:10.171444Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-[DEBUG _parse_um24c_frame] frame=440000000000000000C8, len=10
-[DEBUG] digit1=-48 (0x00), digit2=-48 (0x00)
-[DEBUG _parse_um24c_frame] frame=440000000000000000C8, len=10
-[DEBUG] digit1=-48 (0x00), digit2=-48 (0x00)
-[DEBUG _parse_um24c_frame] frame=440000000000000000C8, len=10
-[DEBUG] digit1=-48 (0x00), digit2=-48 (0x00)
-[DEBUG _parse_um24c_frame] frame=440000000000000000C8, len=10
-[DEBUG] digit1=-48 (0x00), digit2=-48 (0x00)
-[DEBUG _parse_um24c_frame] frame=440000000000000000C8, len=10
-[DEBUG] digit1=-48 (0x00), digit2=-48 (0x00)
-[DEBUG _parse_um24c_frame] frame=440000000000000000C8, len=10
-[DEBUG] digit1=-48 (0x00), digit2=-48 (0x00)
-[DEBUG _parse_um24c_frame] frame=440000000000000000C8, len=10
-[DEBUG] digit1=-48 (0x00), digit2=-48 (0x00)
-[DEBUG _parse_um24c_frame] frame=440000000000000000C8, len=10
-[DEBUG] digit1=-48 (0x00), digit2=-48 (0x00)
-[DEBUG _parse_um24c_frame] frame=440000000000000000C8, len=10
-[DEBUG] digit1=-48 (0x00), digit2=-48 (0x00)
-[DEBUG _parse_um24c_frame] frame=440000000000000000C8, len=10
-[DEBUG] digit1=-48 (0x00), digit2=-48 (0x00)
-[DEBUG _parse_um24c_frame] frame=440000000000000000C8, len=10
-[DEBUG] digit1=-48 (0x00), digit2=-48 (0x00)
-[DEBUG _parse_um24c_frame] frame=440000000000000000C8, len=10
-[DEBUG] digit1=-48 (0x00), digit2=-48 (0x00)
-2026-03-07T22:16:16.624572Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-[DEBUG _parse_um24c_frame] frame=440000000000000000C8, len=10
-[DEBUG] digit1=-48 (0x00), digit2=-48 (0x00)
-[DEBUG _parse_um24c_frame] frame=440000000000000000C8, len=10
-[DEBUG] digit1=-48 (0x00), digit2=-48 (0x00)
-[DEBUG _parse_um24c_frame] frame=440000000000000000C8, len=10
-[DEBUG] digit1=-48 (0x00), digit2=-48 (0x00)
-[DEBUG _parse_um24c_frame] frame=440000000000000000C8, len=10
-[DEBUG] digit1=-48 (0x00), digit2=-48 (0x00)
-2026-03-07T22:16:17.128876Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:16:17.510441Z [info     ] 4 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:16:19.257049Z [info     ] 3 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:16:19.619354Z [info     ] 2 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:16:27.419087Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:16:27.781739Z [info     ] 3 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:16:28.147716Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:16:29.439501Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:16:38.086755Z [info     ] 4 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:16:39.270500Z [info     ] HTTP Request: POST https://api.smith.langchain.com/v1/metadata/submit "HTTP/1.1 204 No Content" [httpx] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:16:39.280913Z [info     ] Successfully submitted metadata to LangSmith instance [langgraph_api.metadata] api_variant=local_dev langgraph_api_version=0.7.67 n_nodes=5 n_runs=1 thread_name=MainThread
-2026-03-07T22:16:39.554177Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:16:47.975242Z [info     ] Worker stats                   [langgraph_runtime_inmem.queue] active=0 api_variant=local_dev available=1 langgraph_api_version=0.7.67 max=1 thread_name=asyncio_2
-2026-03-07T22:16:48.246090Z [info     ] 4 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:16:48.483389Z [info     ] Queue stats                    [langgraph_runtime_inmem.queue] api_variant=local_dev langgraph_api_version=0.7.67 n_pending=0 n_running=0 pending_runs_wait_time_max_secs=None pending_runs_wait_time_med_secs=None pending_unblocked_runs_wait_time_max_secs=None thread_name=asyncio_3
-2026-03-07T22:16:49.714809Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-[DEBUG _parse_um24c_frame] frame=440000000000000000C8, len=10
-[DEBUG] digit1=-48 (0x00), digit2=-48 (0x00)
-2026-03-07T22:16:58.220965Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:16:58.577626Z [info     ] 4 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:17:00.138728Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:17:02.380297Z [warning  ] Failed to send compressed multipart ingest: Connection error caused failure to POST https://api.smith.langchain.com/runs/multipart in LangSmith API. The content length of 107903923 bytes exceeds the maximum size limit of 20971520 bytes. ConnectionError(MaxRetryError("HTTPSConnectionPool(host='api.smith.langchain.com', port=443): Max retries exceeded with url: /runs/multipart (Caused by ProtocolError('Connection aborted.', ConnectionResetError(10054, 'An existing connection was forcibly closed by the remote host', None, 10054, None)))"))
-Content-Length: 107903923
-API Key: lsv2_********************************************fftrace=019cca5b-f7f2-7011-9a5d-0aeb800ccb56,id=019cca5d-f689-7ea2-9bf8-c8cbacf8de71; trace=019cca5b-f7f2-7011-9a5d-0aeb800ccb56,id=019cca5d-9be4-7db2-9778-b16e033c51b6; trace=019cca5b-f7f2-7011-9a5d-0aeb800ccb56,id=019cca5b-f7f2-7011-9a5d-0aeb800ccb56 [langsmith.client] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=ThreadPoolExecutor-0_2
-2026-03-07T22:17:08.397025Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:17:08.756576Z [info     ] 3 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:17:10.083353Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:17:18.841646Z [info     ] 4 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:17:20.375265Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:17:28.909512Z [info     ] 3 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:17:29.273015Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:17:30.542837Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:17:38.983020Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:17:39.333776Z [info     ] 4 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:17:40.614375Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:17:48.408016Z [info     ] Worker stats                   [langgraph_runtime_inmem.queue] active=0 api_variant=local_dev available=1 langgraph_api_version=0.7.67 max=1 thread_name=asyncio_0
-2026-03-07T22:17:48.923607Z [info     ] Queue stats                    [langgraph_runtime_inmem.queue] api_variant=local_dev langgraph_api_version=0.7.67 n_pending=0 n_running=0 pending_runs_wait_time_max_secs=None pending_runs_wait_time_med_secs=None pending_unblocked_runs_wait_time_max_secs=None thread_name=asyncio_1
-2026-03-07T22:17:49.262010Z [info     ] 3 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:17:50.091630Z [info     ] 2 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:17:51.553074Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:18:00.256417Z [info     ] 4 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:18:01.675706Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-[DEBUG _parse_um24c_frame] frame=44707302317303440000, len=10
-[DEBUG] digit1=67 (0x73), digit2=-45 (0x03)
-[DEBUG _parse_um24c_frame] frame=44707302317303440000, len=10
-[DEBUG] digit1=67 (0x73), digit2=-45 (0x03)
-[DEBUG _parse_um24c_frame] frame=44707302317303440000, len=10
-[DEBUG] digit1=67 (0x73), digit2=-45 (0x03)
-[DEBUG _parse_um24c_frame] frame=44707302317303440000, len=10
-[DEBUG] digit1=67 (0x73), digit2=-45 (0x03)
-[DEBUG _parse_um24c_frame] frame=44707102315303440000, len=10
-[DEBUG] digit1=35 (0x53), digit2=-45 (0x03)
-[DEBUG _parse_um24c_frame] frame=44707102315303440000, len=10
-[DEBUG] digit1=35 (0x53), digit2=-45 (0x03)
-[DEBUG _parse_um24c_frame] frame=44707102315303440000, len=10
-[DEBUG] digit1=35 (0x53), digit2=-45 (0x03)
-2026-03-07T22:18:10.404548Z [info     ] 4 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:18:11.843404Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-[DEBUG _parse_um24c_frame] frame=40023075000337530344, len=10
-[DEBUG] digit1=-45 (0x03), digit2=7 (0x37)
-[DEBUG _parse_um24c_frame] frame=40023075000337530344, len=10
-[DEBUG] digit1=-45 (0x03), digit2=7 (0x37)
-[DEBUG _parse_um24c_frame] frame=40023075000337530344, len=10
-[DEBUG] digit1=-45 (0x03), digit2=7 (0x37)
-[DEBUG _parse_um24c_frame] frame=40023075003337710344, len=10
-[DEBUG] digit1=3 (0x33), digit2=7 (0x37)
-[DEBUG PARSE] frame=40023075003337710344, digit1=3, digit2=7, decimal_pos=0x71
-[DEBUG] Calculated value=10, mode_byte=0x75, unit_byte=0x00
-[DEBUG] Unknown mode! mode_byte=0x75, unit_byte=0x00 - defaulting to DC_VOLTAGE
-[DEBUG _parse_um24c_frame] frame=40023075003337710244, len=10
-[DEBUG] digit1=3 (0x33), digit2=7 (0x37)
-[DEBUG PARSE] frame=40023075003337710244, digit1=3, digit2=7, decimal_pos=0x71
-[DEBUG] Calculated value=10, mode_byte=0x75, unit_byte=0x00
-[DEBUG] Unknown mode! mode_byte=0x75, unit_byte=0x00 - defaulting to DC_VOLTAGE
-2026-03-07T22:18:20.542884Z [info     ] 4 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:18:22.020664Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-[DEBUG _parse_um24c_frame] frame=440000000000000000C8, len=10
-[DEBUG] digit1=-48 (0x00), digit2=-48 (0x00)
-[DEBUG _parse_um24c_frame] frame=440000000000000000C8, len=10
-[DEBUG] digit1=-48 (0x00), digit2=-48 (0x00)
-[DEBUG _parse_um24c_frame] frame=440000000000000000C8, len=10
-[DEBUG] digit1=-48 (0x00), digit2=-48 (0x00)
-[DEBUG _parse_um24c_frame] frame=440000000000000000C8, len=10
-[DEBUG] digit1=-48 (0x00), digit2=-48 (0x00)
-[DEBUG _parse_um24c_frame] frame=440000000000000000C8, len=10
-[DEBUG] digit1=-48 (0x00), digit2=-48 (0x00)
-[DEBUG _parse_um24c_frame] frame=440000000000000000C8, len=10
-[DEBUG] digit1=-48 (0x00), digit2=-48 (0x00)
-2026-03-07T22:18:30.687919Z [info     ] 4 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:18:33.007646Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:18:40.757191Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:18:41.122060Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:18:41.535660Z [info     ] 3 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:18:41.924287Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:18:43.289696Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:18:51.669095Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:18:53.494870Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:18:53.866509Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:18:59.359965Z [info     ] Worker stats                   [langgraph_runtime_inmem.queue] active=0 api_variant=local_dev available=1 langgraph_api_version=0.7.67 max=1 thread_name=asyncio_3
-2026-03-07T22:18:59.592691Z [info     ] 2 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-[DEBUG _parse_um24c_frame] frame=440000000000000000C8, len=10
-[DEBUG] digit1=-48 (0x00), digit2=-48 (0x00)
-[DEBUG _parse_um24c_frame] frame=440000000000000000C8, len=10
-[DEBUG] digit1=-48 (0x00), digit2=-48 (0x00)
-[DEBUG _parse_um24c_frame] frame=440000000000000000C8, len=10
-[DEBUG] digit1=-48 (0x00), digit2=-48 (0x00)
-[DEBUG _parse_um24c_frame] frame=440000000000000000C8, len=10
-[DEBUG] digit1=-48 (0x00), digit2=-48 (0x00)
-[DEBUG _parse_um24c_frame] frame=440000000000000000C8, len=10
-[DEBUG] digit1=-48 (0x00), digit2=-48 (0x00)
-[DEBUG _parse_um24c_frame] frame=440000000000000000C8, len=10
-[DEBUG] digit1=-48 (0x00), digit2=-48 (0x00)
-[DEBUG _parse_um24c_frame] frame=440000000000000000C8, len=10
-[DEBUG] digit1=-48 (0x00), digit2=-48 (0x00)
-[DEBUG _parse_um24c_frame] frame=440000000000000000C8, len=10
-[DEBUG] digit1=-48 (0x00), digit2=-48 (0x00)
-[DEBUG _parse_um24c_frame] frame=440000000000000000C8, len=10
-[DEBUG] digit1=-48 (0x00), digit2=-48 (0x00)
-[DEBUG _parse_um24c_frame] frame=440000000000000000C8, len=10
-[DEBUG] digit1=-48 (0x00), digit2=-48 (0x00)
-2026-03-07T22:18:59.970809Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-[DEBUG _parse_um24c_frame] frame=440000000000000000C8, len=10
-[DEBUG] digit1=-48 (0x00), digit2=-48 (0x00)
-[DEBUG _parse_um24c_frame] frame=440000000000000000C8, len=10
-[DEBUG] digit1=-48 (0x00), digit2=-48 (0x00)
-2026-03-07T22:19:00.794861Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:19:01.649576Z [info     ] Queue stats                    [langgraph_runtime_inmem.queue] api_variant=local_dev langgraph_api_version=0.7.67 n_pending=0 n_running=0 pending_runs_wait_time_max_secs=None pending_runs_wait_time_med_secs=None pending_unblocked_runs_wait_time_max_secs=None thread_name=asyncio_1
-[DEBUG _parse_um24c_frame] frame=440000000000000000C8, len=10
-[DEBUG] digit1=-48 (0x00), digit2=-48 (0x00)
-2026-03-07T22:19:11.263928Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:19:11.745389Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:19:12.346275Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:19:13.517048Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:19:14.323465Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:19:16.014105Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:19:16.399501Z [info     ] 4 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:19:21.290563Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:19:22.797601Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:19:23.183428Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:19:23.768294Z [info     ] 3 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:19:27.140470Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:19:28.558436Z [info     ] 2 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:19:29.771197Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:19:42.148777Z [info     ] 2 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:19:42.513583Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:19:42.874525Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:19:44.257539Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:19:52.898901Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:19:53.277166Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:19:53.633629Z [info     ] 4 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:19:54.010117Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:20:04.231677Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:20:05.895618Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:20:06.617103Z [info     ] 2 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:20:07.077011Z [info     ] 5 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:20:07.590756Z [info     ] 4 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:20:09.328737Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:20:09.798167Z [info     ] 2 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:20:12.416972Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:20:17.425933Z [info     ] Worker stats                   [langgraph_runtime_inmem.queue] active=0 api_variant=local_dev available=1 langgraph_api_version=0.7.67 max=1 thread_name=asyncio_1
-2026-03-07T22:20:19.351640Z [info     ] Queue stats                    [langgraph_runtime_inmem.queue] api_variant=local_dev langgraph_api_version=0.7.67 n_pending=0 n_running=0 pending_runs_wait_time_max_secs=None pending_runs_wait_time_med_secs=None pending_unblocked_runs_wait_time_max_secs=None thread_name=asyncio_0
-2026-03-07T22:20:19.844488Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:20:20.223111Z [info     ] 4 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:20:21.646571Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:20:30.071233Z [info     ] 3 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:20:30.432427Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:20:31.608154Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:20:40.310067Z [info     ] 4 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:20:42.031631Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:20:50.428172Z [info     ] 4 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:20:51.922507Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:21:00.517351Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:21:00.877278Z [info     ] 2 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:21:01.241556Z [info     ] 2 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:21:02.942727Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:21:11.033134Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:21:11.394179Z [info     ] 4 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:21:12.688313Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:21:17.733577Z [info     ] Worker stats                   [langgraph_runtime_inmem.queue] active=0 api_variant=local_dev available=1 langgraph_api_version=0.7.67 max=1 thread_name=asyncio_2
-2026-03-07T22:21:18.237791Z [info     ] Queue stats                    [langgraph_runtime_inmem.queue] api_variant=local_dev langgraph_api_version=0.7.67 n_pending=0 n_running=0 pending_runs_wait_time_max_secs=None pending_runs_wait_time_med_secs=None pending_unblocked_runs_wait_time_max_secs=None thread_name=asyncio_3
-2026-03-07T22:21:21.330675Z [info     ] 4 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:21:22.791118Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:21:31.345514Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:21:31.706400Z [info     ] 4 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:21:32.930367Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:21:41.566786Z [info     ] 3 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:21:41.925261Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:21:43.287108Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:21:44.529906Z [info     ] HTTP Request: POST https://api.smith.langchain.com/v1/metadata/submit "HTTP/1.1 204 No Content" [httpx] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:21:44.662298Z [info     ] Successfully submitted metadata to LangSmith instance [langgraph_api.metadata] api_variant=local_dev langgraph_api_version=0.7.67 n_nodes=0 n_runs=0 thread_name=MainThread
-2026-03-07T22:21:51.706410Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:21:52.222999Z [info     ] 4 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:21:57.064771Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:22:02.037210Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:22:02.395657Z [info     ] 4 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:22:03.637944Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:22:12.216109Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:22:12.573450Z [info     ] 4 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:22:14.463841Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:22:17.792872Z [info     ] Worker stats                   [langgraph_runtime_inmem.queue] active=0 api_variant=local_dev available=1 langgraph_api_version=0.7.67 max=1 thread_name=asyncio_3
-2026-03-07T22:22:26.244133Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:22:29.285365Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:22:30.184724Z [info     ] 2 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:22:30.587182Z [info     ] 6 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:22:31.042347Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:22:31.735625Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:22:32.109283Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:22:32.478871Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:22:33.073092Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:22:33.676403Z [info     ] 3 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:22:37.900005Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:22:39.692138Z [info     ] 2 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:22:41.377109Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:22:43.576037Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:22:45.364855Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:22:46.158737Z [info     ] Queue stats                    [langgraph_runtime_inmem.queue] api_variant=local_dev langgraph_api_version=0.7.67 n_pending=0 n_running=0 pending_runs_wait_time_max_secs=None pending_runs_wait_time_med_secs=None pending_unblocked_runs_wait_time_max_secs=None thread_name=asyncio_1
-2026-03-07T22:22:46.750129Z [info     ] 3 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:22:47.199996Z [info     ] 2 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:22:48.672522Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:22:56.877079Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:22:57.309049Z [info     ] 4 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:22:59.540133Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:23:07.218552Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:23:07.580178Z [info     ] 3 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:23:08.039249Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:23:08.631434Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:23:10.481932Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:23:18.086149Z [info     ] Worker stats                   [langgraph_runtime_inmem.queue] active=0 api_variant=local_dev available=1 langgraph_api_version=0.7.67 max=1 thread_name=asyncio_3
-2026-03-07T22:23:18.141296Z [info     ] 4 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:23:18.602233Z [info     ] Queue stats                    [langgraph_runtime_inmem.queue] api_variant=local_dev langgraph_api_version=0.7.67 n_pending=0 n_running=0 pending_runs_wait_time_max_secs=None pending_runs_wait_time_med_secs=None pending_unblocked_runs_wait_time_max_secs=None thread_name=asyncio_0
-2026-03-07T22:23:19.856226Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:23:28.162805Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:23:28.523565Z [info     ] 4 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:23:30.259191Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:23:38.507135Z [info     ] 3 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:23:38.865153Z [info     ] 2 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:23:40.578319Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:23:48.733229Z [info     ] 4 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:23:50.758011Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:23:58.734002Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:23:59.105976Z [info     ] 4 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:24:01.253923Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:24:08.975728Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:24:09.331614Z [info     ] 4 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:24:11.138657Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:24:18.555606Z [info     ] Worker stats                   [langgraph_runtime_inmem.queue] active=0 api_variant=local_dev available=1 langgraph_api_version=0.7.67 max=1 thread_name=asyncio_2
-2026-03-07T22:24:19.072999Z [info     ] Queue stats                    [langgraph_runtime_inmem.queue] api_variant=local_dev langgraph_api_version=0.7.67 n_pending=0 n_running=0 pending_runs_wait_time_max_secs=None pending_runs_wait_time_med_secs=None pending_unblocked_runs_wait_time_max_secs=None thread_name=asyncio_1
-2026-03-07T22:24:19.365769Z [info     ] 4 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:24:21.295930Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:24:29.338559Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:24:29.693975Z [info     ] 4 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:24:31.110344Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:24:39.658964Z [info     ] 4 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:24:41.275723Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:24:49.648186Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:24:50.062093Z [info     ] 4 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:24:51.776014Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:25:00.046739Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:25:00.411160Z [info     ] 4 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:25:01.835292Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:25:10.226813Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:25:10.589320Z [info     ] 4 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:25:12.099654Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:25:18.591030Z [info     ] Worker stats                   [langgraph_runtime_inmem.queue] active=0 api_variant=local_dev available=1 langgraph_api_version=0.7.67 max=1 thread_name=asyncio_3
-2026-03-07T22:25:19.104537Z [info     ] Queue stats                    [langgraph_runtime_inmem.queue] api_variant=local_dev langgraph_api_version=0.7.67 n_pending=0 n_running=0 pending_runs_wait_time_max_secs=None pending_runs_wait_time_med_secs=None pending_unblocked_runs_wait_time_max_secs=None thread_name=asyncio_0
-2026-03-07T22:25:20.451119Z [info     ] 3 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:25:20.814172Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:25:22.194429Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:25:30.556292Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:25:30.916933Z [info     ] 3 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:25:32.889401Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:25:40.856041Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:25:41.221072Z [info     ] 4 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:25:42.476281Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:25:44.472930Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:25:47.184108Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:25:47.625507Z [info     ] 3 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:25:51.022215Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:25:51.382715Z [info     ] 4 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:25:54.467854Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:26:01.286850Z [info     ] 4 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:26:02.756693Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:26:11.454293Z [info     ] 4 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:26:13.263442Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:26:18.995908Z [info     ] Worker stats                   [langgraph_runtime_inmem.queue] active=0 api_variant=local_dev available=1 langgraph_api_version=0.7.67 max=1 thread_name=asyncio_2
-2026-03-07T22:26:19.503394Z [info     ] Queue stats                    [langgraph_runtime_inmem.queue] api_variant=local_dev langgraph_api_version=0.7.67 n_pending=0 n_running=0 pending_runs_wait_time_max_secs=None pending_runs_wait_time_med_secs=None pending_unblocked_runs_wait_time_max_secs=None thread_name=asyncio_1
-2026-03-07T22:26:21.498691Z [info     ] 3 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:26:21.872162Z [info     ] 2 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:26:24.331436Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:26:31.763636Z [info     ] 4 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:26:33.799141Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:26:41.755459Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:26:42.118038Z [info     ] 4 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:26:43.442517Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:26:45.458001Z [info     ] HTTP Request: POST https://api.smith.langchain.com/v1/metadata/submit "HTTP/1.1 204 No Content" [httpx] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:26:45.466751Z [info     ] Successfully submitted metadata to LangSmith instance [langgraph_api.metadata] api_variant=local_dev langgraph_api_version=0.7.67 n_nodes=0 n_runs=0 thread_name=MainThread
-2026-03-07T22:26:52.107718Z [info     ] 4 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:26:53.806003Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:27:02.089838Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:27:02.457751Z [info     ] 4 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:27:04.090507Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:27:12.302219Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:27:12.671258Z [info     ] 4 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:27:14.631399Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:27:19.009135Z [info     ] Worker stats                   [langgraph_runtime_inmem.queue] active=0 api_variant=local_dev available=1 langgraph_api_version=0.7.67 max=1 thread_name=asyncio_0
-2026-03-07T22:27:19.521908Z [info     ] Queue stats                    [langgraph_runtime_inmem.queue] api_variant=local_dev langgraph_api_version=0.7.67 n_pending=0 n_running=0 pending_runs_wait_time_max_secs=None pending_runs_wait_time_med_secs=None pending_unblocked_runs_wait_time_max_secs=None thread_name=asyncio_2
-2026-03-07T22:27:22.513751Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:27:22.894941Z [info     ] 4 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:27:24.414416Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:27:24.656406Z [info     ] Shutting down background workers [langgraph_runtime_inmem.queue] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:27:24.775823Z [info     ] Shutting down remote graphs    [langgraph_api.graph] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:27:24.950769Z [info     ] Stopping dev persistence flush loop [langgraph_runtime_inmem._persistence] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
-2026-03-07T22:27:24.954104Z [info     ] dev persistence flush loop exiting [langgraph_runtime_inmem._persistence] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=Thread-1
-PS C:\Users\Michael\Documents\AI Automation\ai-agent> 
+2026-03-09T19:51:05.513821Z [info     ] Anonymized telemetry enabled. See                     https://docs.trychroma.com/telemetry for more information. [chromadb.telemetry.product.posthog] api_variant=local_dev assistant_id=8b48b208-c421-5445-8e18-2e98882f6e8b graph_id=conversational_agent langgraph_api_version=0.7.67 langgraph_node=tools request_id=7610f2aa-8388-4f93-9837-0c4b54eb71ac run_attempt=1 run_id=019cd427-078c-73d3-925f-1a3d9af77b5f thread_id=44a3d07b-585b-4795-84ed-a87dfe49c34a thread_name=asyncio_0
+2026-03-09T19:51:05.902173Z [info     ] 3 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
+2026-03-09T19:51:07.855505Z [info     ] 4 changes detected             [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
+2026-03-09T19:51:12.232495Z [info     ] HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK" [httpx] api_variant=local_dev assistant_id=8b48b208-c421-5445-8e18-2e98882f6e8b graph_id=conversational_agent langgraph_api_version=0.7.67 langgraph_node=agent request_id=7610f2aa-8388-4f93-9837-0c4b54eb71ac run_attempt=1 run_id=019cd427-078c-73d3-925f-1a3d9af77b5f thread_id=44a3d07b-585b-4795-84ed-a87dfe49c34a thread_name=asyncio_1
+[TOOL] Running get_equipment_configuration...
+2026-03-09T19:51:16.294487Z [info     ] HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK" [httpx] api_variant=local_dev assistant_id=8b48b208-c421-5445-8e18-2e98882f6e8b graph_id=conversational_agent langgraph_api_version=0.7.67 langgraph_node=agent request_id=7610f2aa-8388-4f93-9837-0c4b54eb71ac run_attempt=1 run_id=019cd427-078c-73d3-925f-1a3d9af77b5f thread_id=44a3d07b-585b-4795-84ed-a87dfe49c34a thread_name=asyncio_2
+[TOOL] Running get_test_point_guidance...
+2026-03-09T19:51:20.743718Z [info     ] HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 429 Too Many Requests" [httpx] api_variant=local_dev assistant_id=8b48b208-c421-5445-8e18-2e98882f6e8b graph_id=conversational_agent langgraph_api_version=0.7.67 langgraph_node=agent request_id=7610f2aa-8388-4f93-9837-0c4b54eb71ac run_attempt=1 run_id=019cd427-078c-73d3-925f-1a3d9af77b5f thread_id=44a3d07b-585b-4795-84ed-a87dfe49c34a thread_name=asyncio_2
+2026-03-09T19:51:20.746646Z [info     ] Retrying request to /openai/v1/chat/completions in 17.000000 seconds [groq._base_client] api_variant=local_dev assistant_id=8b48b208-c421-5445-8e18-2e98882f6e8b graph_id=conversational_agent langgraph_api_version=0.7.67 langgraph_node=agent request_id=7610f2aa-8388-4f93-9837-0c4b54eb71ac run_attempt=1 run_id=019cd427-078c-73d3-925f-1a3d9af77b5f thread_id=44a3d07b-585b-4795-84ed-a87dfe49c34a thread_name=asyncio_2
+2026-03-09T19:51:38.553514Z [info     ] HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK" [httpx] api_variant=local_dev assistant_id=8b48b208-c421-5445-8e18-2e98882f6e8b graph_id=conversational_agent langgraph_api_version=0.7.67 langgraph_node=agent request_id=7610f2aa-8388-4f93-9837-0c4b54eb71ac run_attempt=1 run_id=019cd427-078c-73d3-925f-1a3d9af77b5f thread_id=44a3d07b-585b-4795-84ed-a87dfe49c34a thread_name=asyncio_2
+2026-03-09T19:51:40.429955Z [info     ] Background run succeeded       [langgraph_api.worker] api_variant=local_dev assistant_id=8b48b208-c421-5445-8e18-2e98882f6e8b graph_id=conversational_agent langgraph_api_version=0.7.67 request_id=7610f2aa-8388-4f93-9837-0c4b54eb71ac run_attempt=1 run_completed_in_ms=46852 run_created_at=2026-03-09T19:50:53.581713+00:00 run_ended_at=2026-03-09T19:51:40.429607+00:00 run_exec_ms=46039 run_id=019cd427-078c-73d3-925f-1a3d9af77b5f run_started_at=2026-03-09T19:50:54.389895+00:00 run_wait_time_ms=808 thread_id=44a3d07b-585b-4795-84ed-a87dfe49c34a thread_name=asyncio_0
+2026-03-09T19:51:40.438058Z [info     ] Worker stats                   [langgraph_runtime_inmem.queue] active=0 api_variant=local_dev available=1 langgraph_api_version=0.7.67 max=1 thread_name=asyncio_2
+2026-03-09T19:51:40.440882Z [info     ] Queue stats                    [langgraph_runtime_inmem.queue] api_variant=local_dev langgraph_api_version=0.7.67 n_pending=0 n_running=0 pending_runs_wait_time_max_secs=None pending_runs_wait_time_med_secs=None pending_unblocked_runs_wait_time_max_secs=None thread_name=asyncio_1
+2026-03-09T19:52:40.909470Z [info     ] Worker stats                   [langgraph_runtime_inmem.queue] active=0 api_variant=local_dev available=1 langgraph_api_version=0.7.67 max=1 thread_name=asyncio_1
+2026-03-09T19:52:41.426601Z [info     ] Queue stats                    [langgraph_runtime_inmem.queue] api_variant=local_dev langgraph_api_version=0.7.67 n_pending=0 n_running=0 pending_runs_wait_time_max_secs=None pending_runs_wait_time_med_secs=None pending_unblocked_runs_wait_time_max_secs=None thread_name=asyncio_0
+2026-03-09T19:52:55.535743Z [info     ] Created run                    [langgraph_api.models.run] after_seconds=0 api_variant=local_dev assistant_id=8b48b208-c421-5445-8e18-2e98882f6e8b checkpoint_id=None if_not_exists=reject langgraph_api_version=0.7.67 method=POST multitask_strategy=enqueue path=/threads/{thread_id}/runs/stream request_id=d4e568b4-fbc1-4ca7-b2c1-0270f0cfd65d run_create_ms=3 run_id=019cd428-e3ee-7672-9a28-afa56d5b99f6 run_put_ms=0 stream_mode=['messages-tuple', 'values'] stream_resumable=True temporary=False thread_id=44a3d07b-585b-4795-84ed-a87dfe49c34a thread_name=MainThread
+2026-03-09T19:52:56.358079Z [info     ] Starting background run        [langgraph_api.worker] api_variant=local_dev assistant_id=8b48b208-c421-5445-8e18-2e98882f6e8b graph_id=conversational_agent langgraph_api_version=0.7.67 request_id=d4e568b4-fbc1-4ca7-b2c1-0270f0cfd65d resumable=True run_attempt=1 run_creation_ms=3 run_id=019cd428-e3ee-7672-9a28-afa56d5b99f6 run_queue_ms=822 run_started_at=2026-03-09T19:52:56.357747+00:00 run_stream_start_ms=0 temporary=False thread_id=44a3d07b-585b-4795-84ed-a87dfe49c34a thread_name=asyncio_1
+2026-03-09T19:53:01.898124Z [info     ] HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK" [httpx] api_variant=local_dev assistant_id=8b48b208-c421-5445-8e18-2e98882f6e8b graph_id=conversational_agent langgraph_api_version=0.7.67 langgraph_node=agent request_id=d4e568b4-fbc1-4ca7-b2c1-0270f0cfd65d run_attempt=1 run_id=019cd428-e3ee-7672-9a28-afa56d5b99f6 thread_id=44a3d07b-585b-4795-84ed-a87dfe49c34a thread_name=asyncio_0
+2026-03-09T19:53:04.359668Z [info     ] Background run succeeded       [langgraph_api.worker] api_variant=local_dev assistant_id=8b48b208-c421-5445-8e18-2e98882f6e8b graph_id=conversational_agent langgraph_api_version=0.7.67 request_id=d4e568b4-fbc1-4ca7-b2c1-0270f0cfd65d run_attempt=1 run_completed_in_ms=8826 run_created_at=2026-03-09T19:52:55.535584+00:00 run_ended_at=2026-03-09T19:53:04.358735+00:00 run_exec_ms=8000 run_id=019cd428-e3ee-7672-9a28-afa56d5b99f6 run_started_at=2026-03-09T19:52:56.357747+00:00 run_wait_time_ms=822 thread_id=44a3d07b-585b-4795-84ed-a87dfe49c34a thread_name=asyncio_2
+2026-03-09T19:53:41.191441Z [info     ] Worker stats                   [langgraph_runtime_inmem.queue] active=0 api_variant=local_dev available=1 langgraph_api_version=0.7.67 max=1 thread_name=asyncio_2
+2026-03-09T19:53:41.695959Z [info     ] Queue stats                    [langgraph_runtime_inmem.queue] api_variant=local_dev langgraph_api_version=0.7.67 n_pending=0 n_running=0 pending_runs_wait_time_max_secs=None pending_runs_wait_time_med_secs=None pending_unblocked_runs_wait_time_max_secs=None thread_name=asyncio_0
+2026-03-09T19:53:45.322573Z [info     ] Created run                    [langgraph_api.models.run] after_seconds=0 api_variant=local_dev assistant_id=8b48b208-c421-5445-8e18-2e98882f6e8b checkpoint_id=None if_not_exists=reject langgraph_api_version=0.7.67 method=POST multitask_strategy=enqueue path=/threads/{thread_id}/runs/stream request_id=c44181ab-41d5-49ab-accd-d3d385c291ee run_create_ms=25 run_id=019cd429-a669-7f02-8539-f172bf356401 run_put_ms=0 stream_mode=['messages-tuple', 'values'] stream_resumable=True temporary=False thread_id=44a3d07b-585b-4795-84ed-a87dfe49c34a thread_name=MainThread
+2026-03-09T19:53:46.278144Z [info     ] Starting background run        [langgraph_api.worker] api_variant=local_dev assistant_id=8b48b208-c421-5445-8e18-2e98882f6e8b graph_id=conversational_agent langgraph_api_version=0.7.67 request_id=c44181ab-41d5-49ab-accd-d3d385c291ee resumable=True run_attempt=1 run_creation_ms=25 run_id=019cd429-a669-7f02-8539-f172bf356401 run_queue_ms=955 run_started_at=2026-03-09T19:53:46.277760+00:00 run_stream_start_ms=0 temporary=False thread_id=44a3d07b-585b-4795-84ed-a87dfe49c34a thread_name=asyncio_2
+2026-03-09T19:53:52.357413Z [info     ] HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK" [httpx] api_variant=local_dev assistant_id=8b48b208-c421-5445-8e18-2e98882f6e8b graph_id=conversational_agent langgraph_api_version=0.7.67 langgraph_node=agent request_id=c44181ab-41d5-49ab-accd-d3d385c291ee run_attempt=1 run_id=019cd429-a669-7f02-8539-f172bf356401 thread_id=44a3d07b-585b-4795-84ed-a87dfe49c34a thread_name=asyncio_0
+2026-03-09T19:53:55.236185Z [info     ] Background run succeeded       [langgraph_api.worker] api_variant=local_dev assistant_id=8b48b208-c421-5445-8e18-2e98882f6e8b graph_id=conversational_agent langgraph_api_version=0.7.67 request_id=c44181ab-41d5-49ab-accd-d3d385c291ee run_attempt=1 run_completed_in_ms=9938 run_created_at=2026-03-09T19:53:45.322436+00:00 run_ended_at=2026-03-09T19:53:55.235920+00:00 run_exec_ms=8958 run_id=019cd429-a669-7f02-8539-f172bf356401 run_started_at=2026-03-09T19:53:46.277760+00:00 run_wait_time_ms=955 thread_id=44a3d07b-585b-4795-84ed-a87dfe49c34a thread_name=asyncio_0
+2026-03-09T19:54:30.424380Z [info     ] HTTP Request: POST https://api.smith.langchain.com/v1/metadata/submit "HTTP/1.1 204 No Content" [httpx] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
+2026-03-09T19:54:30.442398Z [info     ] Successfully submitted metadata to LangSmith instance [langgraph_api.metadata] api_variant=local_dev langgraph_api_version=0.7.67 n_nodes=13 n_runs=3 thread_name=MainThread
+2026-03-09T19:54:41.278775Z [info     ] Worker stats                   [langgraph_runtime_inmem.queue] active=0 api_variant=local_dev available=1 langgraph_api_version=0.7.67 max=1 thread_name=asyncio_0
+2026-03-09T19:54:41.789604Z [info     ] Queue stats                    [langgraph_runtime_inmem.queue] api_variant=local_dev langgraph_api_version=0.7.67 n_pending=0 n_running=0 pending_runs_wait_time_max_secs=None pending_runs_wait_time_med_secs=None pending_unblocked_runs_wait_time_max_secs=None thread_name=asyncio_1
+2026-03-09T19:54:42.659113Z [warning  ] Failed to send compressed multipart ingest: Connection error caused failure to POST https://api.smith.langchain.com/runs/multipart in LangSmith API. Please confirm your internet connection. ConnectionError(MaxRetryError("HTTPSConnectionPool(host='api.smith.langchain.com', port=443): Max retries exceeded with url: /runs/multipart (Caused by ProtocolError('Connection aborted.', ConnectionResetError(10054, 'An existing connection was forcibly closed by the remote host', None, 10054, None)))"))
+Content-Length: 12590362
+API Key: lsv2_********************************************fftrace=019cd428-e3ee-7672-9a28-afa56d5b99f6,id=019cd428-e3ee-7672-9a28-afa56d5b99f6; trace=019cd428-e3ee-7672-9a28-afa56d5b99f6,id=019cd428-e819-70d2-a335-735872088901; trace=019cd428-e3ee-7672-9a28-afa56d5b99f6,id=019cd428-e819-70d2-a335-735872088901; trace=019cd428-e3ee-7672-9a28-afa56d5b99f6,id=019cd428-e99b-7fe1-b227-1d967dc54431 [langsmith.client] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=ThreadPoolExecutor-0_1
+2026-03-09T19:54:57.440274Z [warning  ] Failed to send compressed multipart ingest: Connection error caused failure to POST https://api.smith.langchain.com/runs/multipart in LangSmith API. Please confirm your internet connection. ConnectionError(MaxRetryError("HTTPSConnectionPool(host='api.smith.langchain.com', port=443): Max retries exceeded with url: /runs/multipart (Caused by ProtocolError('Connection aborted.', ConnectionAbortedError(10053, 'An established connection was aborted by the software in your host machine', None, 10053, None)))"))
+Content-Length: 8395297
+API Key: lsv2_********************************************fftrace=019cd428-e3ee-7672-9a28-afa56d5b99f6,id=019cd428-e99b-7fe1-b227-1d967dc54431; trace=019cd428-e3ee-7672-9a28-afa56d5b99f6,id=019cd428-ec0c-77c0-93d0-875fd386672e [langsmith.client] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=ThreadPoolExecutor-0_2
+2026-03-09T19:55:23.261652Z [warning  ] Failed to send compressed multipart ingest: Connection error caused failure to POST https://api.smith.langchain.com/runs/multipart in LangSmith API. The content length of 27280712 bytes exceeds the maximum size limit of 20971520 bytes. ConnectionError(MaxRetryError("HTTPSConnectionPool(host='api.smith.langchain.com', port=443): Max retries exceeded with url: /runs/multipart (Caused by ProtocolError('Connection aborted.', ConnectionResetError(10054, 'An existing connection was forcibly closed by the remote host', None, 10054, None)))"))
+Content-Length: 27280712
+API Key: lsv2_********************************************fftrace=019cd427-078c-73d3-925f-1a3d9af77b5f,id=019cd427-6f2e-7071-a7f1-43b2c1951a34; trace=019cd427-078c-73d3-925f-1a3d9af77b5f,id=019cd427-6f2e-7071-a7f1-43b2c1951a34; trace=019cd427-078c-73d3-925f-1a3d9af77b5f,id=019cd427-b8e8-7bc2-a269-f46fce17289e; trace=019cd427-078c-73d3-925f-1a3d9af77b5f,id=019cd427-b8e8-7bc2-a269-f46fce17289e; trace=019cd427-078c-73d3-925f-1a3d9af77b5f,id=019cd427-663e-7951-8f33-4d3df43f71b1; trace=019cd427-078c-73d3-925f-1a3d9af77b5f,id=019cd427-bbf9-7513-ae57-fa85db51842c; trace=019cd427-078c-73d3-925f-1a3d9af77b5f,id=019cd427-bbf9-7513-ae57-fa85db51842c; trace=019cd427-078c-73d3-925f-1a3d9af77b5f,id=019cd427-078c-73d3-925f-1a3d9af77b5f [langsmith.client] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=ThreadPoolExecutor-0_0
+2026-03-09T19:55:41.362320Z [info     ] Worker stats                   [langgraph_runtime_inmem.queue] active=0 api_variant=local_dev available=1 langgraph_api_version=0.7.67 max=1 thread_name=asyncio_2
+2026-03-09T19:55:41.878265Z [info     ] Queue stats                    [langgraph_runtime_inmem.queue] api_variant=local_dev langgraph_api_version=0.7.67 n_pending=0 n_running=0 pending_runs_wait_time_max_secs=None pending_runs_wait_time_med_secs=None pending_unblocked_runs_wait_time_max_secs=None thread_name=asyncio_0
+2026-03-09T19:56:41.438688Z [info     ] Worker stats                   [langgraph_runtime_inmem.queue] active=0 api_variant=local_dev available=1 langgraph_api_version=0.7.67 max=1 thread_name=asyncio_0
+2026-03-09T19:56:41.955397Z [info     ] Queue stats                    [langgraph_runtime_inmem.queue] api_variant=local_dev langgraph_api_version=0.7.67 n_pending=0 n_running=0 pending_runs_wait_time_max_secs=None pending_runs_wait_time_med_secs=None pending_unblocked_runs_wait_time_max_secs=None thread_name=asyncio_1
+2026-03-09T19:57:04.706124Z [info     ] Created run                    [langgraph_api.models.run] after_seconds=0 api_variant=local_dev assistant_id=8b48b208-c421-5445-8e18-2e98882f6e8b checkpoint_id=None if_not_exists=reject langgraph_api_version=0.7.67 method=POST multitask_strategy=enqueue path=/threads/{thread_id}/runs/stream request_id=4350ac58-c37e-4ae6-86b0-e97f957e0dc6 run_create_ms=5 run_id=019cd42c-b13f-7bc2-ae88-7798555032b6 run_put_ms=2 stream_mode=['messages-tuple', 'values'] stream_resumable=True temporary=False thread_id=44a3d07b-585b-4795-84ed-a87dfe49c34a thread_name=MainThread
+2026-03-09T19:57:05.974811Z [info     ] Starting background run        [langgraph_api.worker] api_variant=local_dev assistant_id=8b48b208-c421-5445-8e18-2e98882f6e8b graph_id=conversational_agent langgraph_api_version=0.7.67 request_id=4350ac58-c37e-4ae6-86b0-e97f957e0dc6 resumable=True run_attempt=1 run_creation_ms=5 run_id=019cd42c-b13f-7bc2-ae88-7798555032b6 run_queue_ms=1268 run_started_at=2026-03-09T19:57:05.974289+00:00 run_stream_start_ms=0 temporary=False thread_id=44a3d07b-585b-4795-84ed-a87dfe49c34a thread_name=asyncio_0
+2026-03-09T19:57:12.674837Z [info     ] HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK" [httpx] api_variant=local_dev assistant_id=8b48b208-c421-5445-8e18-2e98882f6e8b graph_id=conversational_agent langgraph_api_version=0.7.67 langgraph_node=agent request_id=4350ac58-c37e-4ae6-86b0-e97f957e0dc6 run_attempt=1 run_id=019cd42c-b13f-7bc2-ae88-7798555032b6 thread_id=44a3d07b-585b-4795-84ed-a87dfe49c34a thread_name=asyncio_0
+2026-03-09T19:57:18.073027Z [info     ] Background run succeeded       [langgraph_api.worker] api_variant=local_dev assistant_id=8b48b208-c421-5445-8e18-2e98882f6e8b graph_id=conversational_agent langgraph_api_version=0.7.67 request_id=4350ac58-c37e-4ae6-86b0-e97f957e0dc6 run_attempt=1 run_completed_in_ms=13372 run_created_at=2026-03-09T19:57:04.705701+00:00 run_ended_at=2026-03-09T19:57:18.072571+00:00 run_exec_ms=12098 run_id=019cd42c-b13f-7bc2-ae88-7798555032b6 run_started_at=2026-03-09T19:57:05.974289+00:00 run_wait_time_ms=1268 thread_id=44a3d07b-585b-4795-84ed-a87dfe49c34a thread_name=asyncio_0        
+2026-03-09T19:57:35.093083Z [info     ] Created run                    [langgraph_api.models.run] after_seconds=0 api_variant=local_dev assistant_id=8b48b208-c421-5445-8e18-2e98882f6e8b checkpoint_id=None if_not_exists=reject langgraph_api_version=0.7.67 method=POST multitask_strategy=enqueue path=/threads/{thread_id}/runs/stream request_id=769262c6-cc6c-4575-97e7-8662dcbb6800 run_create_ms=5 run_id=019cd42d-27f3-79c0-a4b0-204f61100ab2 run_put_ms=0 stream_mode=['messages-tuple', 'values'] stream_resumable=True temporary=False thread_id=44a3d07b-585b-4795-84ed-a87dfe49c34a thread_name=MainThread
+2026-03-09T19:57:37.299270Z [info     ] Starting background run        [langgraph_api.worker] api_variant=local_dev assistant_id=8b48b208-c421-5445-8e18-2e98882f6e8b graph_id=conversational_agent langgraph_api_version=0.7.67 request_id=769262c6-cc6c-4575-97e7-8662dcbb6800 resumable=True run_attempt=1 run_creation_ms=4 run_id=019cd42d-27f3-79c0-a4b0-204f61100ab2 run_queue_ms=2205 run_started_at=2026-03-09T19:57:37.298896+00:00 run_stream_start_ms=0 temporary=False thread_id=44a3d07b-585b-4795-84ed-a87dfe49c34a thread_name=asyncio_1
+2026-03-09T19:57:48.343718Z [info     ] HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK" [httpx] api_variant=local_dev assistant_id=8b48b208-c421-5445-8e18-2e98882f6e8b graph_id=conversational_agent langgraph_api_version=0.7.67 langgraph_node=agent request_id=769262c6-cc6c-4575-97e7-8662dcbb6800 run_attempt=1 run_id=019cd42d-27f3-79c0-a4b0-204f61100ab2 thread_id=44a3d07b-585b-4795-84ed-a87dfe49c34a thread_name=asyncio_2
+2026-03-09T19:57:54.242631Z [info     ] Background run succeeded       [langgraph_api.worker] api_variant=local_dev assistant_id=8b48b208-c421-5445-8e18-2e98882f6e8b graph_id=conversational_agent langgraph_api_version=0.7.67 request_id=769262c6-cc6c-4575-97e7-8662dcbb6800 run_attempt=1 run_completed_in_ms=19154 run_created_at=2026-03-09T19:57:35.092946+00:00 run_ended_at=2026-03-09T19:57:54.242081+00:00 run_exec_ms=16943 run_id=019cd42d-27f3-79c0-a4b0-204f61100ab2 run_started_at=2026-03-09T19:57:37.298896+00:00 run_wait_time_ms=2205 thread_id=44a3d07b-585b-4795-84ed-a87dfe49c34a thread_name=asyncio_2        
+2026-03-09T19:57:54.288866Z [info     ] Worker stats                   [langgraph_runtime_inmem.queue] active=0 api_variant=local_dev available=1 langgraph_api_version=0.7.67 max=1 thread_name=asyncio_3
+2026-03-09T19:57:54.366471Z [info     ] Queue stats                    [langgraph_runtime_inmem.queue] api_variant=local_dev langgraph_api_version=0.7.67 n_pending=0 n_running=0 pending_runs_wait_time_max_secs=None pending_runs_wait_time_med_secs=None pending_unblocked_runs_wait_time_max_secs=None thread_name=asyncio_1
+2026-03-09T19:58:54.275035Z [info     ] Worker stats                   [langgraph_runtime_inmem.queue] active=0 api_variant=local_dev available=1 langgraph_api_version=0.7.67 max=1 thread_name=asyncio_3
+2026-03-09T19:58:54.782379Z [info     ] Queue stats                    [langgraph_runtime_inmem.queue] api_variant=local_dev langgraph_api_version=0.7.67 n_pending=0 n_running=0 pending_runs_wait_time_max_secs=None pending_runs_wait_time_med_secs=None pending_unblocked_runs_wait_time_max_secs=None thread_name=asyncio_1
+2026-03-09T19:59:31.478567Z [warning  ] Failed to send compressed multipart ingest: Connection error caused failure to POST https://api.smith.langchain.com/runs/multipart in LangSmith API. Please confirm your internet connection. ConnectionError(MaxRetryError("HTTPSConnectionPool(host='api.smith.langchain.com', port=443): Max retries exceeded with url: /runs/multipart (Caused by ProtocolError('Connection aborted.', ConnectionResetError(10054, 'An existing connection was forcibly closed by the remote host', None, 10054, None)))"))
+Content-Length: 8398489
+API Key: lsv2_********************************************fftrace=019cd42c-b13f-7bc2-ae88-7798555032b6,id=019cd42c-b835-7a61-b8e6-ceace6dea2a6; trace=019cd42c-b13f-7bc2-ae88-7798555032b6,id=019cd42c-c34e-7642-b926-d269c0260b94 [langsmith.client] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=ThreadPoolExecutor-0_0
+2026-03-09T19:59:32.522458Z [info     ] HTTP Request: POST https://api.smith.langchain.com/v1/metadata/submit "HTTP/1.1 204 No Content" [httpx] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
+2026-03-09T19:59:32.525509Z [info     ] Successfully submitted metadata to LangSmith instance [langgraph_api.metadata] api_variant=local_dev langgraph_api_version=0.7.67 n_nodes=4 n_runs=2 thread_name=MainThread
+2026-03-09T19:59:54.560117Z [info     ] Worker stats                   [langgraph_runtime_inmem.queue] active=0 api_variant=local_dev available=1 langgraph_api_version=0.7.67 max=1 thread_name=asyncio_2
+2026-03-09T19:59:55.064943Z [info     ] Queue stats                    [langgraph_runtime_inmem.queue] api_variant=local_dev langgraph_api_version=0.7.67 n_pending=0 n_running=0 pending_runs_wait_time_max_secs=None pending_runs_wait_time_med_secs=None pending_unblocked_runs_wait_time_max_secs=None thread_name=asyncio_3
+2026-03-09T20:00:54.731819Z [info     ] Worker stats                   [langgraph_runtime_inmem.queue] active=0 api_variant=local_dev available=1 langgraph_api_version=0.7.67 max=1 thread_name=asyncio_1
+2026-03-09T20:00:55.245593Z [info     ] Queue stats                    [langgraph_runtime_inmem.queue] api_variant=local_dev langgraph_api_version=0.7.67 n_pending=0 n_running=0 pending_runs_wait_time_max_secs=None pending_runs_wait_time_med_secs=None pending_unblocked_runs_wait_time_max_secs=None thread_name=asyncio_0
+2026-03-09T20:01:33.897345Z [warning  ] Failed to send compressed multipart ingest: Connection error caused failure to POST https://api.smith.langchain.com/runs/multipart in LangSmith API. The content length of 203863590 bytes exceeds the maximum size limit of 20971520 bytes. ConnectionError(MaxRetryError("HTTPSConnectionPool(host='api.smith.langchain.com', port=443): Max retries exceeded with url: /runs/multipart (Caused by ProtocolError('Connection aborted.', ConnectionResetError(10054, 'An existing connection was forcibly closed by the remote host', None, 10054, None)))"))
+Content-Length: 203863590
+API Key: lsv2_********************************************fftrace=019cd42c-b13f-7bc2-ae88-7798555032b6,id=019cd42c-c34e-7642-b926-d269c0260b94; trace=019cd42c-b13f-7bc2-ae88-7798555032b6,id=019cd42c-d75f-7d91-a3c4-a62c5ec2b97f; trace=019cd42c-b13f-7bc2-ae88-7798555032b6,id=019cd42c-d75f-7d91-a3c4-a62c5ec2b97f; trace=019cd42c-b13f-7bc2-ae88-7798555032b6,id=019cd42c-b835-7a61-b8e6-ceace6dea2a6; trace=019cd42c-b13f-7bc2-ae88-7798555032b6,id=019cd42c-ddf8-7180-bf72-b254ddcff395; trace=019cd42c-b13f-7bc2-ae88-7798555032b6,id=019cd42c-ddf8-7180-bf72-b254ddcff395; trace=019cd42c-b13f-7bc2-ae88-7798555032b6,id=019cd42c-b13f-7bc2-ae88-7798555032b6; trace=019cd42d-27f3-79c0-a4b0-204f61100ab2,id=019cd42d-27f3-79c0-a4b0-204f61100ab2; trace=019cd42d-27f3-79c0-a4b0-204f61100ab2,id=019cd42d-3525-7802-8c3c-c8ef296f66ad; trace=019cd42d-27f3-79c0-a4b0-204f61100ab2,id=019cd42d-3525-7802-8c3c-c8ef296f66ad; trace=019cd42d-27f3-79c0-a4b0-204f61100ab2,id=019cd42d-3c41-78a1-8701-8393ef2b7048; trace=019cd42d-27f3-79c0-a4b0-204f61100ab2,id=019cd42d-3c41-78a1-8701-8393ef2b7048; trace=019cd42d-27f3-79c0-a4b0-204f61100ab2,id=019cd42d-40de-7f62-9af7-7c7ace840c32; trace=019cd42d-27f3-79c0-a4b0-204f61100ab2,id=019cd42d-5830-7f11-8537-2708862a102d; trace=019cd42d-27f3-79c0-a4b0-204f61100ab2,id=019cd42d-5830-7f11-8537-2708862a102d; trace=019cd42d-27f3-79c0-a4b0-204f61100ab2,id=019cd42d-67e6-7600-8da7-a7632cb5fb18; trace=019cd42d-27f3-79c0-a4b0-204f61100ab2,id=019cd42d-67e6-7600-8da7-a7632cb5fb18; trace=019cd42d-27f3-79c0-a4b0-204f61100ab2,id=019cd42d-40de-7f62-9af7-7c7ace840c32; trace=019cd42d-27f3-79c0-a4b0-204f61100ab2,id=019cd42d-27f3-79c0-a4b0-204f61100ab2 [langsmith.client] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=ThreadPoolExecutor-0_2
+2026-03-09T20:01:55.098225Z [info     ] Worker stats                   [langgraph_runtime_inmem.queue] active=0 api_variant=local_dev available=1 langgraph_api_version=0.7.67 max=1 thread_name=asyncio_2
+2026-03-09T20:01:55.613880Z [info     ] Queue stats                    [langgraph_runtime_inmem.queue] api_variant=local_dev langgraph_api_version=0.7.67 n_pending=0 n_running=0 pending_runs_wait_time_max_secs=None pending_runs_wait_time_med_secs=None pending_unblocked_runs_wait_time_max_secs=None thread_name=asyncio_3
+2026-03-09T20:02:17.335057Z [info     ] Created run                    [langgraph_api.models.run] after_seconds=0 api_variant=local_dev assistant_id=8b48b208-c421-5445-8e18-2e98882f6e8b checkpoint_id=None if_not_exists=reject langgraph_api_version=0.7.67 method=POST multitask_strategy=enqueue path=/threads/{thread_id}/runs/stream request_id=cf5af1da-ceb8-48ca-a864-b7e78ddd669a run_create_ms=164 run_id=019cd431-75da-76f2-8794-351fbeeaa811 run_put_ms=155 stream_mode=['messages-tuple', 'values'] stream_resumable=True temporary=False thread_id=44a3d07b-585b-4795-84ed-a87dfe49c34a thread_name=MainThread
+2026-03-09T20:02:20.007014Z [info     ] Starting background run        [langgraph_api.worker] api_variant=local_dev assistant_id=8b48b208-c421-5445-8e18-2e98882f6e8b graph_id=conversational_agent langgraph_api_version=0.7.67 request_id=cf5af1da-ceb8-48ca-a864-b7e78ddd669a resumable=True run_attempt=1 run_creation_ms=164 run_id=019cd431-75da-76f2-8794-351fbeeaa811 run_queue_ms=2671 run_started_at=2026-03-09T20:02:20.005939+00:00 run_stream_start_ms=0 temporary=False thread_id=44a3d07b-585b-4795-84ed-a87dfe49c34a thread_name=asyncio_0
+2026-03-09T20:02:26.060110Z [info     ] HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK" [httpx] api_variant=local_dev assistant_id=8b48b208-c421-5445-8e18-2e98882f6e8b graph_id=conversational_agent langgraph_api_version=0.7.67 langgraph_node=agent request_id=cf5af1da-ceb8-48ca-a864-b7e78ddd669a run_attempt=1 run_id=019cd431-75da-76f2-8794-351fbeeaa811 thread_id=44a3d07b-585b-4795-84ed-a87dfe49c34a thread_name=asyncio_1
+2026-03-09T20:02:35.509714Z [info     ] HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK" [httpx] api_variant=local_dev assistant_id=8b48b208-c421-5445-8e18-2e98882f6e8b graph_id=conversational_agent langgraph_api_version=0.7.67 langgraph_node=diagnose request_id=cf5af1da-ceb8-48ca-a864-b7e78ddd669a run_attempt=1 run_id=019cd431-75da-76f2-8794-351fbeeaa811 thread_id=44a3d07b-585b-4795-84ed-a87dfe49c34a thread_name=asyncio_0
+2026-03-09T20:02:39.533020Z [info     ] Background run succeeded       [langgraph_api.worker] api_variant=local_dev assistant_id=8b48b208-c421-5445-8e18-2e98882f6e8b graph_id=conversational_agent langgraph_api_version=0.7.67 request_id=cf5af1da-ceb8-48ca-a864-b7e78ddd669a run_attempt=1 run_completed_in_ms=22362 run_created_at=2026-03-09T20:02:17.334796+00:00 run_ended_at=2026-03-09T20:02:39.532521+00:00 run_exec_ms=19526 run_id=019cd431-75da-76f2-8794-351fbeeaa811 run_started_at=2026-03-09T20:02:20.005939+00:00 run_wait_time_ms=2671 thread_id=44a3d07b-585b-4795-84ed-a87dfe49c34a thread_name=asyncio_0        
+2026-03-09T20:02:55.231849Z [info     ] Worker stats                   [langgraph_runtime_inmem.queue] active=0 api_variant=local_dev available=1 langgraph_api_version=0.7.67 max=1 thread_name=asyncio_1
+2026-03-09T20:02:55.749028Z [info     ] Queue stats                    [langgraph_runtime_inmem.queue] api_variant=local_dev langgraph_api_version=0.7.67 n_pending=0 n_running=0 pending_runs_wait_time_max_secs=None pending_runs_wait_time_med_secs=None pending_unblocked_runs_wait_time_max_secs=None thread_name=asyncio_2
+2026-03-09T20:03:28.139815Z [warning  ] Failed to send compressed multipart ingest: Connection error caused failure to POST https://api.smith.langchain.com/runs/multipart in LangSmith API. The content length of 125300201 bytes exceeds the maximum size limit of 20971520 bytes. ConnectionError(MaxRetryError("HTTPSConnectionPool(host='api.smith.langchain.com', port=443): Max retries exceeded with url: /runs/multipart (Caused by ProtocolError('Connection aborted.', ConnectionResetError(10054, 'An existing connection was forcibly closed by the remote host', None, 10054, None)))"))
+Content-Length: 125300201
+API Key: lsv2_********************************************fftrace=019cd428-e3ee-7672-9a28-afa56d5b99f6,id=019cd428-f894-7d42-8bda-838fff56a03b; trace=019cd428-e3ee-7672-9a28-afa56d5b99f6,id=019cd428-f894-7d42-8bda-838fff56a03b; trace=019cd428-e3ee-7672-9a28-afa56d5b99f6,id=019cd428-fe62-7a02-babe-4eb5c313771d; trace=019cd428-e3ee-7672-9a28-afa56d5b99f6,id=019cd428-fe62-7a02-babe-4eb5c313771d; trace=019cd428-e3ee-7672-9a28-afa56d5b99f6,id=019cd428-ec0c-77c0-93d0-875fd386672e; trace=019cd428-e3ee-7672-9a28-afa56d5b99f6,id=019cd429-0134-7990-ba95-89e5d6200300; trace=019cd428-e3ee-7672-9a28-afa56d5b99f6,id=019cd429-0134-7990-ba95-89e5d6200300; trace=019cd428-e3ee-7672-9a28-afa56d5b99f6,id=019cd428-e3ee-7672-9a28-afa56d5b99f6; trace=019cd429-a669-7f02-8539-f172bf356401,id=019cd429-a669-7f02-8539-f172bf356401; trace=019cd429-a669-7f02-8539-f172bf356401,id=019cd429-abed-7fe1-8db3-906ef904b220; trace=019cd429-a669-7f02-8539-f172bf356401,id=019cd429-abed-7fe1-8db3-906ef904b220; trace=019cd429-a669-7f02-8539-f172bf356401,id=019cd429-ae84-7a30-a0ed-821258d2a43c; trace=019cd429-a669-7f02-8539-f172bf356401,id=019cd429-ae84-7a30-a0ed-821258d2a43c; trace=019cd429-a669-7f02-8539-f172bf356401,id=019cd429-b22a-7031-9dfc-18108e036410; trace=019cd429-a669-7f02-8539-f172bf356401,id=019cd429-be76-7180-b914-98a6f0059080; trace=019cd429-a669-7f02-8539-f172bf356401,id=019cd429-be76-7180-b914-98a6f0059080; trace=019cd429-a669-7f02-8539-f172bf356401,id=019cd429-c7b3-7701-808d-5f6d9e2716a4; trace=019cd429-a669-7f02-8539-f172bf356401,id=019cd429-c7b3-7701-808d-5f6d9e2716a4; trace=019cd429-a669-7f02-8539-f172bf356401,id=019cd429-b22a-7031-9dfc-18108e036410; trace=019cd429-a669-7f02-8539-f172bf356401,id=019cd429-a669-7f02-8539-f172bf356401 [langsmith.client] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=ThreadPoolExecutor-0_1  
+2026-03-09T20:03:29.948947Z [warning  ] Failed to send compressed multipart ingest: Connection error caused failure to POST https://api.smith.langchain.com/runs/multipart in LangSmith API. The content length of 34588984 bytes exceeds the maximum size limit of 20971520 bytes. ConnectionError(MaxRetryError("HTTPSConnectionPool(host='api.smith.langchain.com', port=443): Max retries exceeded with url: /runs/multipart (Caused by ProtocolError('Connection aborted.', ConnectionResetError(10054, 'An existing connection was forcibly closed by the remote host', None, 10054, None)))"))
+Content-Length: 34588984
+API Key: lsv2_********************************************fftrace=019cd431-75da-76f2-8794-351fbeeaa811,id=019cd431-9545-7c73-9aa4-7c3360df0812; trace=019cd431-75da-76f2-8794-351fbeeaa811,id=019cd431-a885-7e82-ac81-ccba19965988; trace=019cd431-75da-76f2-8794-351fbeeaa811,id=019cd431-a885-7e82-ac81-ccba19965988 [langsmith.client] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=ThreadPoolExecutor-0_0
+2026-03-09T20:03:55.711994Z [info     ] Worker stats                   [langgraph_runtime_inmem.queue] active=0 api_variant=local_dev available=1 langgraph_api_version=0.7.67 max=1 thread_name=asyncio_1
+2026-03-09T20:03:56.215703Z [info     ] Queue stats                    [langgraph_runtime_inmem.queue] api_variant=local_dev langgraph_api_version=0.7.67 n_pending=0 n_running=0 pending_runs_wait_time_max_secs=None pending_runs_wait_time_med_secs=None pending_unblocked_runs_wait_time_max_secs=None thread_name=asyncio_2
+2026-03-09T20:04:15.864331Z [warning  ] Failed to send compressed multipart ingest: Connection error caused failure to POST https://api.smith.langchain.com/runs/multipart in LangSmith API. Please confirm your internet connection. ConnectionError(MaxRetryError("HTTPSConnectionPool(host='api.smith.langchain.com', port=443): Max retries exceeded with url: /runs/multipart (Caused by ProtocolError('Connection aborted.', ConnectionAbortedError(10053, 'An established connection was aborted by the software in your host machine', None, 10053, None)))"))
+Content-Length: 16242030
+API Key: lsv2_********************************************fftrace=019cd431-75da-76f2-8794-351fbeeaa811,id=019cd431-af66-75c2-925b-cca2eac1de8a [langsmith.client] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=ThreadPoolExecutor-0_1
+2026-03-09T20:04:17.587628Z [warning  ] Failed to send compressed multipart ingest: Connection error caused failure to POST https://api.smith.langchain.com/runs/multipart in LangSmith API. The content length of 34599403 bytes exceeds the maximum size limit of 20971520 bytes. ConnectionError(MaxRetryError("HTTPSConnectionPool(host='api.smith.langchain.com', port=443): Max retries exceeded with url: /runs/multipart (Caused by ProtocolError('Connection aborted.', ConnectionResetError(10054, 'An existing connection was forcibly closed by the remote host', None, 10054, None)))"))
+Content-Length: 34599403
+API Key: lsv2_********************************************fftrace=019cd431-75da-76f2-8794-351fbeeaa811,id=019cd431-bb29-7ac0-b306-4611dc9f1b04; trace=019cd431-75da-76f2-8794-351fbeeaa811,id=019cd431-af66-75c2-925b-cca2eac1de8a; trace=019cd431-75da-76f2-8794-351fbeeaa811,id=019cd431-75da-76f2-8794-351fbeeaa811 [langsmith.client] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=ThreadPoolExecutor-0_0
+2026-03-09T20:04:23.649274Z [warning  ] Failed to send compressed multipart ingest: Connection error caused failure to POST https://api.smith.langchain.com/runs/multipart in LangSmith API. Please confirm your internet connection. ConnectionError(MaxRetryError("HTTPSConnectionPool(host='api.smith.langchain.com', port=443): Max retries exceeded with url: /runs/multipart (Caused by ProtocolError('Connection aborted.', ConnectionAbortedError(10053, 'An established connection was aborted by the software in your host machine', None, 10053, None)))"))
+Content-Length: 10474412
+API Key: lsv2_********************************************fftrace=019cd431-75da-76f2-8794-351fbeeaa811,id=019cd431-84f8-7be2-aa0b-8c4cb6720bad [langsmith.client] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=ThreadPoolExecutor-0_2
+2026-03-09T20:04:33.445844Z [warning  ] Failed to send compressed multipart ingest: Connection error caused failure to POST https://api.smith.langchain.com/runs/multipart in LangSmith API. Please confirm your internet connection. ConnectionError(MaxRetryError("HTTPSConnectionPool(host='api.smith.langchain.com', port=443): Max retries exceeded with url: /runs/multipart (Caused by ProtocolError('Connection aborted.', ConnectionAbortedError(10053, 'An established connection was aborted by the software in your host machine', None, 10053, None)))"))
+Content-Length: 14145608
+API Key: lsv2_********************************************fftrace=019cd431-75da-76f2-8794-351fbeeaa811,id=019cd431-84f8-7be2-aa0b-8c4cb6720bad [langsmith.client] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=ThreadPoolExecutor-0_3
+2026-03-09T20:04:34.734139Z [info     ] HTTP Request: POST https://api.smith.langchain.com/v1/metadata/submit "HTTP/1.1 204 No Content" [httpx] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
+2026-03-09T20:04:34.735746Z [info     ] Successfully submitted metadata to LangSmith instance [langgraph_api.metadata] api_variant=local_dev langgraph_api_version=0.7.67 n_nodes=2 n_runs=1 thread_name=MainThread
+2026-03-09T20:04:55.900006Z [info     ] Worker stats                   [langgraph_runtime_inmem.queue] active=0 api_variant=local_dev available=1 langgraph_api_version=0.7.67 max=1 thread_name=asyncio_3
+2026-03-09T20:04:56.406663Z [info     ] Queue stats                    [langgraph_runtime_inmem.queue] api_variant=local_dev langgraph_api_version=0.7.67 n_pending=0 n_running=0 pending_runs_wait_time_max_secs=None pending_runs_wait_time_med_secs=None pending_unblocked_runs_wait_time_max_secs=None thread_name=asyncio_1
+2026-03-09T20:05:56.150563Z [info     ] Worker stats                   [langgraph_runtime_inmem.queue] active=0 api_variant=local_dev available=1 langgraph_api_version=0.7.67 max=1 thread_name=asyncio_2
+2026-03-09T20:05:56.659138Z [info     ] Queue stats                    [langgraph_runtime_inmem.queue] api_variant=local_dev langgraph_api_version=0.7.67 n_pending=0 n_running=0 pending_runs_wait_time_max_secs=None pending_runs_wait_time_med_secs=None pending_unblocked_runs_wait_time_max_secs=None thread_name=asyncio_0
+2026-03-09T20:06:56.371311Z [info     ] Worker stats                   [langgraph_runtime_inmem.queue] active=0 api_variant=local_dev available=1 langgraph_api_version=0.7.67 max=1 thread_name=asyncio_3
+2026-03-09T20:06:56.997638Z [info     ] Queue stats                    [langgraph_runtime_inmem.queue] api_variant=local_dev langgraph_api_version=0.7.67 n_pending=0 n_running=0 pending_runs_wait_time_max_secs=None pending_runs_wait_time_med_secs=None pending_unblocked_runs_wait_time_max_secs=None thread_name=asyncio_1
+2026-03-09T20:07:56.416889Z [info     ] Worker stats                   [langgraph_runtime_inmem.queue] active=0 api_variant=local_dev available=1 langgraph_api_version=0.7.67 max=1 thread_name=asyncio_3
+2026-03-09T20:07:56.926904Z [info     ] Queue stats                    [langgraph_runtime_inmem.queue] api_variant=local_dev langgraph_api_version=0.7.67 n_pending=0 n_running=0 pending_runs_wait_time_max_secs=None pending_runs_wait_time_med_secs=None pending_unblocked_runs_wait_time_max_secs=None thread_name=asyncio_2
+2026-03-09T20:08:56.620788Z [info     ] Worker stats                   [langgraph_runtime_inmem.queue] active=0 api_variant=local_dev available=1 langgraph_api_version=0.7.67 max=1 thread_name=asyncio_0
+2026-03-09T20:08:57.186040Z [info     ] Queue stats                    [langgraph_runtime_inmem.queue] api_variant=local_dev langgraph_api_version=0.7.67 n_pending=0 n_running=0 pending_runs_wait_time_max_secs=None pending_runs_wait_time_med_secs=None pending_unblocked_runs_wait_time_max_secs=None thread_name=asyncio_3
+2026-03-09T20:09:34.485038Z [info     ] Created run                    [langgraph_api.models.run] after_seconds=0 api_variant=local_dev assistant_id=8b48b208-c421-5445-8e18-2e98882f6e8b checkpoint_id=None if_not_exists=reject langgraph_api_version=0.7.67 method=POST multitask_strategy=enqueue path=/threads/{thread_id}/runs/stream request_id=e68239eb-ef27-4ef5-b38f-8728474ebc17 run_create_ms=1236 run_id=019cd438-21fe-7f00-b70d-9355c0e9b693 run_put_ms=9 stream_mode=['messages-tuple', 'values'] stream_resumable=True temporary=False thread_id=44a3d07b-585b-4795-84ed-a87dfe49c34a thread_name=MainThread
+2026-03-09T20:09:35.062023Z [info     ] Starting background run        [langgraph_api.worker] api_variant=local_dev assistant_id=8b48b208-c421-5445-8e18-2e98882f6e8b graph_id=conversational_agent langgraph_api_version=0.7.67 request_id=e68239eb-ef27-4ef5-b38f-8728474ebc17 resumable=True run_attempt=1 run_creation_ms=1235 run_id=019cd438-21fe-7f00-b70d-9355c0e9b693 run_queue_ms=577 run_started_at=2026-03-09T20:09:35.061188+00:00 run_stream_start_ms=0 temporary=False thread_id=44a3d07b-585b-4795-84ed-a87dfe49c34a thread_name=asyncio_0
+2026-03-09T20:09:37.078165Z [info     ] HTTP Request: POST https://api.smith.langchain.com/v1/metadata/submit "HTTP/1.1 204 No Content" [httpx] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
+2026-03-09T20:09:37.601519Z [info     ] Successfully submitted metadata to LangSmith instance [langgraph_api.metadata] api_variant=local_dev langgraph_api_version=0.7.67 n_nodes=0 n_runs=0 thread_name=MainThread
+2026-03-09T20:09:43.626817Z [info     ] HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK" [httpx] api_variant=local_dev assistant_id=8b48b208-c421-5445-8e18-2e98882f6e8b graph_id=conversational_agent langgraph_api_version=0.7.67 langgraph_node=agent request_id=e68239eb-ef27-4ef5-b38f-8728474ebc17 run_attempt=1 run_id=019cd438-21fe-7f00-b70d-9355c0e9b693 thread_id=44a3d07b-585b-4795-84ed-a87dfe49c34a thread_name=asyncio_1
+2026-03-09T20:09:51.967057Z [info     ] 1 change detected              [watchfiles.main] api_variant=local_dev langgraph_api_version=0.7.67 thread_name=MainThread
+2026-03-09T20:09:53.738979Z [info     ] HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK" [httpx] api_variant=local_dev assistant_id=8b48b208-c421-5445-8e18-2e98882f6e8b graph_id=conversational_agent langgraph_api_version=0.7.67 langgraph_node=diagnose request_id=e68239eb-ef27-4ef5-b38f-8728474ebc17 run_attempt=1 run_id=019cd438-21fe-7f00-b70d-9355c0e9b693 thread_id=44a3d07b-585b-4795-84ed-a87dfe49c34a thread_name=asyncio_3
+2026-03-09T20:10:01.183420Z [info     ] Background run succeeded       [langgraph_api.worker] api_variant=local_dev assistant_id=8b48b208-c421-5445-8e18-2e98882f6e8b graph_id=conversational_agent langgraph_api_version=0.7.67 request_id=e68239eb-ef27-4ef5-b38f-8728474ebc17 run_attempt=1 run_completed_in_ms=27935 run_created_at=2026-03-09T20:09:34.483401+00:00 run_ended_at=2026-03-09T20:10:01.183089+00:00 run_exec_ms=26121 run_id=019cd438-21fe-7f00-b70d-9355c0e9b693 run_started_at=2026-03-09T20:09:35.061188+00:00 run_wait_time_ms=577 thread_id=44a3d07b-585b-4795-84ed-a87dfe49c34a thread_name=asyncio_1
+2026-03-09T20:10:01.306938Z [info     ] Worker stats                   [langgraph_runtime_inmem.queue] active=0 api_variant=local_dev available=1 langgraph_api_version=0.7.67 max=1 thread_name=asyncio_2
+2026-03-09T20:10:01.351790Z [info     ] Queue stats                    [langgraph_runtime_inmem.queue] api_variant=local_dev langgraph_api_version=0.7.67 n_pending=0 n_running=0 pending_runs_wait_time_max_secs=None pending_runs_wait_time_med_secs=None pending_unblocked_runs_wait_time_max_secs=None thread_name=asyncio_0
