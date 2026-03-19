@@ -10,9 +10,9 @@
 |------|--------|
 | **Project Type** | LangGraph-powered AI troubleshooting agent |
 | **Core Functionality** | Automated equipment diagnostics for CCTV Power Supply Units |
-| **Working Modes** | Mock (simulation) and USB (real hardware) |
+| **Working Modes** | Mock (simulation) and USB (real hardware via Mastech MS8250D) |
 | **Primary LLM** | Groq (Llama 3.3 70B) |
-| **Vector DB** | ChromaDB for RAG knowledge base |
+| **Vector DB** | ChromaDB (embedded mode - no Docker required) |
 | **Current State** | Core diagnostic workflow functional; some conversational agent routing incomplete |
 
 ---
@@ -51,11 +51,8 @@ git pull
 cp .env.example .env
 # Edit .env with your API keys (GROQ_API_KEY, LANGCHAIN_API_KEY, etc.)
 
-# Install dependencies (if not already)
+# Install dependencies
 pip install -r requirements.txt
-
-# Start ChromaDB (required for RAG)
-docker-compose up -d
 
 # Run in mock mode (no hardware needed)
 python -m src.interfaces.cli --mock
@@ -76,6 +73,7 @@ langgraph dev --port 2024
 | Equipment configuration | [`data/equipment/cctv-psu-24w-v1.yaml`](data/equipment/cctv-psu-24w-v1.yaml) |
 | CLI interface | [`src/interfaces/cli.py`](src/interfaces/cli.py) |
 | Infrastructure config | [`src/infrastructure/config.py`](src/infrastructure/config.py) |
+| ChromaDB client | [`src/infrastructure/chromadb_client.py`](src/infrastructure/chromadb_client.py) |
 
 ---
 
@@ -106,6 +104,7 @@ This project follows **data-driven architecture**:
 - **Hybrid intelligence**: Combines deterministic rule-matching with LLM reasoning
 - **Explicit contracts**: Each LangGraph node has clear input/output contracts
 - **Observability first**: Every decision traced via LangSmith
+- **Embedded dependencies**: ChromaDB runs in embedded mode (no Docker needed)
 
 ---
 

@@ -11,7 +11,7 @@
 
 The main LangGraph-based diagnostic workflow is functional with:
 - Signal interpretation using equipment-specific thresholds
-- RAG-powered evidence retrieval from ChromaDB
+- RAG-powered evidence retrieval from ChromaDB (embedded mode)
 - Fault analysis with LLM reasoning
 - Recovery recommendation generation
 
@@ -26,7 +26,7 @@ The main LangGraph-based diagnostic workflow is functional with:
 | Mock signal mode | Working | JSON scenarios in [`data/mock_signals/`](data/mock_signals/) |
 | USB multimeter | Working | Mastech MS8250D support in [`src/infrastructure/usb_multimeter.py`](src/infrastructure/usb_multimeter.py) |
 | Signal interpretation | Working | Domain service in [`src/domain/models.py`](src/domain/models.py) |
-| RAG evidence retrieval | Working | ChromaDB integration in [`src/infrastructure/chromadb_client.py`](src/infrastructure/chromadb_client.py) |
+| RAG evidence retrieval | Working | ChromaDB embedded mode in [`src/infrastructure/chromadb_client.py`](src/infrastructure/chromadb_client.py) |
 | Equipment configuration | Working | YAML-driven thresholds/faults in [`data/equipment/`](data/equipment/) |
 | CLI interface | Working | [`src/interfaces/cli.py`](src/interfaces/cli.py) |
 | LangSmith tracing | Working | Full observability enabled |
@@ -37,7 +37,7 @@ The main LangGraph-based diagnostic workflow is functional with:
 | Equipment YAML schema | Working | [`data/equipment/cctv-psu-24w-v1.yaml`](data/equipment/cctv-psu-24w-v1.yaml) |
 | Mock signal scenarios | Working | 4 scenarios: output_rail, overvoltage, ripple, thermal |
 | Knowledge base | Working | RAG documents in [`data/knowledge/`](data/knowledge/) |
-| ChromaDB vector store | Working | docker-compose up -d |
+| ChromaDB (embedded) | Working | No Docker required - runs out of the box |
 
 ---
 
@@ -54,7 +54,6 @@ The main LangGraph-based diagnostic workflow is functional with:
 
 | Issue | Location | Description |
 |-------|----------|-------------|
-| Missing MQTT client | Not implemented | ESP32 live mode integration planned but not started |
 | Limited equipment support | [`data/equipment/`](data/equipment/) | Only CCTV-PSU-24W-V1 configured |
 
 ### 🟢 Low Priority
@@ -90,10 +89,6 @@ The main LangGraph-based diagnostic workflow is functional with:
    - File: [`data/equipment/`](data/equipment/)
    - Create YAML for another equipment type
 
-5. **Implement MQTT client** (optional)
-   - New file: [`src/infrastructure/mqtt_client.py`](src/infrastructure/mqtt_client.py)
-   - For ESP32-based live signal reception
-
 ---
 
 ## Environment Setup Notes
@@ -108,22 +103,18 @@ GROQ_API_KEY=your_groq_api_key
 LANCHAIN_API_KEY=your_langchain_api_key
 LANGSMITH_TRACING=true
 LANGSMITH_PROJECT_NAME=ai-agent
-
-# ChromaDB (via docker-compose)
-CHROMA_HOST=localhost
-CHROMA_PORT=8000
 ```
 
 ### Running the Project
 
 ```bash
-# Start ChromaDB
-docker-compose up -d
+# No Docker needed - ChromaDB runs in embedded mode
+pip install -r requirements.txt
 
 # Mock mode (no hardware)
 python -m src.interfaces.cli --mock
 
-# USB mode (requires multimeter)
+# USB mode (requires Mastech MS8250D multimeter)
 python -m src.interfaces.cli --usb CCTV-PSU-24W-V1
 
 # LangGraph Studio (debugging)
@@ -149,8 +140,8 @@ If you clone this project on a new machine:
 
 1. ✅ Python 3.10+ environment
 2. ✅ `pip install -r requirements.txt`
-3. ✅ `docker-compose up -d` for ChromaDB
-4. ✅ Configure `.env` with API keys
-5. ✅ Run `python -m src.interfaces.cli --mock` - works out of the box
+3. ✅ Configure `.env` with API keys
+4. ✅ Run `python -m src.interfaces.cli --mock` - works out of the box
+5. ✅ ChromaDB embedded mode works automatically (no Docker)
 6. ⚠️ USB mode requires Mastech MS8250D multimeter with CP210x adapter
 7. ⚠️ LangGraph Studio requires `langgraph` CLI installed

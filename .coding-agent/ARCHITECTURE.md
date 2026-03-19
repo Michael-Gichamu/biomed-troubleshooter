@@ -17,7 +17,7 @@
 ### Data & Storage
 | Component | Technology | Purpose |
 |-----------|------------|---------|
-| Vector Database | ChromaDB | RAG knowledge base |
+| Vector Database | ChromaDB (embedded) | RAG knowledge base - no server needed |
 | Configuration | YAML | Equipment-specific thresholds, faults |
 | Knowledge Docs | Markdown | Equipment diagnostics documentation |
 
@@ -58,19 +58,19 @@ ai-agent/
 │   │                           
 │   ├── infrastructure/         # External integrations
 │   │   ├── config.py           # Centralized configuration
-│   │   ├── chromadb_client.py # Vector DB client
-│   │   ├── llm_client.py       # Groq/Ollama LLM wrapper
+│   │   ├── chromadb_client.py  # ChromaDB (embedded mode)
+│   │   ├── llm_client.py      # Groq/Ollama LLM wrapper
 │   │   ├── usb_multimeter.py   # Serial communication
 │   │   ├── equipment_config.py # YAML loader
 │   │   └── rag_repository.py  # RAG operations
 │   │
 │   ├── interfaces/             # User-facing interfaces
-│   │   ├── cli.py              # Command-line interface
-│   │   └── mode_router.py      # Mock/USB mode selection
+│   │   ├── cli.py             # Command-line interface
+│   │   └── mode_router.py     # Mock/USB mode selection
 │   │
 │   └── studio/                 # LangGraph Studio integration
 │       ├── langgraph_studio.py # Studio entry point
-│       ├── tools.py             # LangGraph tools
+│       ├── tools.py            # LangGraph tools
 │       ├── conversational_agent.py # Studio agent
 │       └── background_usb_reader.py # Async USB reading
 │
@@ -84,7 +84,6 @@ ai-agent/
 │
 ├── docs/                       # Project documentation
 ├── tests/                      # Unit tests
-├── docker-compose.yml          # ChromaDB container
 ├── pyproject.toml              # Python dependencies
 └── langgraph.json             # LangGraph Studio config
 ```
@@ -97,7 +96,7 @@ ai-agent/
 graph TB
     subgraph "Input Sources"
         MOCK[Mock Mode<br/>JSON Scenarios]
-        USB[USB Mode<br/>Mastech Multimeter]
+        USB[USB Mode<br/>Mastech MS8250D<br/>via CP210x]
     end
 
     subgraph "CLI Interface"
@@ -123,7 +122,7 @@ graph TB
 
     subgraph "Infrastructure<br/>src/infrastructure/"
         CONFIG[Configuration]
-        CHROMA[ChromaDB Client]
+        CHROMA[ChromaDB<br/>(embedded)]
         LLM[LLM Client (Groq)]
         EQUIP[Equipment Config]
     end
@@ -157,8 +156,8 @@ graph TB
 ```
 ┌─────────────────┐     ┌──────────────────┐     ┌─────────────────────┐
 │ Mock (JSON)     │     │ USB Multimeter   │     │ CLI Parameters      │
-│                 │     │                  │     │                     │
-│ raw_measurements│     │ raw_measurements  │     │ equipment_model     │
+│                 │     │ (Serial Read)    │     │                     │
+│ raw_measurements│     │ raw_measurements │     │ equipment_model     │
 │ [{test_point,   │     │ [{test_point,    │     │ trigger_content     │
 │   value, unit}] │     │   value, unit}]  │     │                     │
 └────────┬────────┘     └────────┬─────────┘     └──────────┬──────────┘
@@ -199,23 +198,22 @@ class SignalInterpreter:
         return signal_states, overall_status, anomaly_count
 ```
 
-### Phase 3: Evidence Retrieval
+### Phase 3: Evidence Retrieval (ChromaDB Embedded)
 
 ```python
-# src/infrastructure/rag_repository.py
-class RAGRepository:
-    def retrieve(signal_states, equipment_model):
-        # Build query from anomaly states
-        query = " ".join([state.description for state in signal_states])
-        
-        # Semantic search in ChromaDB
-        results = chromadb_client.query(
-            query=query,
-            filter={"equipment_model": equipment_model},
-            n_results=3
-        )
-        
-        return retrieved_evidence
+# src/infrastructure/chromadb_client.py
+# Uses embedded ChromaDB - no server needed
+
+from chromadb import Client as ChromaClient
+
+# Initialize (no host/port needed - runs embedded)
+chroma_client = ChromaClient()
+
+# Query (same API as server mode)
+results = collection.query(
+    query_texts=[query],
+    n_results=3
+)
 ```
 
 ### Phase 4: Fault Analysis
@@ -276,7 +274,7 @@ class RecommendationGenerator:
 | Component | File | Purpose |
 |-----------|------|---------|
 | [`AppConfig`](src/infrastructure/config.py:18) | config.py | Centralized configuration dataclass |
-| [`ChromaDBClient`](src/infrastructure/chromadb_client.py:15) | chromadb_client.py | Vector store wrapper |
+| [`ChromaDBClient`](src/infrastructure/chromadb_client.py:15) | chromadb_client.py | ChromaDB embedded client |
 | [`LLMClient`](src/infrastructure/llm_client.py:20) | llm_client.py | Groq/Ollama LLM abstraction |
 | [`USBMultimeter`](src/infrastructure/usb_multimeter.py:40) | usb_multimeter.py | Serial communication with MS8250D |
 | [`EquipmentConfigLoader`](src/infrastructure/equipment_config.py:20) | equipment_config.py | YAML parsing for equipment |
@@ -299,9 +297,6 @@ class AppConfig:
     
     embedding: EmbeddingConfig  # Provider: "sentence-transformers"
                                 # Model: "all-MiniLM-L6-v2"
-    
-    chromadb: ChromaDBConfig    # Host: "localhost"
-                                # Port: 8000
     
     usb: USBConfig              # Port: "COM3" (auto-detect)
                                 # Baud: 2400
@@ -385,20 +380,30 @@ def validate_input(state: AgentState) -> AgentState:
 - **Probabilistic**: LLM reasoning for ambiguous cases
 - **Fallback chain**: Rules first → LLM for edge cases
 
+### 5. Embedded Dependencies
+ChromaDB runs in embedded mode - no Docker or server required:
+```python
+# Simple as:
+from chromadb import Client
+client = Client()  # Works out of the box!
+```
+
 ---
 
 ## Running the System
 
 ### Mock Mode (No Hardware)
 ```bash
+pip install -r requirements.txt
 python -m src.interfaces.cli --mock
 # Uses scenarios from data/mock_signals/
 ```
 
-### USB Mode (Real Hardware)
+### USB Mode (Real Hardware - Mastech MS8250D)
 ```bash
+pip install -r requirements.txt
 python -m src.interfaces.cli --usb CCTV-PSU-24W-V1
-# Connects to Mastech MS8250D via USB
+# Connects to Mastech MS8250D via USB (CP210x adapter)
 ```
 
 ### LangGraph Studio

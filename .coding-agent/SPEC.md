@@ -18,7 +18,7 @@ Biomedical and electronic equipment troubleshooting requires specialized knowled
 
 An AI-powered diagnostic agent that:
 - **Automates troubleshooting**: Reduces dependency on expert technicians
-- **Provides real-time diagnostics**: Interprets live electrical measurements
+- **Provides real-time diagnostics**: Interprets live electrical measurements via USB
 - **Delivers evidence-based recommendations**: Uses RAG to ground decisions in documentation
 - **Works continuously**: No fatigue, consistent results, 24/7 availability
 
@@ -40,7 +40,7 @@ An AI-powered diagnostic agent that:
 ### 1. Signal Interpretation
 **What it does**: Converts raw electrical measurements into semantic states
 
-- Reads voltage, current, resistance from multimeter
+- Reads voltage, current, resistance from Mastech MS8250D multimeter via USB
 - Maps against equipment-specific thresholds from YAML
 - Returns: `normal`, `over_voltage`, `under_voltage`, `missing`, `short_circuit`, etc.
 
@@ -60,7 +60,7 @@ Output: { "state": "over_voltage", "severity": "high", "threshold_exceeded": 4.5
 ### 3. Evidence Retrieval
 **What it does**: Grounds diagnosis in equipment documentation
 
-- Queries ChromaDB vector store with semantic search
+- Queries ChromaDB vector store (embedded mode) with semantic search
 - Retrieves relevant diagnostic procedures
 - Returns: supporting evidence for the diagnosis
 
@@ -73,6 +73,19 @@ Output: { "state": "over_voltage", "severity": "high", "threshold_exceeded": 4.5
 
 ---
 
+## Data Collection Method
+
+### USB Automatic Data Collection
+
+The system automatically collects measurement data via USB from the **Mastech MS8250D Digital Multimeter**:
+- **Connection**: CP210x USB-to-Serial adapter
+- **Protocol**: UART @ 2400 baud
+- **Auto-detection**: Automatically identifies COM port
+
+The multimeter continuously streams measurements which the system interprets in real-time.
+
+---
+
 ## Business Logic Overview
 
 ### Data Flow
@@ -81,7 +94,7 @@ Output: { "state": "over_voltage", "severity": "high", "threshold_exceeded": 4.5
 ┌─────────────┐     ┌──────────────────┐     ┌─────────────────┐
 │ Raw         │     │ Signal           │     │ Fault           │
 │ Measurements│────▶│ Interpretation   │────▶│ Analysis        │
-│ (multimeter)│     │ (thresholds)     │     │ (LLM + rules)   │
+│ (USB)       │     │ (thresholds)     │     │ (LLM + rules)   │
 └─────────────┘     └──────────────────┘     └────────┬────────┘
                                                       │
                                                       ▼
@@ -133,7 +146,7 @@ New equipment can be added by:
 # Mock diagnosis (no hardware)
 python -m src.interfaces.cli --mock
 
-# Real hardware diagnosis
+# Real hardware diagnosis via USB
 python -m src.interfaces.cli --usb CCTV-PSU-24W-V1
 ```
 
@@ -181,21 +194,17 @@ langgraph dev --port 2024
 
 ## Out of Scope (v1)
 
-- [ ] Real-time equipment monitoring (future: MQTT)
-- [ ] Mobile app interface
-- [ ] Cloud deployment
-- [ ] Multi-equipment batch processing
-- [ ] Predictive maintenance analytics
-- [ ] Warranty/contract integration
+- [ ] Web interface (future)
+- [ ] Cloud deployment (future)
+- [ ] Multi-equipment batch processing (future)
+- [ ] Predictive maintenance analytics (future)
+- [ ] Warranty/contract integration (future)
 
 ---
 
 ## Future Enhancements
 
-Based on [`docs/implementation_plan.md`](docs/implementation_plan.md):
-
-1. **MQTT Integration**: Receive signals from ESP32-based sensors
-2. **Web Interface**: React-based UI for non-technical users
-3. **Multi-equipment Support**: Expand beyond CCTV PSUs
-4. **Historical Analysis**: Track equipment health over time
-5. **Collaborative Diagnosis**: Multiple agents working together
+1. **Web Interface**: React-based UI for non-technical users
+2. **Multi-equipment Support**: Expand beyond CCTV PSUs
+3. **Historical Analysis**: Track equipment health over time
+4. **Collaborative Diagnosis**: Multiple agents working together
