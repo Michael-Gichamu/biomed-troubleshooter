@@ -68,7 +68,7 @@ langgraph dev --port 2024
 
 | Purpose | File |
 |---------|------|
-| Main diagnostic workflow | [`src/application/agent.py`](src/application/agent.py) |
+| Main diagnostic workflow | [`src/studio/conversational_agent.py`](src/studio/conversational_agent.py) |
 | Domain models & services | [`src/domain/models.py`](src/domain/models.py) |
 | Equipment configuration | [`data/equipment/cctv-psu-24w-v1.yaml`](data/equipment/cctv-psu-24w-v1.yaml) |
 | CLI interface | [`src/interfaces/cli.py`](src/interfaces/cli.py) |
