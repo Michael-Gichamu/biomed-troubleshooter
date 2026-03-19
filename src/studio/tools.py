@@ -14,9 +14,26 @@ from typing import Optional, Any
 import time
 from langchain_core.tools import tool
 
-from src.infrastructure.rag_repository import RAGRepository
-from src.infrastructure.equipment_config import get_equipment_config
-from src.infrastructure.usb_multimeter import USBMultimeterClient, MultimeterReading
+# Lazy imports to avoid DLL loading issues on Windows
+# Import RAG only when the tool is actually called
+_rag_repo = None
+_equipment_config = None
+
+def _get_equipment_config():
+    """Lazy initialization of equipment config to avoid unnecessary imports."""
+    global _equipment_config
+    if _equipment_config is None:
+        from src.infrastructure.equipment_config import get_equipment_config
+        _equipment_config = get_equipment_config
+    return _equipment_config
+
+def _get_rag_repository():
+    """Lazy initialization of RAG repository to avoid DLL loading issues."""
+    global _rag_repo
+    if _rag_repo is None:
+        from src.infrastructure.rag_repository import RAGRepository
+        _rag_repo = RAGRepository.from_directory("data/chromadb")
+    return _rag_repo
 
 
 @tool
@@ -46,8 +63,8 @@ def query_diagnostic_knowledge(
         query="how to measure output voltage on TP2"
         returns: [{"title": "MEAS-006", "content": "Output Voltage Measurement...", ...}]
     """
-    # Initialize RAG repository
-    rag = RAGRepository.from_directory("data/chromadb")
+    # Initialize RAG repository (lazy loading)
+    rag = _get_rag_repository()
     
     try:
         rag.initialize()
@@ -114,7 +131,7 @@ def get_equipment_configuration(
         returns: {"test_points": [{"signal_id": "TP2", "name": "Output Voltage", ...}]}
     """
     try:
-        config = get_equipment_config(equipment_model)
+        config = _get_equipment_config()(equipment_model)
     except FileNotFoundError:
         return {
             "error": f"Equipment configuration not found for {equipment_model}",
@@ -295,7 +312,7 @@ def get_test_point_guidance(
         and an inline image for visual guidance.
     """
     try:
-        config = get_equipment_config(equipment_model)
+        config = _get_equipment_config()(equipment_model)
         guidance = config.get_test_point_guidance(test_point_id)
         if "error" in guidance:
             return guidance
