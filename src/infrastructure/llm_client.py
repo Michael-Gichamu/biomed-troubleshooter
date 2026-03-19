@@ -162,3 +162,10 @@ Return ONLY the JSON, no other text."""
             else:
                 lines.append(f"  - {tp}: {val} {unit}")
         return "\n".join(lines) if lines else "No measurements available"
+
+
+# Convenience function for getting the LLM instance (for backwards compatibility)
+def get_llm():
+    """Get the current active LLM instance from LLMManager."""
+    from .llm_manager import get_llm_manager
+    return get_llm_manager().current_llm
