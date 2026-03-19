@@ -7,13 +7,14 @@
 
 ## Current Milestone
 
-**Phase: Core Diagnostic Workflow Complete**
+**Phase: Core Diagnostic Workflow Complete + Self-Healing Infrastructure**
 
 The main LangGraph-based diagnostic workflow is functional with:
 - Signal interpretation using equipment-specific thresholds
 - RAG-powered evidence retrieval from ChromaDB (embedded mode)
 - Fault analysis with LLM reasoning
 - Recovery recommendation generation
+- **NEW**: Self-healing LLM infrastructure with automatic key/model rotation
 
 ---
 
@@ -30,6 +31,16 @@ The main LangGraph-based diagnostic workflow is functional with:
 | Equipment configuration | Working | YAML-driven thresholds/faults in [`data/equipment/`](data/equipment/) |
 | CLI interface | Working | [`src/interfaces/cli.py`](src/interfaces/cli.py) |
 | LangSmith tracing | Working | Full observability enabled |
+
+### ✅ Self-Healing LLM Infrastructure (NEW!)
+| Feature | Status | Notes |
+|---------|--------|-------|
+| Multiple API keys | Working | [`src/infrastructure/llm_manager.py`](src/infrastructure/llm_manager.py) |
+| Multiple fallback models | Working | Auto-rotation on failure |
+| Exponential backoff | Working | 1s → 2s → 4s → 8s → 16s |
+| Error pattern detection | Working | LogParser detects 503, rate limits, timeouts |
+| Automatic key rotation | Working | Rotates through GROQ_API_KEYS |
+| Automatic model rotation | Working | Falls back to next model if all keys fail |
 
 ### ✅ Data & Configuration
 | Feature | Status | Notes |
@@ -99,10 +110,16 @@ Create `.env` from `.env.example`:
 
 ```
 # Required
-GROQ_API_KEY=your_groq_api_key
+GROQ_API_KEYS=key1,key2,key3   # Multiple keys (auto-rotates)
+LLM_MODELS=model1,model2       # Multiple models (fallback chain)
 LANCHAIN_API_KEY=your_langchain_api_key
 LANGSMITH_TRACING=true
-LANGSMITH_PROJECT_NAME=ai-agent
+
+# Optional (with defaults)
+MAX_RETRIES_PER_KEY=2
+MAX_RETRIES_PER_MODEL=2
+BACKOFF_BASE_SECONDS=1.0
+BACKOFF_MAX_SECONDS=16.0
 ```
 
 ### Running the Project
@@ -140,8 +157,9 @@ If you clone this project on a new machine:
 
 1. ✅ Python 3.10+ environment
 2. ✅ `pip install -r requirements.txt`
-3. ✅ Configure `.env` with API keys
+3. ✅ Configure `.env` with API keys (use GROQ_API_KEYS for multiple keys)
 4. ✅ Run `python -m src.interfaces.cli --mock` - works out of the box
 5. ✅ ChromaDB embedded mode works automatically (no Docker)
-6. ⚠️ USB mode requires Mastech MS8250D multimeter with CP210x adapter
-7. ⚠️ LangGraph Studio requires `langgraph` CLI installed
+6. ✅ Self-healing LLM with automatic key/model rotation
+7. ⚠️ USB mode requires Mastech MS8250D multimeter with CP210x adapter
+8. ⚠️ LangGraph Studio requires `langgraph` CLI installed
