@@ -15,18 +15,14 @@ def test_config_images():
     print(f"Checking images for {model}...")
     for img_id, img in config.images.items():
         print(f"  Image: {img_id} ({img.filename})")
-        embed = img.get_base64_data()
-        if embed:
-            print(f"    SUCCESS: Embedded as {embed['mime_type']} ({len(embed['base64'])} bytes)")
-        else:
-            print(f"    FAILED: Could not resolve/embed image")
+        print(f"    Test points: {img.test_points}")
 
     print("\nChecking test point guidance (TP2)...")
     guidance = config.get_test_point_guidance("TP2")
-    if guidance.get("image_base64"):
-        print(f"  SUCCESS: TP2 image embedded ({len(guidance['image_base64'])} bytes)")
+    if guidance.get("image_url"):
+        print(f"  SUCCESS: TP2 image URL: {guidance['image_url']}")
     else:
-        print(f"  FAILED: TP2 image not embedded")
+        print(f"  FAILED: TP2 image URL not found")
 
 if __name__ == "__main__":
     test_config_images()

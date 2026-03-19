@@ -80,7 +80,7 @@ def format_message_content(text: str, image_data: Optional[dict] = None) -> Any:
     Format message content with the image PROMINENTLY as the first block.
     
     Returns a list of content blocks compatible with LangGraph Studio:
-    - Image block: {"type": "image_url", "image_url": {"url": "data:image/jpeg;base64,..."}}
+    - Image block: {"type": "image_url", "image_url": {"url": "http://..."}}
     - Text block: {"type": "text", "text": "..."}
     
     Or returns the original text string if no image_data is provided.
@@ -88,20 +88,16 @@ def format_message_content(text: str, image_data: Optional[dict] = None) -> Any:
     if not image_data:
         return text
     
-    # Extract image data
-    image_base64 = image_data.get('image_base64')
-    mime_type = image_data.get('mime_type', 'image/jpeg')
+    # Extract image URL (now URL-based instead of base64)
+    image_url = image_data.get('image_url')
     
-    if not image_base64:
+    if not image_url:
         return text
     
     # Build the content list with image FIRST (for prominence in LangGraph Studio)
     # Also add descriptive text as a fallback
     test_point_info = image_data.get('test_point', '')
     location_desc = image_data.get('location_description', '')
-    
-    # Create image URL with proper data URI format
-    image_url = f"data:{mime_type};base64,{image_base64}"
     
     # Build content blocks
     content_blocks = [
@@ -170,12 +166,7 @@ def clean_messages_for_llm(messages: list[BaseMessage]) -> list[BaseMessage]:
             try:
                 data = json.loads(new_msg.content)
                 if isinstance(data, dict):
-                    if "image_base64" in data:
-                        data["image_base64"] = "[SENSITIVE DATA STRIPPED]"
-                    if "images" in data:
-                        for img in data["images"]:
-                            if isinstance(img, dict) and "image_base64" in img:
-                                img["image_base64"] = "[SENSITIVE DATA STRIPPED]"
+                    # No longer stripping base64 - we now use URL-based images
                     new_msg.content = json.dumps(data)
             except:
                 pass
@@ -311,14 +302,14 @@ def agent_node(state: ConversationalAgentState):
             try:
                 res_data = json.loads(m.content)
                 if isinstance(res_data, dict):
-                    # Priority 1: Direct test point image
-                    if res_data.get("image_base64"):
+                    # Priority 1: Direct test point image (URL-based now)
+                    if res_data.get("image_url"):
                         image_data = res_data
                         break
                     # Priority 2: Visual guide annotations from test point guidance
                     elif res_data.get("visual_guide") and isinstance(res_data["visual_guide"], list) and res_data["visual_guide"]:
-                        # Fallback if image_base64 is present
-                        if res_data.get("image_base64"):
+                        # Fallback if image_url is present
+                        if res_data.get("image_url"):
                             image_data = res_data
                             break
                     # Priority 3: Bulk image list
@@ -386,8 +377,7 @@ def tool_node(state: ConversationalAgentState):
             result = tool.invoke(tool_call["args"])
             
             # Special handling for guidance images
-            # To prevent state bloat, we strip the image_base64 immediately 
-            # after it's produced to keep the persistent state lightweight.
+            # Image URLs are now used instead of base64 - no need to strip
             if tool_call["name"] == "get_test_point_guidance" and isinstance(result, dict):
                 # Track the test point we just showed guidance for
                 if result.get("test_point"):
