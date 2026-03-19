@@ -10,6 +10,18 @@ from pathlib import Path
 from typing import Optional
 from dataclasses import dataclass
 
+# Lazy import for sentence-transformers to avoid import errors
+_embedding_function = None
+
+def _get_embedding_function():
+    """Get or create the sentence-transformers embedding function."""
+    global _embedding_function
+    if _embedding_function is None:
+        from sentence_transformers import SentenceTransformer
+        # Use the same model that's already cached
+        _embedding_function = SentenceTransformer('all-MiniLM-L6-v2')
+    return _embedding_function
+
 
 @dataclass
 class ChromaDBConfig:
@@ -41,18 +53,28 @@ class ChromaDBClient:
 
     def initialize(self) -> None:
         """Initialize ChromaDB client and collection."""
+        # Create persistence directory
+        import os
+        Path(self.config.persist_directory).mkdir(parents=True, exist_ok=True)
+        
+        # Try local PersistentClient first (no Docker needed!)
         try:
             import chromadb
-        except ImportError:
-            raise RuntimeError("ChromaDB not installed. Run: pip install chromadb")
-
-        # Create persistence directory
-        Path(self.config.persist_directory).mkdir(parents=True, exist_ok=True)
-
-        # Initialize client
-        self._client = chromadb.PersistentClient(
-            path=self.config.persist_directory
-        )
+            from chromadb.config import Settings
+            self._client = chromadb.PersistentClient(
+                path=self.config.persist_directory,
+                settings=Settings(anonymized_telemetry=False)
+            )
+            print(f"[ChromaDB] Using local persistent storage at {self.config.persist_directory}")
+        except Exception as local_err:
+            # Fall back to in-memory if local fails
+            print(f"[ChromaDB] Local storage failed: {local_err}")
+            try:
+                import chromadb
+                self._client = chromadb.EphemeralClient()
+                print("[ChromaDB] Using in-memory client")
+            except OSError as ephemeral_err:
+                raise RuntimeError(f"ChromaDB unavailable: {ephemeral_err}")
 
         # Get or create collection
         self._collection = self._client.get_or_create_collection(
@@ -86,10 +108,15 @@ class ChromaDBClient:
         if not self.is_initialized:
             self.initialize()
 
+        # Pre-compute embeddings using sentence-transformers (avoids ONNX download issues)
+        embedding_fn = _get_embedding_function()
+        embeddings = embedding_fn.encode(documents).tolist()
+
         self._collection.add(
             documents=documents,
             metadatas=metadatas,
-            ids=ids
+            ids=ids,
+            embeddings=embeddings
         )
 
     def query(
@@ -112,8 +139,13 @@ class ChromaDBClient:
         if not self.is_initialized:
             self.initialize()
 
+        # Pre-compute query embeddings using sentence-transformers
+        embedding_fn = _get_embedding_function()
+        query_embeddings = embedding_fn.encode(query_texts).tolist()
+
         return self._collection.query(
             query_texts=query_texts,
+            query_embeddings=query_embeddings,
             n_results=n_results,
             where=where,
             include=["documents", "metadatas", "distances"]

@@ -7,14 +7,13 @@
 
 ## Current Milestone
 
-**Phase: Core Diagnostic Workflow Complete + Self-Healing Infrastructure**
+**Phase: Base64 Elimination + Inline Image Rendering Complete**
 
-The main LangGraph-based diagnostic workflow is functional with:
-- Signal interpretation using equipment-specific thresholds
-- RAG-powered evidence retrieval from ChromaDB (embedded mode)
-- Fault analysis with LLM reasoning
-- Recovery recommendation generation
-- **NEW**: Self-healing LLM infrastructure with automatic key/model rotation
+The system has been refactored to:
+- Eliminate all base64 image handling
+- Enable inline image rendering via URLs
+- Align equipment documentation with test points and images
+- Reduce token usage and prevent LLM overflow errors
 
 ---
 
@@ -32,23 +31,22 @@ The main LangGraph-based diagnostic workflow is functional with:
 | CLI interface | Working | [`src/interfaces/cli.py`](src/interfaces/cli.py) |
 | LangSmith tracing | Working | Full observability enabled |
 
-### ✅ Self-Healing LLM Infrastructure (NEW!)
+### ✅ Image Handling (NEW!)
+| Feature | Status | Notes |
+|---------|--------|-------|
+| URL-based images | Working | No base64 in LLM messages |
+| Inline image rendering | Working | Markdown format: `![alt](url)` |
+| Local image server | Working | [`start-dev.bat`](start-dev.bat) / [`start-dev.sh`](start-dev.sh) |
+| Configurable base URL | Working | IMAGE_BASE_URL in .env |
+
+### ✅ Self-Healing LLM Infrastructure
 | Feature | Status | Notes |
 |---------|--------|-------|
 | Multiple API keys | Working | [`src/infrastructure/llm_manager.py`](src/infrastructure/llm_manager.py) |
 | Multiple fallback models | Working | Auto-rotation on failure |
 | Exponential backoff | Working | 1s → 2s → 4s → 8s → 16s |
-| Error pattern detection | Working | LogParser detects 503, rate limits, timeouts |
 | Automatic key rotation | Working | Rotates through GROQ_API_KEYS |
 | Automatic model rotation | Working | Falls back to next model if all keys fail |
-
-### ✅ Data & Configuration
-| Feature | Status | Notes |
-|---------|--------|-------|
-| Equipment YAML schema | Working | [`data/equipment/cctv-psu-24w-v1.yaml`](data/equipment/cctv-psu-24w-v1.yaml) |
-| Mock signal scenarios | Working | 4 scenarios: output_rail, overvoltage, ripple, thermal |
-| Knowledge base | Working | RAG documents in [`data/knowledge/`](data/knowledge/) |
-| ChromaDB (embedded) | Working | No Docker required - runs out of the box |
 
 ---
 
@@ -58,8 +56,7 @@ The main LangGraph-based diagnostic workflow is functional with:
 
 | Issue | Location | Description |
 |-------|----------|-------------|
-| Empty function | [`src/application/conversational_agent.py:191`](src/application/conversational_agent.py:191) | `route_from_analysis()` is `pass` - routing logic not implemented |
-| Incomplete image handling | [`src/studio/conversational_agent.py:395`](src/studio/conversational_agent.py:395) | Image data stripping logic is `pass` - needs implementation |
+| None | - | All high priority issues resolved |
 
 ### 🟡 Medium Priority
 
@@ -78,25 +75,20 @@ The main LangGraph-based diagnostic workflow is functional with:
 
 ## Next Actionable Steps
 
-### Immediate (Fix Blockers)
+### Immediate
 
-1. **Implement `route_from_analysis()` function**
-   - File: [`src/application/conversational_agent.py`](src/application/conversational_agent.py:191)
-   - Should route based on analysis results in state keys
-   - Priority: High
-
-2. **Implement image data stripping**
-   - File: [`src/studio/conversational_agent.py`](src/studio/conversational_agent.py:395)
-   - Optimize UI by stripping large image data after agent step
-   - Priority: Medium
+1. **Run the new startup script**
+   - Windows: `start-dev.bat`
+   - Unix/Mac: `./start-dev.sh`
+   - Starts both image server (port 8000) and LangGraph Studio (port 2024)
 
 ### Short-term (Enhancements)
 
-3. **Add more test scenarios**
+2. **Add more test scenarios**
    - File: [`data/mock_signals/`](data/mock_signals/)
    - Add undervoltage, short circuit scenarios
 
-4. **Add equipment support**
+3. **Add equipment support**
    - File: [`data/equipment/`](data/equipment/)
    - Create YAML for another equipment type
 
@@ -120,6 +112,7 @@ MAX_RETRIES_PER_KEY=2
 MAX_RETRIES_PER_MODEL=2
 BACKOFF_BASE_SECONDS=1.0
 BACKOFF_MAX_SECONDS=16.0
+IMAGE_BASE_URL=http://localhost:8000
 ```
 
 ### Running the Project
@@ -128,26 +121,37 @@ BACKOFF_MAX_SECONDS=16.0
 # No Docker needed - ChromaDB runs in embedded mode
 pip install -r requirements.txt
 
+# NEW: Start both servers with one command
+# Windows
+start-dev.bat
+
+# Unix/Mac
+./start-dev.sh
+
+# Or manually:
+# Image server (port 8000)
+python -m http.server 8000 --directory data/equipment
+
+# LangGraph Studio (port 2024)
+langgraph dev --port 2024
+
 # Mock mode (no hardware)
 python -m src.interfaces.cli --mock
 
 # USB mode (requires Mastech MS8250D multimeter)
 python -m src.interfaces.cli --usb CCTV-PSU-24W-V1
-
-# LangGraph Studio (debugging)
-langgraph dev --port 2024
 ```
 
 ---
 
 ## Technical Debt
 
-| Item | Description | Impact |
+| Item | Description | Status |
 |------|-------------|--------|
-| Empty conversational routing | `route_from_analysis()` not implemented | Conversational agent can't route properly |
-| Incomplete image handling | Large image data not stripped | Memory/UI performance issues |
-| Single equipment type | Only CCTV-PSU configured | Limited use case |
-| No integration tests | Only unit tests for parser | Risk of regressions |
+| Empty conversational routing | `route_from_analysis()` not implemented | Pending |
+| Image handling via URLs | Refactored from base64 | ✅ Complete |
+| Single equipment type | Only CCTV-PSU configured | Pending |
+| No integration tests | Only unit tests for parser | Pending |
 
 ---
 
@@ -161,5 +165,6 @@ If you clone this project on a new machine:
 4. ✅ Run `python -m src.interfaces.cli --mock` - works out of the box
 5. ✅ ChromaDB embedded mode works automatically (no Docker)
 6. ✅ Self-healing LLM with automatic key/model rotation
-7. ⚠️ USB mode requires Mastech MS8250D multimeter with CP210x adapter
-8. ⚠️ LangGraph Studio requires `langgraph` CLI installed
+7. ✅ URL-based images prevent token overflow
+8. ⚠️ USB mode requires Mastech MS8250D multimeter with CP210x adapter
+9. ⚠️ LangGraph Studio requires `langgraph` CLI installed

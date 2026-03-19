@@ -24,7 +24,11 @@ signals:
     unit: "V"
     measurability: "external"
     physical_description: "Top-left corner of PCB, large blue two-position screw terminal connector with AC LINE and NEUTRAL markings"
-    image_url: "docs/CCTV Power Supply Unit.jpg"
+    component_type: "capacitor"
+    image_url: "http://localhost:8000/cctv-psu-24w-v1-test-points/ac_input_capacitor.png"
+    diagnostic_meaning: "Confirms AC power is present at input. Zero reading indicates no AC power from wall or power cord issue."
+    expected_behavior: "170-265V AC (typical mains range)"
+    related_tests: []
     pro_tips:
       - "Use caution - this point carries mains voltage up to 265V AC"
       - "Set multimeter to AC voltage mode before connecting"
@@ -38,7 +42,13 @@ signals:
     unit: "V"
     measurability: "internal"
     physical_description: "Upper-right corner of PCB, near the four diodes in a black rectangular package (BR1). Look for the large electrolytic capacitor nearby."
-    image_url: "docs/CCTV Power Supply Unit.jpg"
+    component_type: "bridge_rectifier"
+    image_url: "http://localhost:8000/cctv-psu-24w-v1-test-points/bridge_rectifier_diode.png"
+    diagnostic_meaning: "Confirms AC to DC conversion stage. Failure indicates bridge diode issue. Zero or low reading with AC present suggests failed diodes."
+    expected_behavior: "280-380V DC under load (peak of AC input minus diode drops)"
+    related_tests:
+      - "forward_bias_test"
+      - "reverse_bias_test"
     pro_tips:
       - "This point can read up to 380V DC - use extreme caution"
       - "If reading negative, swap your multimeter probes"
@@ -51,7 +61,11 @@ signals:
     unit: "Ω"
     measurability: "internal"
     physical_description: "Near the AC input connector, white cylindrical component with metal end caps. May have visible fuse symbol printed on PCB."
-    image_url: "docs/CCTV Power Supply Unit.jpg"
+    component_type: "fuse"
+    image_url: "http://localhost:8000/cctv-psu-24w-v1-test-points/fuse_test_point.png"
+    diagnostic_meaning: "Primary protection device. If open, indicates downstream short in bridge, capacitor, or primary circuitry. Check for shorts before replacing."
+    expected_behavior: "<0.1Ω (continuity) when good"
+    related_tests: []
     pro_tips:
       - "This fuse is a 250V 1A slow-blow type"
       - "If open, check BR1 and C1 before replacing - there may be a downstream short"
@@ -65,7 +79,11 @@ signals:
     unit: "V"
     measurability: "internal"
     physical_description: "Bottom-right area of PCB, look for the large output capacitor (C12, 1000μF 16V) with a small test point nearby marked TP2"
-    image_url: "docs/CCTV Power Supply Unit.jpg"
+    component_type: "capacitor"
+    image_url: "http://localhost:8000/cctv-psu-24w-v1-test-points/main_capacitor_test_point.png"
+    diagnostic_meaning: "Main output voltage. Failure here indicates regulation or primary side failure. Check U5, R2 feedback, and secondary components."
+    expected_behavior: "11.4-12.6V DC under no-load; 10.8-13.2V under load"
+    related_tests: []
     pro_tips:
       - "This is the main output - check here first for no-output faults"
       - "Load the supply with 12V 1A bulb or resistor to test under load"
@@ -78,7 +96,11 @@ signals:
     unit: "V"
     measurability: "internal"
     physical_description: "Center-left of PCB, near U5 (the black IC with 8 pins). Small test point marked TP3 close to the feedback voltage divider."
-    image_url: "docs/CCTV Power Supply Unit.jpg"
+    component_type: "resistor"
+    image_url: "http://localhost:8000/cctv-psu-24w-v1-test-points/resistor_1.png"
+    diagnostic_meaning: "Precision 2.5V reference for output regulation. If this is wrong, output voltage will be wrong. Check R2 feedback resistor."
+    expected_behavior: "2.4-2.6V DC (precision reference)"
+    related_tests: []
     pro_tips:
       - "This is the precision 2.5V reference for output regulation"
       - "If this is wrong, output voltage will be wrong"
@@ -91,7 +113,11 @@ signals:
     unit: "A"
     measurability: "internal"
     physical_description: "Near the output connector, look for a small resistor (typically 0.1Ω-0.5Ω) in series with the positive output rail"
-    image_url: "docs/CCTV Power Supply Unit.jpg"
+    component_type: "resistor"
+    image_url: "http://localhost:8000/cctv-psu-24w-v1-test-points/resistor_1.png"
+    diagnostic_meaning: "Monitors load current for overcurrent protection. High current indicates output short or overload condition."
+    expected_behavior: "0-2.0A normal; 2.0-2.5A overload; >2.5A overcurrent (protection)"
+    related_tests: []
     pro_tips:
       - "Use current measurement or measure voltage drop across sense resistor"
       - "Divide the voltage drop by the resistor value to get current"
@@ -104,7 +130,11 @@ signals:
     unit: "Ω"
     measurability: "internal"
     physical_description: "Center area of PCB, small beige or blue rectangular component marked R2. Usually a 470Ω 1% metal film resistor."
-    image_url: "docs/CCTV Power Supply Unit.jpg"
+    component_type: "resistor"
+    image_url: "http://localhost:8000/cctv-psu-24w-v1-test-points/resistor_1.png"
+    diagnostic_meaning: "Sets output voltage via feedback loop. If open, output goes high. If shorted, output drops to near zero."
+    expected_behavior: "465-475Ω (470Ω ±1%)"
+    related_tests: []
     pro_tips:
       - "This resistor sets the output voltage - if open, output goes high"
       - "If shorted, output voltage will drop to near zero"
@@ -117,7 +147,11 @@ signals:
     unit: "Ω"
     measurability: "internal"
     physical_description: "Bottom-right of PCB, the large electrolytic capacitor (1000μF 16V). Marked C12 on PCB silkscreen."
-    image_url: "docs/CCTV Power Supply Unit.jpg"
+    component_type: "capacitor"
+    image_url: "http://localhost:8000/cctv-psu-24w-v1-test-points/main_capacitor_test_point.png"
+    diagnostic_meaning: "Filter capacitor health indicator. High ESR causes output ripple, voltage droop under load, and can trigger thermal issues."
+    expected_behavior: "<0.2Ω normal; 0.2-0.5Ω degraded; >0.5Ω failed"
+    related_tests: []
     pro_tips:
       - "High ESR causes output ripple and voltage droop under load"
       - "Use an ESR meter for accurate readings - multimeter won't work"
@@ -131,7 +165,11 @@ signals:
     unit: "°C"
     measurability: "internal"
     physical_description: "Center-right of PCB, black 8-pin IC in rectangular package. This is the buck converter controller IC."
-    image_url: "docs/CCTV Power Supply Unit.jpg"
+    component_type: "mosfet"
+    image_url: "http://localhost:8000/cctv-psu-24w-v1-test-points/mosfet_transistor.png"
+    diagnostic_meaning: "Buck converter switching element temperature. High temperature indicates overload, poor heatsinking, or component degradation."
+    expected_behavior: "40-60°C normal under light load; 60-80°C elevated; >80°C warning; >95°C critical"
+    related_tests: []
     pro_tips:
       - "Normal operating temperature is 40-60°C under light load"
       - "Above 80°C indicates thermal issues or overload"

@@ -75,39 +75,33 @@ class ConversationalAgentState:
 # HELPER: IMAGE EMBEDDING
 # =============================================================================
 
-def format_message_content(text: str, image_data: Optional[dict] = None) -> Any:
+def format_message_content(text: str, image_data: Optional[dict] = None) -> str:
     """
-    Format message content with the image PROMINENTLY as the first block.
+    Format message content with inline markdown image rendering.
     
-    Returns a list of content blocks compatible with LangGraph Studio:
-    - Image block: {"type": "image_url", "image_url": {"url": "http://..."}}
-    - Text block: {"type": "text", "text": "..."}
+    Returns a markdown string with inline image:
+    - Image: ![Test Point](image_url)
+    - Text: follows after
     
     Or returns the original text string if no image_data is provided.
     """
     if not image_data:
         return text
     
-    # Extract image URL (now URL-based instead of base64)
+    # Extract image URL
     image_url = image_data.get('image_url')
     
     if not image_url:
         return text
     
-    # Build the content list with image FIRST (for prominence in LangGraph Studio)
-    # Also add descriptive text as a fallback
+    # Build markdown content with image inline
     test_point_info = image_data.get('test_point', '')
     location_desc = image_data.get('location_description', '')
     
-    # Build content blocks
-    content_blocks = [
-        {
-            "type": "image_url",
-            "image_url": {
-                "url": image_url
-            }
-        }
-    ]
+    # Use markdown format for inline image rendering
+    # Use test point info as alt text for the image
+    alt_text = test_point_info if test_point_info else "Test Point"
+    markdown_image = f"![{alt_text}]({image_url})"
     
     # Add text content - include location info as header
     header = ""
@@ -117,14 +111,10 @@ def format_message_content(text: str, image_data: Optional[dict] = None) -> Any:
             header += f" - {location_desc}"
         header += "\n\n"
     
-    # Append to the text
-    full_text = header + text
-    content_blocks.append({
-        "type": "text",
-        "text": full_text
-    })
+    # Combine markdown image with text content
+    markdown_content = f"{markdown_image}\n\n{header}{text}"
     
-    return content_blocks
+    return markdown_content
 
 # =============================================================================
 # NODES
@@ -228,7 +218,7 @@ INTERACTION STYLE:
 
 IMAGE RENDERING:
 - You ARE capable of showing images. When the user asks for one, or when you are guiding them to a test point, ALWAYS call a tool that provides image data (e.g., `get_equipment_configuration` with `request_type="all"` or `get_test_point_guidance`). 
-- The image will be shown inline as the first content block. Do NOT include markdown links or base64 text in your response.
+- Images are shown inline using markdown format: ![Test Point](image_url). Do NOT include base64 text in your response.
 
 STATE TRACKING:
 - current_step: Tracks which diagnostic step you're on (1, 2, 3, etc.)
@@ -294,8 +284,8 @@ def agent_node(state: ConversationalAgentState):
     
     # Image Enrichment: Find latest guidance image or reference image
     image_data = None
-    # We look through history to find the most recent ToolMessage that contains image data.
-    # We search the ORIGINAL state.messages which have the base64 data.
+    # We look through history to find the most recent ToolMessage that contains image URL.
+    # We search the ORIGINAL state.messages which have the URL-based image data.
     # We increase search depth to ensure images from early steps are still available.
     for m in reversed(state.messages):
         if isinstance(m, ToolMessage):

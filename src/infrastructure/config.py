@@ -94,6 +94,18 @@ class MockConfig:
 
 
 @dataclass
+class ImageConfig:
+    """Image server configuration."""
+    base_url: str = "http://localhost:8000"
+    
+    @classmethod
+    def from_env(cls) -> "ImageConfig":
+        return cls(
+            base_url=os.getenv("IMAGE_BASE_URL", "http://localhost:8000")
+        )
+
+
+@dataclass
 class AppConfig:
     """Main application configuration."""
     mode: str = "mock"  # "mock" or "usb"
@@ -106,6 +118,7 @@ class AppConfig:
     chromadb: ChromaDBConfig = field(default_factory=ChromaDBConfig.from_env)
     usb: USBConfig = field(default_factory=USBConfig.from_env)
     mock: MockConfig = field(default_factory=MockConfig.from_env)
+    image: ImageConfig = field(default_factory=ImageConfig.from_env)
     
     # Paths
     knowledge_path: Path = field(default_factory=lambda: Path("data/knowledge"))
@@ -121,7 +134,8 @@ class AppConfig:
             embedding=EmbeddingConfig.from_env(),
             chromadb=ChromaDBConfig.from_env(),
             usb=USBConfig.from_env(),
-            mock=MockConfig.from_env()
+            mock=MockConfig.from_env(),
+            image=ImageConfig.from_env()
         )
     
     def is_mock_mode(self) -> bool:
@@ -184,3 +198,12 @@ def get_langsmith_config() -> dict:
 def get_app_config() -> AppConfig:
     """Get application configuration."""
     return get_config()
+
+
+def get_image_base_url() -> str:
+    """Get the base URL for equipment images.
+    
+    Returns:
+        The IMAGE_BASE_URL from environment, defaults to http://localhost:8000
+    """
+    return get_config().image.base_url

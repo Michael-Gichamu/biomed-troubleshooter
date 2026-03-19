@@ -10,6 +10,33 @@ from typing import Optional, Dict, List, Any
 from pathlib import Path
 import yaml
 
+from src.infrastructure.config import get_image_base_url
+
+
+def get_full_image_url(image_path: str) -> str:
+    """Construct full image URL from relative path using configured IMAGE_BASE_URL.
+    
+    Args:
+        image_path: Relative path to image (e.g., "cctv-psu-24w-v1-test-points/image.png")
+                    or full URL which will have its base replaced
+    
+    Returns:
+        Full URL with IMAGE_BASE_URL prepended
+    """
+    if not image_path:
+        return ""
+    
+    base_url = get_image_base_url().rstrip('/')
+    
+    # If it's already a full URL, replace the base
+    if image_path.startswith('http://') or image_path.startswith('https://'):
+        # Extract the relative path after the domain
+        # This handles existing URLs in YAML files
+        return f"{base_url}/{image_path.split('/', 3)[-1]}"
+    
+    # Otherwise, prepend the base URL
+    return f"{base_url}/{image_path.lstrip('/')}"
+
 
 @dataclass
 class SignalConfig:
@@ -307,6 +334,20 @@ class EquipmentConfig:
                 return image
         return None
 
+    def get_image_url(self, image_id: str) -> str:
+        """Get full URL for an image by ID using configured IMAGE_BASE_URL.
+        
+        Args:
+            image_id: The image ID
+            
+        Returns:
+            Full URL with IMAGE_BASE_URL prepended to the image filename
+        """
+        image = self.images.get(image_id)
+        if not image:
+            return ""
+        return get_full_image_url(image.filename)
+
     def get_test_point_guidance(self, tp_id: str) -> Dict[str, Any]:
         """
         Get consolidated guidance for a test point, including a base64 image.
@@ -323,12 +364,15 @@ class EquipmentConfig:
         if not signal:
             return {"error": f"Test point {tp_id} not found"}
 
+        # Construct full image URL using configured IMAGE_BASE_URL
+        full_image_url = get_full_image_url(signal.image_url) if signal.image_url else ""
+
         guidance = {
             "name": signal.name,
             "test_point": signal.test_point,
             "physical_description": signal.physical_description,
             "pro_tips": signal.pro_tips,
-            "image_url": signal.image_url
+            "image_url": full_image_url
         }
 
         return guidance

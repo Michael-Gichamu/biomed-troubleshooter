@@ -223,14 +223,15 @@ def get_equipment_configuration(
         """Return reference images with test point locations."""
         images = []
         for img in config.images.values():
-            embed = img.get_base64_data()
+            # Build HTTP URL from filename
+            # Images are stored in data/equipment/<equipment_id>-test-points/
+            image_url = f"http://localhost:8000/{equipment_model}-test-points/{img.filename}"
             images.append({
                 "image_id": img.image_id,
                 "filename": img.filename,
                 "description": img.description,
                 "test_points": img.test_points,
-                "image_base64": embed["base64"] if embed else None,
-                "mime_type": embed["mime_type"] if embed else None,
+                "image_url": image_url,
                 "annotations": [
                     {
                         "target": a.get("target", ""),
@@ -246,14 +247,14 @@ def get_equipment_configuration(
         # Return complete config
         images = []
         for img in config.images.values():
-            embed = img.get_base64_data()
+            # Build HTTP URL from filename
+            image_url = f"http://localhost:8000/{equipment_model}-test-points/{img.filename}"
             images.append({
                 "image_id": img.image_id,
                 "filename": img.filename,
                 "description": img.description,
                 "test_points": img.test_points,
-                "image_base64": embed["base64"] if embed else None,
-                "mime_type": embed["mime_type"] if embed else None,
+                "image_url": image_url,
                 "annotations": [
                     {
                         "target": a.get("target", ""),
@@ -320,51 +321,18 @@ def get_test_point_guidance(
         # Add extra context for the agent
         guidance["equipment_model"] = equipment_model
         
-        # Load and embed the image for inline display in LangGraph Studio
-        image_url = guidance.get("image_url", "")
-        if image_url:
-            # Try to load the image and convert to base64
-            try:
-                from pathlib import Path
-                import base64
-                
-                # The image_url is relative to the data directory
-                image_path = Path("data") / image_url if not Path(image_url).is_absolute() else Path(image_url)
-                
-                if image_path.exists():
-                    with open(image_path, "rb") as f:
-                        image_data = base64.b64encode(f.read()).decode("utf-8")
-                    
-                    # Determine mime type from extension
-                    ext = image_path.suffix.lower()
-                    mime_type = "image/jpeg" if ext in [".jpg", ".jpeg"] else "image/png" if ext == ".png" else "image/jpeg"
-                    
-                    guidance["image_base64"] = image_data
-                    guidance["mime_type"] = mime_type
-                    guidance["image_filename"] = image_path.name
-                    guidance["location_description"] = f"Test point {test_point_id} location - {guidance.get('name', '')}"
-                else:
-                    # Image file not found, use the reference image from config
-                    pass
-            except Exception as e:
-                # Silently fail if image loading fails
-                print(f"[DEBUG] Could not load image for {test_point_id}: {e}")
+        # Use image_url from signal (already populated in guidance)
+        # The image_url is already in HTTP URL format from YAML
+        # Ensure it's returned as empty string if not set
+        if "image_url" not in guidance or not guidance["image_url"]:
+            guidance["image_url"] = ""
         
-        # If no image found yet, try to get from config.images
-        if not guidance.get("image_base64"):
-            try:
-                # Get the first image from config that has annotations for this test point
-                for img in config.images.values():
-                    if test_point_id in (img.test_points or []):
-                        embed = img.get_base64_data()
-                        if embed:
-                            guidance["image_base64"] = embed["base64"]
-                            guidance["mime_type"] = embed["mime_type"]
-                            guidance["image_filename"] = img.filename
-                            guidance["location_description"] = f"Test point {test_point_id} location"
-                            break
-            except Exception as e:
-                print(f"[DEBUG] Could not get image from config: {e}")
+        # Remove base64 fields - we now return URL only
+        guidance.pop("image_base64", None)
+        guidance.pop("mime_type", None)
+        
+        # Add location description for clarity
+        guidance["location_description"] = f"Test point {test_point_id} location - {guidance.get('name', '')}"
         
         return guidance
     except Exception as e:
