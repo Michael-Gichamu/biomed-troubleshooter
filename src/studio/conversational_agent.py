@@ -487,6 +487,10 @@ def resume_from_human(state: ConversationalAgentState):
 
 def should_continue(state: ConversationalAgentState):
     """Route after agent node - checks for session completion, human interrupt, or max iterations."""
+    # Defensive: handle empty messages
+    if not state.messages:
+        return "tools"  # Default to tools if no messages
+    
     # Check if session is complete
     if state.is_session_complete:
         return END
@@ -516,6 +520,10 @@ def post_tool_route(state: ConversationalAgentState):
     - If read_multimeter returns "timeout_unstable" → use interrupt to ask user to retry
     - If fault detected → route to agent for diagnosis
     """
+    # Defensive: handle empty messages
+    if not state.messages:
+        return "agent"
+    
     # After tools run, check if this was a measurement tool
     last_msg = state.messages[-1]
     
