@@ -1,10 +1,8 @@
 #!/bin/bash
 # =============================================================================
-# Biomedical Troubleshooting Agent - Start Both Servers
+# Biomedical Troubleshooting Agent - Start Script
 # =============================================================================
-# This script starts:
-#   1. Local HTTP server for test point images (port 8000)
-#   2. LangGraph Studio for the AI agent (port 2024)
+# This script starts LangGraph Studio for the AI agent (port 2024)
 # =============================================================================
 
 echo "================================================"
@@ -14,13 +12,11 @@ echo ""
 
 # Check if virtual environment exists
 if [ -f "venv/bin/python" ]; then
-    VENV_PYTHON="venv/bin/python"
     VENV_LANGGRAPH="venv/bin/langgraph"
-elif command -v python &> /dev/null; then
-    VENV_PYTHON="python"
+elif command -v langgraph &> /dev/null; then
     VENV_LANGGRAPH="langgraph"
 else
-    echo "Error: Python not found. Please install Python 3.10+"
+    echo "Error: langgraph not found. Please install LangGraph CLI"
     exit 1
 fi
 
@@ -35,24 +31,8 @@ check_port() {
     fi
 }
 
-# Start Image Server in background
-echo "[1/2] Starting local image server on port 8000..."
-
-# Check if port 8000 is already in use
-if check_port 8000; then
-    echo "      Port 8000 already in use - skipping image server"
-else
-    $VENV_PYTHON -m http.server 8000 --directory data/equipment > /dev/null 2>&1 &
-    IMAGE_PID=$!
-    echo "      Image server started (PID: $IMAGE_PID): http://localhost:8000"
-fi
-echo ""
-
-# Wait a moment for the image server to start
-sleep 2
-
 # Start LangGraph Studio
-echo "[2/2] Starting LangGraph Studio on port 2024..."
+echo "Starting LangGraph Studio on port 2024..."
 
 # Check if port 2024 is already in use
 if check_port 2024; then
