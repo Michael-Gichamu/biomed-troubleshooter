@@ -169,32 +169,46 @@ def clean_messages_for_llm(messages: list[BaseMessage]) -> list[BaseMessage]:
 
 SYSTEM_PROMPT = """You are a professional Biomedical Engineering Diagnostic Assistant. 
 
+STRICT DIAGNOSTIC BEHAVIOR RULES:
+
+1. **NEVER HALLUCINATE** - Only use values from tool output. Never assume or guess measurement values.
+
+2. **NEVER GUESS TEST POINTS** - Only use valid test points from equipment configuration. Call `get_equipment_configuration` or `get_test_point_guidance` to get the valid list.
+
+3. **VALIDATE TOOL RESULTS** - If tool result contains guidance.error or invalid test point, discard it and choose a valid one from config.
+
+4. **MANDATORY PAUSE AFTER EVERY MEASUREMENT** - After getting ANY measurement result, you MUST:
+   - STOP your response
+   - Say EXACTLY: "Press NEXT to continue diagnosis"
+   - Do NOT continue automatically - wait for user confirmation
+
+5. **DISPLAY IMAGES INLINE** - Use markdown format: `![Test Point](image_url)`
+
+6. **RESPONSE FORMAT** - After each measurement, follow this structure:
+   - WHY: Explain why this test point was selected
+   - MEASUREMENT RESULT: Show the value clearly (e.g., "Voltage: 24.2V DC")
+   - INTERPRETATION: Explain what the reading means (normal/abnormal/fault indicator)
+   - NEXT ACTION: What you plan to do next
+   - PAUSE: "Press NEXT to continue diagnosis"
+
 DIAGNOSTIC PRINCIPLES:
 1. EQUIPMENT FIRST: You MUST identify the equipment model before providing any diagnostic guidance. If the `equipment_model` is not provided in your state, your ONLY goal is to ask the user for the model identifier (e.g., "cctv-psu-24w-v1"). NEVER assume a model.
 2. DOCUMENT-FIRST: Once a model is identified, you MUST consult the equipment configuration and diagnostic knowledge base to identify probable faults before suggesting tests.
 
-**AUTONOMOUS MEASUREMENT FLOW - NO MANUAL CONFIRMATION REQUIRED:**
-
-The measurement system now works automatically WITHOUT requiring you to ask for user confirmation:
+**MEASUREMENT FLOW WITH MANDATORY PAUSE:**
 
 1. When you need to measure a test point, call `read_multimeter` - it will:
    - FIRST: Show the test point guidance (image, location, pro tips)
    - THEN: Automatically start sampling and wait for stabilization
    - FINALLY: Return the stable reading
 
-2. You do NOT need to ask the user to type "ready", "next", or any confirmation.
-
-3. After showing guidance, tell the user to place probes and HOLD STEADY while sampling occurs:
+2. After showing guidance, tell the user to place probes and HOLD STEADY while sampling occurs:
    - GOOD: "Place the probes on the marked test point and hold them steady while I sample for a few seconds."
-   - BAD: "Reply ready when you're done" (NEVER say this)
-   - BAD: "Reply next to continue" (NEVER say this)
 
-4. The system will automatically collect ~10-30 samples and return the stable reading.
-
-5. After getting a stable reading, CONTINUE the diagnosis automatically:
-   - Interpret the result against expected thresholds
-   - Proceed to next test point if needed
-   - DO NOT ask for "next" confirmation
+3. After getting the measurement result, you MUST pause:
+   - Present the result using the response format (WHY, MEASUREMENT RESULT, INTERPRETATION, NEXT ACTION)
+   - End with "Press NEXT to continue diagnosis"
+   - DO NOT proceed to next step without user confirmation
 
 **STEP TRACKING:**
 - Always show current step like "Step X of Y: [Description]"
@@ -207,11 +221,8 @@ The measurement system now works automatically WITHOUT requiring you to ask for 
 
 **TIMEOUT HANDLING:**
 If `read_multimeter` returns status "timeout" or "timeout_unstable":
-- The system already showed guidance to the user
-- Simply explain what happened and offer guidance:
-  - "I couldn't get a stable reading. The probes may have poor contact. Please reposition them on the test point and I'll try again."
-- You can call `read_multimeter` again or use `enter_manual_reading`
-- DO NOT ask user to type anything specific - just proceed or offer retry
+- Explain what happened and offer guidance
+- Say "Press NEXT to continue diagnosis" to wait for user to retry
 
 **ITERATION LIMIT:**
 - The session will auto-terminate after 10 measurement iterations
@@ -219,15 +230,6 @@ If `read_multimeter` returns status "timeout" or "timeout_unstable":
 
 **TALK-BEFORE-ACT - CRITICAL FOR UX:**
 Before calling ANY tool, ALWAYS provide a brief conversational update to the user. This ensures the user sees text in the LangGraph Studio UI even when "Show Tool Calls" is toggled off.
-
-Example workflow:
-1. "I'm going to check the voltage at TP2 now. Let me show you where to place the probes..."
-2. Call `read_multimeter` - it handles guidance + sampling automatically
-3. The stable reading is returned
-4. "The output voltage is 24.2V - that's within normal range. Now let me check..."
-5. Continue to next test point (no "next" confirmation needed)
-
-NEVER ask the user to manually report a reading - always use `read_multimeter` or `enter_manual_reading` tools.
 
 IMAGE RENDERING:
 - You ARE capable of showing images. When the user asks for one, or when you are guiding them to a test point, ALWAYS call a tool that provides image data (e.g., `get_equipment_configuration` with `request_type="all"` or `get_test_point_guidance`). 
@@ -237,7 +239,6 @@ STATE TRACKING:
 - current_step: Tracks which diagnostic step you're on (1, 2, 3, etc.)
 - total_steps: Total planned steps for this diagnosis
 - Update these values as you progress through the diagnosis.
-- awaiting_test_point_guidance: Set to True after showing guidance - MUST call read_multimeter next
 """
 
 # Maximum iterations to prevent infinite loops
@@ -276,19 +277,17 @@ def agent_node(state: ConversationalAgentState):
     if state.step_description:
         sys_content += f" - {state.step_description}"
     
-    # CRITICAL: If we just showed test point guidance, FORCE the LLM to call read_multimeter
-    # This implements the auto-collection requirement
-    if state.awaiting_test_point_guidance:
-        sys_content += """
-        
-        **MANDATORY NEXT ACTION - AUTO-COLLECTION REQUIRED:**
-        You just showed the user where to probe (test point guidance was provided). 
-        You MUST now call the `read_multimeter` tool IMMEDIATELY to collect the measurement.
-        Do NOT ask the user to report the value manually - use the read_multimeter tool.
-        
-        Extract the test_point_id from the previous guidance (from state.last_guidance_test_point or the tool result)
-        and call read_multimeter with that test_point_id.
-        """
+    # CRITICAL: After EVERY measurement, the agent MUST include "Press NEXT to continue diagnosis"
+    # The system will automatically pause after tools run, but the agent response should also
+    # clearly indicate waiting for user confirmation.
+    sys_content += """
+    
+    **MANDATORY RESPONSE FORMAT AFTER MEASUREMENTS:**
+    After getting any measurement result, your response MUST end with:
+    "Press NEXT to continue diagnosis"
+    
+    Do NOT continue automatically - wait for the user to confirm before proceeding.
+    """
     
     sys_msg = SystemMessage(content=sys_content)
     
@@ -332,30 +331,15 @@ def agent_node(state: ConversationalAgentState):
     if "SESSION COMPLETED" in content_str:
         is_complete = True
     
-    # Check if agent called a measurement tool - if so, we'll pause after tools run
-    is_awaiting_measurement = False
-    needs_auto_reading = False  # Will be set True if we need to auto-collect next turn
-    
-    if hasattr(response, "tool_calls") and response.tool_calls:
-        for tc in response.tool_calls:
-            if tc.get("name") in ("read_multimeter", "enter_manual_reading"):
-                is_awaiting_measurement = True
-                # After a measurement is taken, clear the auto-read flag
-                needs_auto_reading = False
-                break
-            elif tc.get("name") == "get_test_point_guidance":
-                # Mark that we need to auto-collect after this guidance
-                needs_auto_reading = True
-    
     return {
         "messages": [response], 
         "is_session_complete": is_complete,
         "equipment_model": equipment_model,
         "iteration_count": state.iteration_count + 1,
-        "is_paused_for_human": is_awaiting_measurement,
+        "is_paused_for_human": False,  # Pause is handled in post_tool_route after tools run
         "current_step": state.current_step,
         "total_steps": state.total_steps,
-        "awaiting_test_point_guidance": needs_auto_reading,
+        "awaiting_test_point_guidance": False,  # No longer needed - we pause after every measurement
         "last_guidance_test_point": state.last_guidance_test_point
     }
 
@@ -369,32 +353,12 @@ def tool_node(state: ConversationalAgentState):
     results = []
     measurements = []
     
-    # Track if we just showed test point guidance
-    showed_guidance_test_point = None
-    measurement_collected = False
-    
     for tool_call in last_msg.tool_calls:
         tool = tools_map.get(tool_call["name"])
         if tool:
             print(f"[TOOL] Running {tool_call['name']}...")
             result = tool.invoke(tool_call["args"])
             
-            # Special handling for guidance images
-            # Image URLs are now used instead of base64 - no need to strip
-            if tool_call["name"] == "get_test_point_guidance" and isinstance(result, dict):
-                # Track the test point we just showed guidance for
-                if result.get("test_point"):
-                    showed_guidance_test_point = result.get("test_point")
-                # Keep the image data for the NEXT node to use (it's in the ToolMessage content)
-                # But we can strip it here and the agent_node will have to get it 
-                # FROM the tool result if we want to show it in the UI.
-                # Actually, the most robust way is to strip it AFTER the next agent step.
-                pass
-            
-            # Track if we just collected a measurement
-            if tool_call["name"] in ("read_multimeter", "enter_manual_reading"):
-                measurement_collected = True
-                
             results.append(ToolMessage(
                 tool_call_id=tool_call["id"],
                 content=json.dumps(result) if isinstance(result, dict) else str(result)
@@ -412,13 +376,10 @@ def tool_node(state: ConversationalAgentState):
                     }
                     measurements.append(measurement)
     
-    # After measurement is collected, clear the auto-read flag
-    # After guidance is shown, set the auto-read flag
+    # Note: We no longer track awaiting_test_point_guidance - pause is now mandatory after every measurement
     return {
         "messages": results,
-        "measurements": state.measurements + measurements,
-        "awaiting_test_point_guidance": False if measurement_collected else (showed_guidance_test_point is not None),
-        "last_guidance_test_point": showed_guidance_test_point or state.last_guidance_test_point
+        "measurements": state.measurements + measurements
     }
 
 # =============================================================================
@@ -430,7 +391,9 @@ def wait_for_human(state: ConversationalAgentState):
     Wait for human confirmation before continuing.
     This node uses interrupt() to pause the graph and wait for user input.
     
-    The interrupt message tells the user what to do next (e.g., 'Reply next to continue').
+    STRICT DIAGNOSTIC RULE: After EVERY measurement, we MUST pause and wait for user to press NEXT.
+    
+    The interrupt message tells the user to press NEXT to continue diagnosis.
     """
     # Get the last AI message to include in the interrupt
     last_msg = state.messages[-1]
@@ -440,10 +403,10 @@ def wait_for_human(state: ConversationalAgentState):
     if state.step_description:
         step_context += f": {state.step_description}"
     
-    # Create a clear instruction message
+    # Create a clear instruction message - MUST say "Press NEXT to continue diagnosis"
     instruction = (
         f"{step_context} - Measurement complete. "
-        "Reply 'next' to continue diagnosis, or describe any issues you're seeing."
+        "Press NEXT to continue diagnosis"
     )
     
     # Use interrupt to pause and wait for human
@@ -535,20 +498,19 @@ def should_continue(state: ConversationalAgentState):
 
 def post_tool_route(state: ConversationalAgentState):
     """
-    Route after tools node - continue automatically or handle timeout.
+    Route after tools node - ALWAYS pause for human after measurements.
     
-    AUTONOMOUS FLOW - No manual confirmation required:
+    STRICT DIAGNOSTIC RULE: After EVERY measurement, we MUST pause for user confirmation.
     
-    - If read_multimeter returns "success" → route to agent to interpret result
-      (No pause - continues automatically to next step)
+    - If read_multimeter returns "success" → route to wait_for_human (PAUSE REQUIRED)
     
-    - If read_multimeter returns "timeout" or "timeout_unstable" → handle timeout
-      (Will offer retry or manual entry, but continues flow)
+    - If read_multimeter returns "timeout" or "timeout_unstable" → route to wait_for_human
+      (User will confirm retry or continue)
     
-    - If fault detected → route to agent for diagnosis
+    - If fault detected → route to wait_for_human (User will confirm diagnosis)
     
-    The key change: After successful measurement, we NO LONGER pause for human "next" confirmation.
-    We immediately continue to interpret the result and proceed with the diagnosis.
+    The key change: After any measurement, we ALWAYS pause for human "next" confirmation.
+    The agent must not auto-proceed - must wait for user to press NEXT.
     """
     # Defensive: handle empty messages
     if not state.messages:
@@ -565,17 +527,18 @@ def post_tool_route(state: ConversationalAgentState):
                 # Check for measurement status
                 status = result.get("status", "")
                 
-                # Handle timeout cases - route to handle_timeout for retry logic
+                # Handle timeout cases - still pause for human to confirm retry
                 if status in ("timeout", "timeout_unstable"):
-                    return "handle_timeout"
+                    return "wait_for_human"
                 
-                # Handle success - continue automatically to interpret result
-                # NO PAUSE FOR HUMAN - continue to agent for interpretation
+                # Handle success - PAUSE FOR HUMAN before continuing
+                # This is the KEY CHANGE: always pause after measurements
                 if status == "success" or "value" in result:
-                    return "agent"
+                    return "wait_for_human"
         except:
             pass
     
+    # For non-measurement tools, continue to agent
     return "agent"
 
 
@@ -704,13 +667,14 @@ def create_conversational_graph():
         }
     )
     
-    # Tools routing: after measurement, either handle timeout or continue to agent
-    # NO PAUSE_FOR_HUMAN - flow is now autonomous
+    # Tools routing: after measurement, ALWAYS pause for human confirmation
+    # This implements the strict diagnostic rule: "Press NEXT to continue diagnosis"
     builder.add_conditional_edges(
         "tools",
         post_tool_route,
         {
             "agent": "agent",
+            "wait_for_human": "wait_for_human",
             "handle_timeout": "handle_timeout"
         }
     )
