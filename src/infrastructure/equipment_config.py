@@ -18,23 +18,24 @@ def get_full_image_url(image_path: str) -> str:
     
     Args:
         image_path: Relative path to image (e.g., "cctv-psu-24w-v1-test-points/image.png")
-                    or full URL which will have its base replaced
+                    or full URL (which will be returned as-is)
     
     Returns:
-        Full URL with IMAGE_BASE_URL prepended
+        Full URL - either the input URL if already complete, or with IMAGE_BASE_URL prepended
     """
     if not image_path:
         return ""
     
-    base_url = get_image_base_url().rstrip('/')
-    
-    # If it's already a full URL, replace the base
+    # If it's already a full URL (GitHub RAW, etc.), return as-is
     if image_path.startswith('http://') or image_path.startswith('https://'):
-        # Extract the relative path after the domain
-        # This handles existing URLs in YAML files
-        return f"{base_url}/{image_path.split('/', 3)[-1]}"
+        return image_path
     
-    # Otherwise, prepend the base URL
+    # Otherwise, use the configured base URL
+    base_url = get_image_base_url().rstrip('/')
+    if not base_url:
+        # No base URL configured, return relative path as-is
+        return image_path
+    
     return f"{base_url}/{image_path.lstrip('/')}"
 
 

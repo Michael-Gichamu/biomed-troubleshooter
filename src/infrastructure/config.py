@@ -96,12 +96,12 @@ class MockConfig:
 @dataclass
 class ImageConfig:
     """Image server configuration."""
-    base_url: str = "http://localhost:8000"
+    base_url: str = ""  # Default to empty - use full URLs from YAML
     
     @classmethod
     def from_env(cls) -> "ImageConfig":
         return cls(
-            base_url=os.getenv("IMAGE_BASE_URL", "http://localhost:8000")
+            base_url=os.getenv("IMAGE_BASE_URL", "")  # Default to empty string
         )
 
 
@@ -204,6 +204,7 @@ def get_image_base_url() -> str:
     """Get the base URL for equipment images.
     
     Returns:
-        The IMAGE_BASE_URL from environment, defaults to http://localhost:8000
+        The IMAGE_BASE_URL from environment, defaults to empty string
+        (meaning full URLs from YAML will be used as-is)
     """
     return get_config().image.base_url

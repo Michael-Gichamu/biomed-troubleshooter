@@ -223,9 +223,9 @@ def get_equipment_configuration(
         """Return reference images with test point locations."""
         images = []
         for img in config.images.values():
-            # Build HTTP URL from filename
-            # Images are stored in data/equipment/<equipment_id>-test-points/
-            image_url = f"http://localhost:8000/{equipment_model}-test-points/{img.filename}"
+            # Use GitHub RAW URL format - images are stored in data/equipment/<equipment_id>-test-points/
+            # Format: https://raw.githubusercontent.com/<owner>/<repo>/main/data/equipment/<equipment_id>-test-points/<filename>
+            image_url = f"https://raw.githubusercontent.com/Michael-Gichamu/biomed-troubleshooter/main/data/equipment/{equipment_model}-test-points/{img.filename}"
             images.append({
                 "image_id": img.image_id,
                 "filename": img.filename,
@@ -247,8 +247,8 @@ def get_equipment_configuration(
         # Return complete config
         images = []
         for img in config.images.values():
-            # Build HTTP URL from filename
-            image_url = f"http://localhost:8000/{equipment_model}-test-points/{img.filename}"
+            # Use GitHub RAW URL format
+            image_url = f"https://raw.githubusercontent.com/Michael-Gichamu/biomed-troubleshooter/main/data/equipment/{equipment_model}-test-points/{img.filename}"
             images.append({
                 "image_id": img.image_id,
                 "filename": img.filename,
