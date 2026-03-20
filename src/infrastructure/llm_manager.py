@@ -411,6 +411,62 @@ def invoke_with_retry(messages: List[Dict[str, str]], max_full_retries: int = 3)
             raise
 
 
+def invoke_with_tools_and_retry(messages: List[Any], tools: List[Any], max_full_retries: int = 3) -> Any:
+    """
+    Invoke LLM with tools bound and automatic retry/rotation logic.
+    
+    This function handles RateLimitError, APIError, and other errors by:
+    1. Retrying with exponential backoff
+    2. Rotating to next API key if available
+    3. Rotating to next model if all keys exhausted
+    
+    Args:
+        messages: List of message objects (SystemMessage, HumanMessage, etc.)
+        tools: List of LangChain tools to bind to the LLM
+        max_full_retries: Maximum full rotation cycles
+        
+    Returns:
+        LLM response with tool calls
+        
+    Raises:
+        Exception: If all retries exhausted
+    """
+    manager = get_llm_manager()
+    
+    for full_retry in range(max_full_retries):
+        llm = manager.current_llm
+        
+        try:
+            # Bind tools to the LLM
+            llm_with_tools = llm.bind_tools(tools)
+            response = llm_with_tools.invoke(messages)
+            return response
+        
+        except Exception as e:
+            logger.warning(f"LLM call with tools failed: {str(e)[:100]}")
+            
+            if manager.should_rotate(e):
+                # Calculate backoff
+                backoff_time = manager.get_backoff_time()
+                logger.info(f"Retrying after {backoff_time}s...")
+                time.sleep(backoff_time)
+                
+                # Try to rotate
+                if manager.rotate():
+                    manager.increment_retry()
+                    continue
+                else:
+                    # Try next model if available
+                    if manager.current_model_index < len(manager.models) - 1:
+                        manager.increment_model_retry()
+                        manager.rotate()
+                        continue
+            
+            # If we get here, all options exhausted
+            logger.error(f"All retries exhausted after {full_retry + 1} attempts")
+            raise
+
+
 # Backwards compatibility: get_llm() returns the active LLM
 def get_llm() -> Any:
     """Backwards compatible function to get LLM instance."""

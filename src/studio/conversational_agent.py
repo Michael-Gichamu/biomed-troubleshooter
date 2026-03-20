@@ -275,10 +275,8 @@ MAX_ITERATIONS = 10
 
 def agent_node(state: ConversationalAgentState):
     """The planning/reasoning node."""
-    from src.infrastructure.llm_client import get_llm
-    llm = get_llm()
+    from src.infrastructure.llm_manager import invoke_with_tools_and_retry
     tools = get_tools()
-    llm_with_tools = llm.bind_tools(tools)
     
     # Clean history to keep token count low
     cleaned_messages = clean_messages_for_llm(state.messages)
@@ -319,8 +317,8 @@ def agent_node(state: ConversationalAgentState):
     
     sys_msg = SystemMessage(content=sys_content)
     
-    # Run LLM
-    response = llm_with_tools.invoke([sys_msg] + cleaned_messages)
+    # Run LLM with retry logic (handles RateLimitError, APIError, etc. with key/model rotation)
+    response = invoke_with_tools_and_retry([sys_msg] + cleaned_messages, tools)
     
     # Image Enrichment: Find latest guidance image or reference image
     image_data = None
@@ -622,10 +620,8 @@ def diagnose_node(state: ConversationalAgentState):
     Diagnose node that provides final analysis when max iterations reached.
     This node analyzes accumulated measurements and provides a conclusion.
     """
-    from src.infrastructure.llm_client import get_llm
+    from src.infrastructure.llm_manager import invoke_with_retry
     from langchain_core.messages import SystemMessage
-    
-    llm = get_llm()
     
     # Build measurement summary for diagnosis
     measurement_summary = ""
@@ -653,7 +649,8 @@ Please provide:
 End your response with "SESSION COMPLETED" to close this session.
 """
     
-    response = llm.invoke([SystemMessage(content=diagnose_prompt)])
+    # Use retry logic for diagnosis (handles RateLimitError, APIError, etc.)
+    response = invoke_with_retry([{"role": "system", "content": diagnose_prompt}])
     
     # Add measurement summary as context
     response.content = f"[Diagnostic Summary - {len(state.measurements)} measurements taken]\n\n" + str(response.content)
