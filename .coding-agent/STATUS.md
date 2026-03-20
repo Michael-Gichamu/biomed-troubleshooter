@@ -46,8 +46,8 @@ The multimeter measurement flow has been refactored to:
 |---------|--------|-------|
 | URL-based images | Working | No base64 in LLM messages |
 | Inline image rendering | Working | Markdown format: `![alt](url)` |
-| Local image server | Working | [`start-dev.bat`](start-dev.bat) / [`start-dev.sh`](start-dev.sh) |
-| Configurable base URL | Working | IMAGE_BASE_URL in .env |
+| GitHub RAW hosting | Working | Images served via github.com raw URLs |
+| No local server needed | Working | Eliminated port 8000 dependency |
 
 ### ✅ Self-Healing LLM Infrastructure
 | Feature | Status | Notes |
@@ -87,10 +87,10 @@ The multimeter measurement flow has been refactored to:
 
 ### Immediate
 
-1. **Run the new startup script**
-   - Windows: `start-dev.bat`
-   - Unix/Mac: `./start-dev.sh`
-   - Starts both image server (port 8000) and LangGraph Studio (port 2024)
+1. **Run the startup script**
+   - Windows: `start.bat`
+   - Unix/Mac: `./start.sh`
+   - Starts LangGraph Studio (port 2024) - no local image server needed
 
 ### Short-term (Enhancements)
 
@@ -122,7 +122,7 @@ MAX_RETRIES_PER_KEY=2
 MAX_RETRIES_PER_MODEL=2
 BACKOFF_BASE_SECONDS=1.0
 BACKOFF_MAX_SECONDS=16.0
-IMAGE_BASE_URL=http://localhost:8000
+# IMAGE_BASE_URL is now optional - images use GitHub RAW URLs
 ```
 
 ### Running the Project
@@ -131,16 +131,12 @@ IMAGE_BASE_URL=http://localhost:8000
 # No Docker needed - ChromaDB runs in embedded mode
 pip install -r requirements.txt
 
-# NEW: Start both servers with one command
+# Start LangGraph Studio
 # Windows
-start-dev.bat
+start.bat
 
 # Unix/Mac
-./start-dev.sh
-
-# Or manually:
-# Image server (port 8000)
-python -m http.server 8000 --directory data/equipment
+./start.sh
 
 # LangGraph Studio (port 2024)
 langgraph dev --port 2024
@@ -175,6 +171,6 @@ If you clone this project on a new machine:
 4. ✅ Run `python -m src.interfaces.cli --mock` - works out of the box
 5. ✅ ChromaDB embedded mode works automatically (no Docker)
 6. ✅ Self-healing LLM with automatic key/model rotation
-7. ✅ URL-based images prevent token overflow
+7. ✅ GitHub RAW URLs for images - no local server needed
 8. ⚠️ USB mode requires Mastech MS8250D multimeter with CP210x adapter
 9. ⚠️ LangGraph Studio requires `langgraph` CLI installed

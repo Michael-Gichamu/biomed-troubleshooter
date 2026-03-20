@@ -60,8 +60,9 @@ python -m src.interfaces.cli --mock
 # Or run in USB mode (requires Mastech MS8250D multimeter)
 python -m src.interfaces.cli --usb CCTV-PSU-24W-V1
 
-# Or use LangGraph Studio for debugging
+# Or use LangGraph Studio
 langgraph dev --port 2024
+# Note: Images are served via GitHub RAW URLs - no local server needed
 ```
 
 ### Key Files Reference
