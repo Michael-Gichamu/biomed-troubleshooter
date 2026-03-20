@@ -349,6 +349,9 @@ def agent_node(state: ConversationalAgentState):
                 continue
     
     # Format content blocks. Place image FIRST for maximum prominence.
+    # Handle case where response.content might be None
+    if response.content is None:
+        response.content = ""
     response.content = format_message_content(response.content, image_data)
     
     # Session completion check
