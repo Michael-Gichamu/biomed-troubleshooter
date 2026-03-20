@@ -1,19 +1,20 @@
 # Current Project Status
 
-> Last updated: 2026-03-19
+> Last updated: 2026-03-20
 > This document reflects the actual current state of the codebase.
 
 ---
 
 ## Current Milestone
 
-**Phase: Base64 Elimination + Inline Image Rendering Complete**
+**Phase: Autonomous Stabilization Flow Complete**
 
-The system has been refactored to:
-- Eliminate all base64 image handling
-- Enable inline image rendering via URLs
-- Align equipment documentation with test points and images
-- Reduce token usage and prevent LLM overflow errors
+The multimeter measurement flow has been refactored to:
+- Eliminate manual "ready/next" confirmation after test-point guidance
+- Implement MAD-based robust stabilization algorithm
+- Enable autonomous sampling with dwell-time enforcement
+- Return only stable readings to the agent
+- Faster, less frustrating UX for engineers
 
 ---
 
@@ -31,7 +32,16 @@ The system has been refactored to:
 | CLI interface | Working | [`src/interfaces/cli.py`](src/interfaces/cli.py) |
 | LangSmith tracing | Working | Full observability enabled |
 
-### ✅ Image Handling (NEW!)
+### ✅ Autonomous Measurement (NEW!)
+| Feature | Status | Notes |
+|---------|--------|-------|
+| MAD-based stabilization | Working | Uses Median Absolute Deviation for outlier rejection |
+| Dwell-time enforcement | Working | Requires 3 consecutive stable samples |
+| Integrated guidance + sampling | Working | Single tool call shows guidance then samples |
+| No manual confirmation | Working | Removed "Reply next" prompts |
+| Robust cluster detection | Working | Prefers newest stable readings |
+
+### ✅ Image Handling
 | Feature | Status | Notes |
 |---------|--------|-------|
 | URL-based images | Working | No base64 in LLM messages |

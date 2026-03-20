@@ -269,6 +269,41 @@ class RecommendationGenerator:
 | [`generate_recommendations`](src/application/agent.py:178) | agent.py | Builds recovery steps from YAML |
 | [`generate_response`](src/application/agent.py:211) | agent.py | Constructs final structured response |
 
+### Autonomous Measurement Flow (NEW!)
+
+The conversational agent now uses an autonomous two-phase measurement flow:
+
+```mermaid
+graph TB
+    A[Agent calls read_multimeter] --> B[Phase 1: Get Guidance<br/>Show test point image, location, tips]
+    B --> C[Phase 2: Autonomous Sampling<br/>System samples continuously]
+    C --> D{Stabilization Check}
+    D -->|Not stable| C
+    D -->|3+ consecutive stable| E[STABLE: Return median<br/>of stable cluster]
+    C --> F{Timeout?}
+    F -->|Yes| G[Return timeout<br/>with guidance]
+    
+    style B fill:#e1f5fe
+    style C fill:#e8f5e8
+    style E fill:#c8e6c9
+    style G fill:#ffcdd2
+```
+
+**Key Components:**
+
+| Component | File | Purpose |
+|-----------|------|---------|
+| [`RobustStabilizer`](src/studio/background_usb_reader.py:45) | background_usb_reader.py | MAD-based outlier rejection |
+| [`MeasurementPhase`](src/studio/background_usb_reader.py:27) | background_usb_reader.py | State machine enum |
+| [`read_multimeter`](src/studio/tools.py:343) | tools.py | Integrated guidance + sampling tool |
+
+**Stabilization Algorithm:**
+1. Maintain rolling window of 30 samples
+2. Apply MAD (Median Absolute Deviation) for outlier detection
+3. Find clusters of 5+ consecutive stable readings
+4. Require 3 consecutive stable samples (dwell time)
+5. Return trimmed mean of newest stable cluster
+
 ### Infrastructure Components
 
 | Component | File | Purpose |

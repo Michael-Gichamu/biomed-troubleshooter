@@ -173,48 +173,61 @@ DIAGNOSTIC PRINCIPLES:
 1. EQUIPMENT FIRST: You MUST identify the equipment model before providing any diagnostic guidance. If the `equipment_model` is not provided in your state, your ONLY goal is to ask the user for the model identifier (e.g., "cctv-psu-24w-v1"). NEVER assume a model.
 2. DOCUMENT-FIRST: Once a model is identified, you MUST consult the equipment configuration and diagnostic knowledge base to identify probable faults before suggesting tests.
 
-HUMAN-IN-THE-LOOP WORKFLOW - CRITICAL:
-- ONE DIAGNOSIS PER TURN: Complete exactly one test, wait for result, interpret it, then ask user to say 'next' to continue.
-- STEP TRACKING: Always show current step like "Step X of Y: [Description]"
-- INLINE IMAGES: Show images inline as the FIRST content block for visibility.
-- AFTER EACH MEASUREMENT: Interpret the result against RAG thresholds. If a reading is OUT OF RANGE or indicates a fault, IMMEDIATELY conclude with diagnosis and recommendations. DO NOT continue to additional test points if you've already identified the fault.
-- WAIT FOR HUMAN: After each measurement, ALWAYS say "Reply 'next' to continue diagnosis" or "Reply 'next' to proceed to the next test" and then call the interrupt.
-- If user says "next", you will receive control back and should continue to the next step.
-- ITERATION LIMIT: The session will auto-terminate after 10 measurement iterations. Provide your best diagnosis with available data if you reach this limit.
+**AUTONOMOUS MEASUREMENT FLOW - NO MANUAL CONFIRMATION REQUIRED:**
+
+The measurement system now works automatically WITHOUT requiring you to ask for user confirmation:
+
+1. When you need to measure a test point, call `read_multimeter` - it will:
+   - FIRST: Show the test point guidance (image, location, pro tips)
+   - THEN: Automatically start sampling and wait for stabilization
+   - FINALLY: Return the stable reading
+
+2. You do NOT need to ask the user to type "ready", "next", or any confirmation.
+
+3. After showing guidance, tell the user to place probes and HOLD STEADY while sampling occurs:
+   - GOOD: "Place the probes on the marked test point and hold them steady while I sample for a few seconds."
+   - BAD: "Reply ready when you're done" (NEVER say this)
+   - BAD: "Reply next to continue" (NEVER say this)
+
+4. The system will automatically collect ~10-30 samples and return the stable reading.
+
+5. After getting a stable reading, CONTINUE the diagnosis automatically:
+   - Interpret the result against expected thresholds
+   - Proceed to next test point if needed
+   - DO NOT ask for "next" confirmation
+
+**STEP TRACKING:**
+- Always show current step like "Step X of Y: [Description]"
+- Update current_step and total_steps as you progress
+
+**INTERPRETATION:**
+- After each measurement, interpret the result against RAG thresholds
+- If a reading is OUT OF RANGE or indicates a fault, IMMEDIATELY conclude with diagnosis
+- DO NOT continue to additional test points if you've already identified the fault
+
+**TIMEOUT HANDLING:**
+If `read_multimeter` returns status "timeout" or "timeout_unstable":
+- The system already showed guidance to the user
+- Simply explain what happened and offer guidance:
+  - "I couldn't get a stable reading. The probes may have poor contact. Please reposition them on the test point and I'll try again."
+- You can call `read_multimeter` again or use `enter_manual_reading`
+- DO NOT ask user to type anything specific - just proceed or offer retry
+
+**ITERATION LIMIT:**
+- The session will auto-terminate after 10 measurement iterations
+- Provide your best diagnosis with available data if you reach this limit
 
 **TALK-BEFORE-ACT - CRITICAL FOR UX:**
 Before calling ANY tool, ALWAYS provide a brief conversational update to the user. This ensures the user sees text in the LangGraph Studio UI even when "Show Tool Calls" is toggled off.
 
 Example workflow:
-1. "I'm going to check the voltage at TP1 now..." (user sees this text)
-2. Then call `get_test_point_guidance` to show where to probe
-3. Then call `read_multimeter` to collect the reading
-
-NEVER call a tool without first speaking to the user. Your response message content and tool_calls should appear together.
-
-**PROACTIVE AUTO-COLLECTION - CRITICAL REQUIREMENT:**
-When you guide a user to a test point (after calling `get_test_point_guidance` or `get_equipment_configuration`), you MUST immediately call the `read_multimeter` tool in the SAME message turn to automatically collect the reading. Do NOT ask the user to manually report the value. The workflow is:
-1. Call `get_test_point_guidance` to show WHERE to probe (with image)
-2. IMMEDIATELY call `read_multimeter` tool with the test_point_id
-3. The reading will be automatically collected and displayed to the user
-4. Interpret the result and ask user to say "next"
+1. "I'm going to check the voltage at TP2 now. Let me show you where to place the probes..."
+2. Call `read_multimeter` - it handles guidance + sampling automatically
+3. The stable reading is returned
+4. "The output voltage is 24.2V - that's within normal range. Now let me check..."
+5. Continue to next test point (no "next" confirmation needed)
 
 NEVER ask the user to manually report a reading - always use `read_multimeter` or `enter_manual_reading` tools.
-
-**TIMEOUT HANDLING:**
-If `read_multimeter` returns status "timeout", the agent should:
-- Ask the user: "I couldn't detect a reading. Are the probes connected? Please type 'retry' or enter the value manually using `enter_manual_reading`"
-- Do NOT proceed to next step until a valid reading is obtained
-- Offer the user options: retry the measurement or enter manually
-
-INTERACTION STYLE:
-- Be conversational and instructional - guide the user like a mentor.
-- Before each test: Explain WHAT to test and WHY it matters.
-- Provide clear step-by-step instructions: "Step 1 of 5: Testing the Input Fuse"
-- Locating the point: ALWAYS provide visual guidance with inline images.
-- Text instructions: Explain what the user should do in simple terms.
-- After measurement: Interpret the reading against expected thresholds.
-- End each turn with: "Reply 'next' to continue diagnosis" or "SESSION COMPLETED" if done.
 
 IMAGE RENDERING:
 - You ARE capable of showing images. When the user asks for one, or when you are guiding them to a test point, ALWAYS call a tool that provides image data (e.g., `get_equipment_configuration` with `request_type="all"` or `get_test_point_guidance`). 
@@ -486,7 +499,17 @@ def resume_from_human(state: ConversationalAgentState):
 # =============================================================================
 
 def should_continue(state: ConversationalAgentState):
-    """Route after agent node - checks for session completion, human interrupt, or max iterations."""
+    """
+    Route after agent node - checks for session completion or max iterations.
+    
+    AUTONOMOUS FLOW: No more waiting for human confirmation.
+    After agent decides on next action, we either:
+    - Call tools (if needed)
+    - Diagnose (if max iterations reached)
+    - End (if session complete)
+    
+    The flow continues automatically without human "next" confirmation.
+    """
     # Defensive: handle empty messages
     if not state.messages:
         return "tools"  # Default to tools if no messages
@@ -495,9 +518,9 @@ def should_continue(state: ConversationalAgentState):
     if state.is_session_complete:
         return END
     
-    # Check if we're in a paused state - route to wait_for_human
-    if state.is_paused_for_human:
-        return "wait_for_human"
+    # NOTE: We no longer pause for human confirmation
+    # The is_paused_for_human flag is still tracked for backward compatibility
+    # but we don't route to wait_for_human anymore
     
     # Check if we've exceeded max iterations - force diagnose
     if state.iteration_count >= MAX_ITERATIONS:
@@ -512,13 +535,20 @@ def should_continue(state: ConversationalAgentState):
 
 def post_tool_route(state: ConversationalAgentState):
     """
-    Route after tools node - check if we should pause for human, handle timeout, or continue.
+    Route after tools node - continue automatically or handle timeout.
     
-    Logic:
-    - If read_multimeter returns "success" → route to agent to interpret result, then pause for "next"
-    - If read_multimeter returns "timeout" → use interrupt to ask user for retry/manual entry
-    - If read_multimeter returns "timeout_unstable" → use interrupt to ask user to retry
+    AUTONOMOUS FLOW - No manual confirmation required:
+    
+    - If read_multimeter returns "success" → route to agent to interpret result
+      (No pause - continues automatically to next step)
+    
+    - If read_multimeter returns "timeout" or "timeout_unstable" → handle timeout
+      (Will offer retry or manual entry, but continues flow)
+    
     - If fault detected → route to agent for diagnosis
+    
+    The key change: After successful measurement, we NO LONGER pause for human "next" confirmation.
+    We immediately continue to interpret the result and proceed with the diagnosis.
     """
     # Defensive: handle empty messages
     if not state.messages:
@@ -535,22 +565,14 @@ def post_tool_route(state: ConversationalAgentState):
                 # Check for measurement status
                 status = result.get("status", "")
                 
-                # Handle timeout cases - interrupt to ask for retry/manual
+                # Handle timeout cases - route to handle_timeout for retry logic
                 if status in ("timeout", "timeout_unstable"):
-                    # Return special routing to trigger timeout handling
                     return "handle_timeout"
                 
-                # Handle success - check for fault
+                # Handle success - continue automatically to interpret result
+                # NO PAUSE FOR HUMAN - continue to agent for interpretation
                 if status == "success" or "value" in result:
-                    # Check if a fault was found
-                    is_fault = result.get("is_out_of_range", False) or result.get("fault_detected", False)
-                    
-                    if is_fault:
-                        # Fault found - route to agent for diagnosis
-                        return "agent"
-                    else:
-                        # No fault - pause for human confirmation (ask for "next")
-                        return "pause_for_human"
+                    return "agent"
         except:
             pass
     
@@ -560,44 +582,44 @@ def post_tool_route(state: ConversationalAgentState):
 def handle_timeout_node(state: ConversationalAgentState):
     """
     Handle timeout from read_multimeter.
-    Uses interrupt to ask user: "I couldn't detect a reading. Are the probes connected? 
-    Please type 'retry' or enter the value manually."
     
-    This allows the user to:
-    - Type "retry" to try again
-    - Use enter_manual_reading to input the value manually
-    - Or the agent can call read_multimeter again
+    AUTONOMOUS FLOW: Instead of asking user to type something specific,
+    we provide guidance and let the agent decide next steps.
+    
+    The agent will:
+    1. Explain the situation to the user
+    2. Offer to retry or accept manual input
+    3. Continue the diagnostic flow
+    
+    We no longer use interrupt() - we just return and let the agent
+    handle the retry logic naturally.
     """
     last_msg = state.messages[-1]
     test_point = "unknown"
+    guidance_info = None
     
-    # Get test point from the timeout result
+    # Get test point and guidance from the timeout result
     if isinstance(last_msg, ToolMessage):
         try:
             result = json.loads(last_msg.content)
             test_point = result.get("test_point", "unknown")
+            guidance_info = result.get("guidance")
         except:
             pass
     
-    # Use interrupt to pause and wait for user response
-    instruction = (
-        f"I couldn't detect a stable reading at {test_point} after 15 seconds. "
-        "Are the multimeter probes properly connected? "
-        "Please do one of the following:\n"
-        "- Type 'retry' and I will try again\n"
-        "- Enter the value manually using 'enter_manual_reading' tool\n"
-        "- Describe any issues you're seeing"
-    )
+    # NO INTERRUPT - just continue to agent to handle retry
+    # The agent will see the timeout status and can:
+    # - Call read_multimeter again for retry
+    # - Call enter_manual_reading
+    # - Provide guidance to the user
     
-    human_response = interrupt({
-        "instruction": instruction,
-        "test_point": test_point,
-        "reason": "timeout"
-    })
-    
-    # This code only runs after interrupt resumes
     return {
-        "is_paused_for_human": False
+        "is_paused_for_human": False,
+        "last_tool_result": {
+            "status": "timeout_handled",
+            "test_point": test_point,
+            "guidance_available": guidance_info is not None
+        }
     }
 
 # =============================================================================
@@ -682,13 +704,13 @@ def create_conversational_graph():
         }
     )
     
-    # Tools routing: after measurement, either pause for human, handle timeout, or continue to agent
+    # Tools routing: after measurement, either handle timeout or continue to agent
+    # NO PAUSE_FOR_HUMAN - flow is now autonomous
     builder.add_conditional_edges(
         "tools",
         post_tool_route,
         {
             "agent": "agent",
-            "pause_for_human": "wait_for_human",
             "handle_timeout": "handle_timeout"
         }
     )

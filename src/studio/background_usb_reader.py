@@ -4,142 +4,385 @@ Background USB Multimeter Reader
 This module provides a singleton background reader that continuously
 reads from the USB multimeter and intelligently processes readings:
 1. Ignores noise (very low values from air/probe handling)
-2. Uses sliding window to find stable readings
-3. Returns the stable average when values settle
+2. Uses MAD-based outlier rejection for robust stabilization
+3. Enforces dwell-time: requires consecutive stable samples
+4. Returns the median of the stable cluster
+
+Stabilization States:
+- guidance_shown: Test point guidance was just displayed
+- sampling: Actively collecting samples
+- stable: Valid stable cluster found
+- timeout: No stable reading after timeout
 """
 
 import threading
 import time
 import statistics
-from typing import Optional
+from typing import Optional, List, Tuple
 from dataclasses import dataclass, field
 from collections import deque
+from enum import Enum
 
 from src.infrastructure.usb_multimeter import USBMultimeterClient, MultimeterReading
 
 
+class MeasurementPhase(Enum):
+    """State machine for measurement flow."""
+    IDLE = "idle"
+    GUIDANCE_SHOWN = "guidance_shown"
+    SAMPLING = "sampling"
+    STABLE = "stable"
+    TIMEOUT = "timeout"
+
+
 @dataclass
-class ReadingStats:
-    """Track reading statistics using sliding window for stabilization detection."""
-    # Fluctuation thresholds by measurement type (as percentage)
-    # Increased to be more robust for "real-world" probe handling
+class RobustStabilizer:
+    """
+    Robust sensor-reading algorithm using MAD-based outlier detection.
+    
+    Algorithm:
+    1. Maintain sliding window of recent samples
+    2. Reject obvious noise and impossible values
+    3. Use median-based center estimate
+    4. Use MAD (Median Absolute Deviation) for robust spread measure
+    5. Accept reading only when consecutive cluster stays within threshold for dwell period
+    6. Return median of stable cluster, not raw mean
+    """
+    
+    # Measurement type specific thresholds (as percentage band)
     FLUCTUATION_THRESHOLDS = {
-        "AC_VOLTAGE": 10.0,      # 10% for AC
-        "AC_CURRENT": 10.0,
-        "DC_VOLTAGE": 7.0,       # 7% for DC (was 2%)
-        "DC_CURRENT": 7.0,
-        "RESISTANCE": 5.0,
-        "DEFAULT": 7.0
+        "AC_VOLTAGE": 7.0,      # 7% for AC
+        "AC_CURRENT": 7.0,
+        "DC_VOLTAGE": 3.0,      # 3% for DC - tighter threshold
+        "DC_CURRENT": 3.0,
+        "RESISTANCE": 2.0,      # 2% or absolute based
+        "CONTINUITY": 1.0,      # Very tight for continuity
+        "DEFAULT": 5.0
     }
     
-    # Sliding window size for stability check
-    WINDOW_SIZE = 20
+    # Absolute thresholds for low-value measurements (in ohms)
+    ABSOLUTE_THRESHOLDS = {
+        "RESISTANCE": 0.5,     # 0.5 ohm absolute
+        "CONTINUITY": 0.3,     # 0.3 ohm absolute
+        "DEFAULT": 0.1         # 0.1V absolute for voltage
+    }
     
-    # Noise threshold - ignore readings below this (air interference)
-    NOISE_THRESHOLD = 0.5  # volts - ignore values below 0.5V
+    # Window and dwell configuration
+    WINDOW_SIZE = 30           # Keep 30 samples in rolling window
+    MIN_CLUSTER_SIZE = 5       # Minimum cluster to consider
+    DWELL_REQUIRED = 3         # Must have 3 consecutive stable samples
+    MIN_VALID_SAMPLES = 10      # Minimum samples before checking stability
     
-    # Use deque for sliding window
-    _window: deque = field(default_factory=lambda: deque(maxlen=20))
+    # Noise threshold - ignore readings below this
+    NOISE_THRESHOLD_VOLTS = 0.5
+    NOISE_THRESHOLD_OHMS = 1.0
+    
+    _window: deque = field(default_factory=lambda: deque(maxlen=30))
+    _valid_readings: deque = field(default_factory=lambda: deque(maxlen=30))
     timestamps: list = field(default_factory=list)
     measurement_type: str = "DC_VOLTAGE"
     
+    # Dwell tracking
+    _consecutive_stable_count: int = 0
+    _last_stable_value: Optional[float] = None
+    
+    # State tracking
+    phase: MeasurementPhase = MeasurementPhase.IDLE
+    sample_count: int = 0
+    
     @property
     def readings(self) -> list:
-        """Return readings list from window."""
+        """Return all readings from window."""
         return list(self._window)
+    
+    @property
+    def valid_readings(self) -> list:
+        """Return only valid (above noise threshold) readings."""
+        return list(self._valid_readings)
     
     def set_measurement_type(self, m_type: str):
         """Set the measurement type for threshold calculation."""
         self.measurement_type = m_type.upper() if m_type else "DEFAULT"
-        self.clear()
+        self.reset()
     
-    def add(self, reading: float):
-        """Add a reading to the sliding window."""
-        self._window.append(reading)
-        self.timestamps.append(time.time())
-    
-    def clear(self):
-        """Clear all readings."""
+    def reset(self):
+        """Reset all state for a new measurement."""
         self._window.clear()
+        self._valid_readings.clear()
         self.timestamps.clear()
+        self._consecutive_stable_count = 0
+        self._last_stable_value = None
+        self.phase = MeasurementPhase.GUIDANCE_SHOWN
+        self.sample_count = 0
+    
+    def start_sampling(self):
+        """Mark that we've started actual sampling after guidance."""
+        if self.phase == MeasurementPhase.GUIDANCE_SHOWN:
+            self.phase = MeasurementPhase.SAMPLING
     
     def get_fluctuation_threshold(self) -> float:
         """Get the fluctuation threshold percentage for current measurement type."""
-        return self.FLUCTUATION_THRESHOLDS.get(self.measurement_type, self.FLUCTUATION_THRESHOLDS["DEFAULT"])
+        return self.FLUCTUATION_THRESHOLDS.get(
+            self.measurement_type, 
+            self.FLUCTUATION_THRESHOLDS["DEFAULT"]
+        )
     
-    def has_valid_readings(self) -> bool:
-        """Check if we have enough valid readings (above noise threshold)."""
-        valid_count = sum(1 for v in self._window if v >= self.NOISE_THRESHOLD)
-        return valid_count >= 5
+    def get_absolute_threshold(self) -> float:
+        """Get absolute threshold for low-value measurements."""
+        return self.ABSOLUTE_THRESHOLDS.get(
+            self.measurement_type,
+            self.ABSOLUTE_THRESHOLDS["DEFAULT"]
+        )
     
-    def is_stable(self) -> bool:
-        """Check if recent readings are stable using sub-sequence clustering.
-        
-        Look for at least 5 consecutive readings within the last WINDOW_SIZE
-        that have low fluctuation.
+    def _get_noise_threshold(self) -> float:
+        """Get noise threshold based on measurement type."""
+        if "VOLTAGE" in self.measurement_type or "CURRENT" in self.measurement_type:
+            return self.NOISE_THRESHOLD_VOLTS
+        elif self.measurement_type in ("RESISTANCE", "CONTINUITY"):
+            return self.NOISE_THRESHOLD_OHMS
+        return 0.1
+    
+    def add(self, reading: float) -> bool:
         """
-        readings = self.readings
-        if len(readings) < 5:
-            return False
-            
-        # Filter noise internally
-        valid = [v for v in readings if v >= self.NOISE_THRESHOLD]
-        if len(valid) < 5:
-            return False
-            
-        # Check sub-sequences of length 5
-        for i in range(len(valid) - 4):
-            cluster = valid[i:i+5]
-            mean = statistics.mean(cluster)
-            if mean == 0: continue
-            
-            # Robust stability check: (max - min) / mean
-            fluctuation = (max(cluster) - min(cluster)) / mean * 100
-            
-            if fluctuation <= self.get_fluctuation_threshold():
-                return True
-                
+        Add a reading to the window.
+        
+        Returns:
+            True if reading passed noise filter and was added
+        """
+        self.sample_count += 1
+        self._window.append(reading)
+        self.timestamps.append(time.time())
+        
+        # Start sampling phase if still in guidance
+        self.start_sampling()
+        
+        # Check noise threshold
+        noise_threshold = self._get_noise_threshold()
+        
+        # For resistance/continuity, don't filter low values
+        if self.measurement_type in ("RESISTANCE", "CONTINUITY"):
+            self._valid_readings.append(reading)
+            return True
+        
+        # For voltage/current, filter noise
+        if reading >= noise_threshold:
+            self._valid_readings.append(reading)
+            return True
+        
         return False
     
-    def get_stable_average(self) -> Optional[float]:
-        """Get average of the stable cluster with outlier rejection."""
-        readings = self.readings
-        # Filter noise
-        valid = [v for v in readings if v >= self.NOISE_THRESHOLD]
-        
-        if len(valid) < 5:
-            return None
-            
-        # Find the latest stable cluster (last 5 readings)
-        # We prioritize the LATEST stable behavior
-        for i in range(len(valid) - 5, -1, -1):
-            cluster = valid[i:i+5]
-            mean = statistics.mean(cluster)
-            if mean < 0.01: continue # Avoid division by near-zero
-            
-            fluctuation = (max(cluster) - min(cluster)) / mean * 100
-            
-            # Also support a fixed epsilon (0.1V) for very stable but low readings
-            is_tight_epsilon = (max(cluster) - min(cluster)) <= 0.1
-            
-            if fluctuation <= self.get_fluctuation_threshold() or is_tight_epsilon:
-                # Stable cluster found! Apply outlier rejection (trim ends)
-                sorted_cluster = sorted(cluster)
-                # Trim min and max, average middle 3
-                trimmed = sorted_cluster[1:4]
-                return statistics.mean(trimmed)
-                
-        return None
+    def _calculate_median(self, values: list) -> float:
+        """Calculate median of a list."""
+        if not values:
+            return 0.0
+        sorted_vals = sorted(values)
+        n = len(sorted_vals)
+        if n % 2 == 0:
+            return (sorted_vals[n//2 - 1] + sorted_vals[n//2]) / 2
+        return sorted_vals[n//2]
     
-    def get_last_valid_readings(self, count: int = 3) -> list:
-        """Get the last N valid readings (above noise threshold)."""
-        valid_readings = [v for v in self._window if v >= self.NOISE_THRESHOLD]
-        return valid_readings[-count:] if len(valid_readings) >= count else valid_readings
+    def _calculate_mad(self, values: list) -> float:
+        """
+        Calculate Median Absolute Deviation.
+        
+        MAD is a robust measure of spread that is less affected by outliers
+        than standard deviation.
+        
+        MAD = median(|Xi - median(X)|)
+        """
+        if len(values) < 2:
+            return 0.0
+        
+        median = self._calculate_median(values)
+        deviations = [abs(v - median) for v in values]
+        return self._calculate_median(deviations)
+    
+    def _is_outlier(self, value: float, center: float, mad: float, threshold_multiplier: float = 3.0) -> bool:
+        """
+        Determine if a value is an outlier using MAD-based test.
+        
+        Modified z-score = 0.6745 * (x - median) / MAD
+        Values with modified z-score > threshold_multiplier are outliers
+        """
+        if mad == 0:
+            # No spread - check absolute difference
+            return abs(value - center) > self.get_absolute_threshold()
+        
+        modified_z = 0.6745 * abs(value - center) / mad
+        return modified_z > threshold_multiplier
+    
+    def _find_stable_clusters(self, values: list) -> List[Tuple[int, int, float, float]]:
+        """
+        Find stable clusters in the readings.
+        
+        Returns:
+            List of (start_idx, end_idx, cluster_median, cluster_mad) for each stable cluster
+        """
+        if len(values) < self.MIN_CLUSTER_SIZE:
+            return []
+        
+        clusters = []
+        
+        # Check clusters of MIN_CLUSTER_SIZE consecutive readings
+        for i in range(len(values) - self.MIN_CLUSTER_SIZE + 1):
+            cluster = values[i:i + self.MIN_CLUSTER_SIZE]
+            
+            # Skip if cluster contains outliers
+            cluster_median = self._calculate_median(cluster)
+            cluster_mad = self._calculate_mad(cluster)
+            
+            # Calculate cluster spread
+            cluster_min = min(cluster)
+            cluster_max = max(cluster)
+            
+            # Percentage-based check
+            pct_threshold = self.get_fluctuation_threshold()
+            abs_threshold = self.get_absolute_threshold()
+            
+            if cluster_median > 0:
+                pct_spread = (cluster_max - cluster_min) / cluster_median * 100
+            else:
+                pct_spread = float('inf')
+            
+            # Check against both percentage and absolute thresholds
+            is_stable = (pct_spread <= pct_threshold) or ((cluster_max - cluster_min) <= abs_threshold)
+            
+            if is_stable:
+                clusters.append((i, i + self.MIN_CLUSTER_SIZE, cluster_median, cluster_mad))
+        
+        return clusters
+    
+    def _prefer_newest_cluster(self, clusters: List[Tuple[int, int, float, float]]) -> Optional[Tuple[float, float]]:
+        """
+        Prefer the newest stable cluster (highest start index).
+        
+        Returns:
+            (median, mad) of the newest stable cluster, or None
+        """
+        if not clusters:
+            return None
+        
+        # Sort by start index (prefer newest), then by smallest MAD (prefer tightest)
+        clusters.sort(key=lambda x: (x[0], x[3] if x[3] is not None else float('inf')))
+        
+        # Return the median and MAD of the newest cluster
+        newest = clusters[-1]
+        return (newest[2], newest[3])
+    
+    def is_stable(self) -> bool:
+        """
+        Check if we have a stable reading using robust MAD-based algorithm.
+        
+        Requirements:
+        1. Have minimum valid samples
+        2. Find at least one stable cluster
+        3. Track consecutive stable samples (dwell time)
+        """
+        valid = self.valid_readings
+        
+        if len(valid) < self.MIN_VALID_SAMPLES:
+            return False
+        
+        # Find all stable clusters
+        clusters = self._find_stable_clusters(valid)
+        
+        if not clusters:
+            # Reset dwell counter if no stable cluster
+            self._consecutive_stable_count = 0
+            return False
+        
+        # Get the newest stable cluster
+        stable_result = self._prefer_newest_cluster(clusters)
+        
+        if stable_result is None:
+            self._consecutive_stable_count = 0
+            return False
+        
+        median_val, mad_val = stable_result
+        
+        # Check if this is the same stable value as last check
+        if self._last_stable_value is not None:
+            abs_diff = abs(median_val - self._last_stable_value)
+            threshold = self.get_absolute_threshold()
+            
+            if abs_diff <= threshold:
+                # Still stable - increment dwell counter
+                self._consecutive_stable_count += 1
+            else:
+                # Value changed significantly - reset dwell
+                self._consecutive_stable_count = 0
+        else:
+            # First stable detection
+            self._consecutive_stable_count = 1
+        
+        self._last_stable_value = median_val
+        
+        # Check dwell requirement
+        if self._consecutive_stable_count >= self.DWELL_REQUIRED:
+            self.phase = MeasurementPhase.STABLE
+            return True
+        
+        return False
+    
+    def get_stable_reading(self) -> Optional[float]:
+        """
+        Get the stable reading value.
+        
+        Returns the median of the newest stable cluster, with outlier rejection.
+        """
+        valid = self.valid_readings
+        
+        if len(valid) < self.MIN_VALID_SAMPLES:
+            return None
+        
+        # Find stable clusters
+        clusters = self._find_stable_clusters(valid)
+        
+        if not clusters:
+            return None
+        
+        # Get newest stable cluster
+        stable_result = self._prefer_newest_cluster(clusters)
+        
+        if stable_result is None:
+            return None
+        
+        median_val, _ = stable_result
+        
+        # Apply additional trimming: remove values more than 2*MAD from median
+        cluster_values = []
+        for i in range(len(valid) - self.MIN_CLUSTER_SIZE + 1, len(valid)):
+            # Only consider the newest samples
+            cluster_values.append(valid[i])
+        
+        if len(cluster_values) < 3:
+            return median_val
+        
+        # Final trim: sort and trim extremes
+        sorted_cluster = sorted(cluster_values)
+        trimmed = sorted_cluster[1:-1] if len(sorted_cluster) > 2 else sorted_cluster
+        
+        return statistics.mean(trimmed) if trimmed else median_val
+    
+    def get_statistics(self) -> dict:
+        """Get current statistics for debugging."""
+        valid = self.valid_readings
+        return {
+            "phase": self.phase.value,
+            "total_samples": self.sample_count,
+            "valid_samples": len(valid),
+            "consecutive_stable": self._consecutive_stable_count,
+            "last_value": self._window[-1] if self._window else None,
+            "median": self._calculate_median(valid) if valid else None,
+            "mad": self._calculate_mad(valid) if valid else None,
+            "threshold_pct": self.get_fluctuation_threshold(),
+            "threshold_abs": self.get_absolute_threshold()
+        }
 
 
 @dataclass
 class BackgroundReader:
-    """Singleton background reader for USB multimeter with noise filtering."""
+    """Singleton background reader for USB multimeter with robust stabilization."""
     
     # Noise threshold - ignore readings below this (air interference)
     NOISE_THRESHOLD = 0.7  # volts - ignore values below 0.7V
@@ -152,8 +395,8 @@ class BackgroundReader:
     _lock: threading.Lock = field(default_factory=threading.Lock)
     _is_running: bool = False
     
-    # Reading buffer for stabilization
-    _reading_stats: ReadingStats = field(default_factory=ReadingStats)
+    # Robust stabilizer for measurement
+    _stabilizer: RobustStabilizer = field(default_factory=RobustStabilizer)
     _last_probe_time: float = 0.0
     
     def start(self) -> bool:
@@ -178,7 +421,7 @@ class BackgroundReader:
         return True
     
     def _read_loop(self):
-        """Background reading loop with noise filtering."""
+        """Background reading loop with noise filtering and stabilization."""
         while not self._stop_event.is_set():
             try:
                 if self.client:
@@ -195,31 +438,32 @@ class BackgroundReader:
                         if value < threshold:
                             # Too low - likely noise
                             with self._lock:
-                                self._reading_stats.clear()
+                                self._stabilizer.reset()
                             continue
                         
                         # Set measurement type for threshold calculation
-                        self._reading_stats.set_measurement_type(reading.measurement_type)
+                        self._stabilizer.set_measurement_type(reading.measurement_type)
                         
-                        # Valid reading - add to buffer
+                        # Add to stabilizer - check if it passes noise filter
                         with self._lock:
-                            self._reading_stats.add(value)
+                            was_added = self._stabilizer.add(value)
                             self._latest_reading = reading
                             
-                            # Check if readings are stable (percentage-based)
-                            stable_avg = self._reading_stats.get_stable_average()
-                            if stable_avg is not None:
-                                # Stable reading found! Create a stable reading
-                                self._stable_reading = MultimeterReading(
-                                    value=stable_avg,
-                                    unit=reading.unit,
-                                    measurement_type=reading.measurement_type,
-                                    timestamp=reading.timestamp,
-                                    test_point_id=reading.test_point_id
-                                )
-                                # Clear stats after finding stable reading
-                                # so we can detect new probe placements
-                                self._reading_stats.clear()
+                            if was_added:
+                                # Check if readings are now stable
+                                if self._stabilizer.is_stable():
+                                    stable_val = self._stabilizer.get_stable_reading()
+                                    if stable_val is not None:
+                                        # Stable reading found! Create a stable reading
+                                        self._stable_reading = MultimeterReading(
+                                            value=stable_val,
+                                            unit=reading.unit,
+                                            measurement_type=reading.measurement_type,
+                                            timestamp=reading.timestamp,
+                                            test_point_id=reading.test_point_id
+                                        )
+                                        # Note: Don't clear stabilizer - allow continuous monitoring
+                                        print(f"[BACKGROUND_READER] Stable reading: {stable_val} {reading.unit}")
                                 
             except Exception as e:
                 # Continue on error
@@ -237,68 +481,105 @@ class BackgroundReader:
         with self._lock:
             return self._stable_reading
     
-    def get_reading_with_stabilization(self, timeout: float = 10.0, measurement_type: str = "DC_VOLTAGE") -> Optional[MultimeterReading]:
+    def get_reading_with_stabilization(
+        self, 
+        timeout: float = 10.0, 
+        measurement_type: str = "DC_VOLTAGE"
+    ) -> Optional[MultimeterReading]:
         """
-        Wait for stable reading with percentage-based stabilization.
+        Wait for stable reading with robust MAD-based stabilization.
         
         Algorithm:
-        1. Clear previous readings
-        2. Wait for readings above noise threshold (0.5V)
-        3. Collect readings until stable:
-           - DC Voltage: 3% fluctuation max
-           - AC Voltage: 7.5% fluctuation max
-           - Resistance: 2% fluctuation max
-        4. Return the stable average
+        1. Clear previous readings and reset stabilizer
+        2. Set measurement type for appropriate thresholds
+        3. Wait for minimum valid samples (10+)
+        4. Check for stable cluster using MAD-based outlier rejection
+        5. Require dwell time: 3 consecutive stable samples
+        6. Return median of stable cluster
         
         Args:
             timeout: Maximum time to wait in seconds
             measurement_type: Type of measurement (DC_VOLTAGE, AC_VOLTAGE, etc.)
             
         Returns:
-            Stable averaged reading, or None if timeout
+            Stable reading, or None if timeout
         """
         print(f"[DEBUG] get_reading_with_stabilization called: type={measurement_type}, timeout={timeout}")
         
         with self._lock:
-            self._reading_stats.clear()
-            self._reading_stats.set_measurement_type(measurement_type)
+            # Reset stabilizer for new measurement
+            self._stabilizer.reset()
+            self._stabilizer.set_measurement_type(measurement_type)
             self._stable_reading = None
         
         start_time = time.time()
         
         while time.time() - start_time < timeout:
             with self._lock:
+                # Check if we have a stable reading
                 if self._stable_reading:
                     print(f"[DEBUG] Returning stable reading: {self._stable_reading.value}")
                     return self._stable_reading
-                # Also return latest if it's been stable for a while (percentage-based)
-                if self._reading_stats.is_stable():
-                    avg = self._reading_stats.get_average()
-                    if avg and self._latest_reading:
-                        print(f"[DEBUG] Readings stable, avg={avg}, latest={self._latest_reading.value}")
-                        threshold_pct = self._reading_stats.get_fluctuation_threshold()
-                        stable = MultimeterReading(
-                            value=avg,
+                
+                # Check if stabilizer indicates stable
+                if self._stabilizer.is_stable():
+                    stable_val = self._stabilizer.get_stable_reading()
+                    if stable_val is not None and self._latest_reading:
+                        print(f"[DEBUG] Stabilizer indicates stable, value={stable_val}")
+                        self._stable_reading = MultimeterReading(
+                            value=stable_val,
                             unit=self._latest_reading.unit,
                             measurement_type=self._latest_reading.measurement_type,
                             timestamp=time.time(),
                             test_point_id=self._latest_reading.test_point_id
                         )
-                        return stable
+                        return self._stable_reading
                 
-                # Debug: show readings status
-                if self._reading_stats.readings:
-                    print(f"[DEBUG] Current readings: {self._reading_stats.readings}, count={len(self._reading_stats.readings)}")
+                # Debug: show statistics periodically
+                if self._stabilizer.sample_count % 20 == 0 and self._stabilizer.sample_count > 0:
+                    stats = self._stabilizer.get_statistics()
+                    print(f"[DEBUG] Stabilizer stats: {stats}")
             
             time.sleep(0.2)
         
-        # Timeout - return whatever we have if it's reasonable
+        # Timeout - return best effort reading if we have any
         with self._lock:
-            print(f"[DEBUG] Timeout. Latest reading: {self._latest_reading}, readings collected: {self._reading_stats.readings}")
-            if self._latest_reading and abs(self._latest_reading.value) > self._reading_stats.NOISE_THRESHOLD:
+            print(f"[DEBUG] Timeout. Stabilizer stats: {self._stabilizer.get_statistics()}")
+            
+            # Try to return whatever stable reading we might have
+            if self._stable_reading:
+                return self._stable_reading
+            
+            # If we have valid readings but no stability, try to return median
+            valid = self._stabilizer.valid_readings
+            if len(valid) >= 5 and self._latest_reading:
+                median_val = self._stabilizer._calculate_median(valid[-10:])  # Last 10
+                print(f"[DEBUG] No stable reading, returning median of last 10: {median_val}")
+                return MultimeterReading(
+                    value=median_val,
+                    unit=self._latest_reading.unit,
+                    measurement_type=self._latest_reading.measurement_type,
+                    timestamp=time.time(),
+                    test_point_id=self._latest_reading.test_point_id
+                )
+            
+            # Last resort: return latest if above noise threshold
+            if self._latest_reading and abs(self._latest_reading.value) > self._stabilizer._get_noise_threshold():
+                print(f"[DEBUG] Timeout, returning latest: {self._latest_reading.value}")
                 return self._latest_reading
         
+        print(f"[DEBUG] Complete timeout - no readings")
         return None
+    
+    def get_sample_count(self) -> int:
+        """Get the number of samples collected."""
+        with self._lock:
+            return self._stabilizer.sample_count
+    
+    def get_stabilizer_stats(self) -> dict:
+        """Get current stabilizer statistics."""
+        with self._lock:
+            return self._stabilizer.get_statistics()
     
     def stop(self):
         """Stop the background reader."""

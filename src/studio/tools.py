@@ -343,45 +343,89 @@ def get_test_point_guidance(
 def read_multimeter(
     test_point_id: str,
     measurement_type: str = "voltage_dc",
-    timeout: float = 15.0
+    timeout: float = 15.0,
+    equipment_model: str = "cctv-psu-24w-v1"
 ) -> dict:
     """
-    Read a measurement from the USB multimeter with automatic noise filtering and polling.
+    Autonomous measurement flow with integrated guidance.
     
-    This tool WAITS and POLLS for a stable reading:
-    1. Noise filtering: Ignores values below 0.5V (air interference)
-    2. Stabilization: Waits for stable readings (std dev <= 5V)
-    3. Polling: Continuously polls for up to 15 seconds until stable reading is obtained
-    4. Returns explicit status: "success", "timeout", or "error"
+    TWO-PHASE FLOW (no manual confirmation required):
+    
+    PHASE 1 - GUIDANCE:
+    - Retrieves test point location, description, pro tips, and image
+    - Displays inline image and instructions to the engineer
+    - No user confirmation needed
+    
+    PHASE 2 - AUTONOMOUS STABILIZATION:
+    - Starts sampling immediately after guidance is shown
+    - Uses MAD-based outlier rejection for robust readings
+    - Requires 3 consecutive stable samples (dwell time)
+    - Returns only the stable reading
+    - Never asks user to type "ready" or "next"
     
     Args:
         test_point_id: The test point identifier (e.g., "TP2")
         measurement_type: Type of measurement - "voltage_dc", "voltage_ac", 
                          "resistance", "current_dc", "continuity"
         timeout: Maximum time to wait for stable reading in seconds (default 15s)
+        equipment_model: Equipment model identifier (default: cctv-psu-24w-v1)
         
     Returns:
-        Dict with measurement value, unit, and metadata.
-        Returns explicit "status" field: "success", "timeout", or "error"
+        Dict with measurement value, unit, guidance info, and status.
+        - "status": "success" (stable reading obtained), "timeout" (no stable reading), or "error"
+        - "guidance": Contains test point info, image URL, and instructions
+        - "stabilization_info": Sample count and method used
         
     Example:
         read_multimeter(test_point_id="TP2", measurement_type="voltage_dc")
-        returns: {"status": "success", "test_point": "TP2", "value": 224.5, "unit": "V", ...}
-        
-        If timeout:
-        returns: {"status": "timeout", "test_point": "TP2", "message": "No stable reading after 15 seconds", ...}
+        returns: {
+            "status": "success", 
+            "test_point": "TP2", 
+            "value": 224.5, 
+            "unit": "V",
+            "guidance": {...},  # Test point guidance info
+            "stabilization_info": {"samples": 25, "method": "MAD-based"}
+        }
     """
     from src.studio.background_usb_reader import ensure_reader_running, get_background_reader
     
+    # =========================================================================
+    # PHASE 1: Get test point guidance (automatically, no user confirmation)
+    # =========================================================================
+    
+    # Get guidance first - this shows the engineer where to probe
+    try:
+        guidance_result = get_test_point_guidance.invoke({
+            "equipment_model": equipment_model,
+            "test_point_id": test_point_id
+        })
+    except Exception as e:
+        guidance_result = {
+            "error": f"Failed to get guidance: {str(e)}",
+            "test_point": test_point_id
+        }
+    
+    # =========================================================================
+    # PHASE 2: Autonomous stabilization - start sampling immediately
+    # =========================================================================
+    
     # Ensure background reader is running
     if not ensure_reader_running():
-        available_ports = USBMultimeterClient.list_available_ports()
+        # Try to get port list for error message
+        try:
+            from src.infrastructure.usb_multimeter import USBMultimeterClient
+            available_ports = USBMultimeterClient.list_available_ports()
+        except:
+            available_ports = []
+        
         return {
             "status": "error",
             "error": "Could not connect to multimeter",
             "available_ports": available_ports,
             "instruction": "Please connect the multimeter via USB",
-            "test_point": test_point_id
+            "test_point": test_point_id,
+            "guidance": guidance_result,
+            "message": "Multimeter not connected. Please connect and try again."
         }
     
     reader = get_background_reader()
@@ -397,8 +441,12 @@ def read_multimeter(
     }
     mtype_enum = measurement_type_map.get(measurement_type.lower(), "DC_VOLTAGE")
     
-    # Wait for stable reading with polling
+    # Wait for stable reading - this is now autonomous, no human input needed
     reading = reader.get_reading_with_stabilization(timeout=timeout, measurement_type=mtype_enum)
+    
+    # Get sample count for feedback
+    sample_count = reader.get_sample_count()
+    stabilizer_stats = reader.get_stabilizer_stats()
     
     if reading:
         reading.test_point_id = test_point_id
@@ -406,35 +454,52 @@ def read_multimeter(
         result["measurement_type_requested"] = measurement_type
         result["note"] = "Stable reading - automatically collected from multimeter"
         result["is_stable"] = True
-        result["status"] = "success"  # Explicit success status
+        result["status"] = "success"
+        result["guidance"] = guidance_result
+        result["stabilization_info"] = {
+            "samples_collected": sample_count,
+            "method": "MAD-based robust stabilization",
+            "dwell_required": 3,
+            "phase": stabilizer_stats.get("phase", "unknown"),
+            "median": stabilizer_stats.get("median"),
+            "mad": stabilizer_stats.get("mad")
+        }
         return result
     
-    # Timeout - no stable reading after polling
-    last_valid = reader._reading_stats.get_last_valid_readings(3) if hasattr(reader, '_reading_stats') else []
+    # Timeout - no stable reading after timeout
+    # Return best effort with guidance for repositioning
+    stabilizer_stats = reader.get_stabilizer_stats()
+    valid_samples = stabilizer_stats.get("valid_samples", 0)
     
-    if last_valid:
-        avg = sum(last_valid) / len(last_valid)
+    if valid_samples >= 5:
+        # Had some readings but couldn't stabilize
         return {
-            "status": "timeout_unstable",  # Timeout but had some readings
+            "status": "timeout_unstable",
             "test_point": test_point_id,
-            "value": round(avg, 2),
-            "unit": "V",
             "measurement_type": mtype_enum,
-            "raw_values": last_valid,
             "measurement_type_requested": measurement_type,
-            "note": f"Unstable readings around {avg:.1f}V - make sure probes have good contact",
+            "guidance": guidance_result,
+            "note": "Readings were unstable - probes may need repositioning",
             "is_stable": False,
-            "message": "Readings were unstable. Please ensure probes have good contact and try again."
+            "samples_collected": sample_count,
+            "valid_samples": valid_samples,
+            "message": "The readings kept fluctuating. Please ensure probes have good contact "
+                      "and hold them steady. The multimeter will sample automatically."
         }
     
-    # Complete timeout - no readings at all
+    # Complete timeout - no or very few readings
     return {
-        "status": "timeout",  # Explicit timeout status
-        "error": "No reading received",
+        "status": "timeout",
         "test_point": test_point_id,
+        "measurement_type": mtype_enum,
+        "measurement_type_requested": measurement_type,
         "timeout_seconds": timeout,
+        "guidance": guidance_result,
+        "samples_collected": sample_count,
         "instruction": "Position your multimeter probes on the test point - I will automatically read the stable value",
-        "message": f"I couldn't detect a reading after {timeout} seconds. Are the probes connected?"
+        "message": f"I couldn't detect a stable reading after {timeout} seconds. "
+                   f"Are the probes properly connected? Please position them on the test point "
+                   f"and hold steady while I sample."
     }
 
 
