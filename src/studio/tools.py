@@ -450,19 +450,25 @@ def read_multimeter(
     
     if reading:
         reading.test_point_id = test_point_id
-        result = reading.to_dict()
-        result["measurement_type_requested"] = measurement_type
-        result["note"] = "Stable reading - automatically collected from multimeter"
-        result["is_stable"] = True
-        result["status"] = "success"
-        result["guidance"] = guidance_result
-        result["stabilization_info"] = {
-            "samples_collected": sample_count,
-            "method": "MAD-based robust stabilization",
-            "dwell_required": 3,
-            "phase": stabilizer_stats.get("phase", "unknown"),
-            "median": stabilizer_stats.get("median"),
-            "mad": stabilizer_stats.get("mad")
+        
+        # Get structured stability info with trimmed mean
+        stable_result = reader.get_stable_result()
+        
+        # Build result in the requested format
+        result = {
+            "value": round(reading.value, 2) if reading.value is not None else None,
+            "unit": reading.unit,
+            "status": "success",
+            "test_point": test_point_id,
+            "measurement_type": reading.measurement_type,
+            "measurement_type_requested": measurement_type,
+            "guidance": guidance_result,
+            "stability": stable_result if stable_result else {
+                "min": None,
+                "max": None,
+                "samples": 0,
+                "method": "trimmed_mean"
+            }
         }
         return result
     

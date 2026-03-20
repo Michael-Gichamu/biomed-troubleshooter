@@ -86,6 +86,12 @@ class RobustStabilizer:
     _consecutive_stable_count: int = 0
     _last_stable_value: Optional[float] = None
     
+    # Stable cluster tracking (for trimmed mean calculation)
+    _stable_min: Optional[float] = None
+    _stable_max: Optional[float] = None
+    _stable_sample_count: int = 0
+    _stable_cluster_values: list = field(default_factory=list)
+    
     # State tracking
     phase: MeasurementPhase = MeasurementPhase.IDLE
     sample_count: int = 0
@@ -112,6 +118,10 @@ class RobustStabilizer:
         self.timestamps.clear()
         self._consecutive_stable_count = 0
         self._last_stable_value = None
+        self._stable_min = None
+        self._stable_max = None
+        self._stable_sample_count = 0
+        self._stable_cluster_values.clear()
         self.phase = MeasurementPhase.GUIDANCE_SHOWN
         self.sample_count = 0
     
@@ -326,9 +336,10 @@ class RobustStabilizer:
     
     def get_stable_reading(self) -> Optional[float]:
         """
-        Get the stable reading value.
+        Get the stable reading value using trimmed mean.
         
-        Returns the median of the newest stable cluster, with outlier rejection.
+        Returns the trimmed mean (20% top/bottom removed) of the newest stable cluster.
+        Also tracks min, max, and sample count for the stable cluster.
         """
         valid = self.valid_readings
         
@@ -349,20 +360,59 @@ class RobustStabilizer:
         
         median_val, _ = stable_result
         
-        # Apply additional trimming: remove values more than 2*MAD from median
+        # Collect cluster values from the newest samples
         cluster_values = []
         for i in range(len(valid) - self.MIN_CLUSTER_SIZE + 1, len(valid)):
             # Only consider the newest samples
             cluster_values.append(valid[i])
         
         if len(cluster_values) < 3:
+            # Not enough for trimming, use median
+            self._stable_min = min(cluster_values) if cluster_values else None
+            self._stable_max = max(cluster_values) if cluster_values else None
+            self._stable_sample_count = len(cluster_values)
+            self._stable_cluster_values = cluster_values.copy()
             return median_val
         
-        # Final trim: sort and trim extremes
+        # Sort and calculate trimmed mean (remove top/bottom 20%)
         sorted_cluster = sorted(cluster_values)
-        trimmed = sorted_cluster[1:-1] if len(sorted_cluster) > 2 else sorted_cluster
+        n = len(sorted_cluster)
+        trim_count = max(1, int(n * 0.2))  # At least 1 from each side
+        
+        trimmed = sorted_cluster[trim_count:-trim_count] if trim_count < n else sorted_cluster
+        
+        # Track stable cluster statistics
+        self._stable_min = min(sorted_cluster)
+        self._stable_max = max(sorted_cluster)
+        self._stable_sample_count = len(sorted_cluster)
+        self._stable_cluster_values = sorted_cluster.copy()
         
         return statistics.mean(trimmed) if trimmed else median_val
+    
+    def get_stable_result(self) -> Optional[dict]:
+        """
+        Get the final structured result with trimmed mean and stability info.
+        
+        Returns:
+            Dict with:
+            - value: trimmed mean of stable cluster
+            - min: minimum value in stable cluster
+            - max: maximum value in stable cluster
+            - samples: number of samples in stable cluster
+            - method: "trimmed_mean"
+        """
+        value = self.get_stable_reading()
+        
+        if value is None:
+            return None
+        
+        return {
+            "value": round(value, 2),
+            "min": round(self._stable_min, 2) if self._stable_min is not None else None,
+            "max": round(self._stable_max, 2) if self._stable_max is not None else None,
+            "samples": self._stable_sample_count,
+            "method": "trimmed_mean"
+        }
     
     def get_statistics(self) -> dict:
         """Get current statistics for debugging."""
@@ -580,6 +630,16 @@ class BackgroundReader:
         """Get current stabilizer statistics."""
         with self._lock:
             return self._stabilizer.get_statistics()
+    
+    def get_stable_result(self) -> Optional[dict]:
+        """
+        Get the structured stable result with trimmed mean and stability info.
+        
+        Returns:
+            Dict with value, min, max, samples, method, or None if not stable.
+        """
+        with self._lock:
+            return self._stabilizer.get_stable_result()
     
     def stop(self):
         """Stop the background reader."""
