@@ -10,7 +10,7 @@ This module defines the tools that the conversational agent uses to:
 All guidance MUST come from RAG to prevent hallucination.
 """
 
-from typing import Optional, Any
+from typing import Optional, Any, Dict, List
 import time
 from langchain_core.tools import tool
 
@@ -18,6 +18,7 @@ from langchain_core.tools import tool
 # Import RAG only when the tool is actually called
 _rag_repo = None
 _equipment_config = None
+_diagnostic_engine = None
 
 def _get_equipment_config():
     """Lazy initialization of equipment config to avoid unnecessary imports."""
@@ -34,6 +35,14 @@ def _get_rag_repository():
         from src.infrastructure.rag_repository import RAGRepository
         _rag_repo = RAGRepository.from_directory("data/chromadb")
     return _rag_repo
+
+def _get_diagnostic_engine():
+    """Lazy initialization of diagnostic engine."""
+    global _diagnostic_engine
+    if _diagnostic_engine is None:
+        from src.domain.diagnostic_state import DiagnosticEngine
+        _diagnostic_engine = DiagnosticEngine
+    return _diagnostic_engine
 
 
 @tool
@@ -341,52 +350,46 @@ def get_test_point_guidance(
 
 @tool
 def read_multimeter(
-    test_point_id: str,
+    test_point: str,
     measurement_type: str = "voltage_dc",
-    timeout: float = 15.0,
+    max_duration: float = 180.0,
     equipment_model: str = "cctv-psu-24w-v1"
 ) -> dict:
     """
-    Autonomous measurement flow with integrated guidance.
+    Read stabilized measurement from multimeter at the specified test point.
     
-    TWO-PHASE FLOW (no manual confirmation required):
-    
-    PHASE 1 - GUIDANCE:
-    - Retrieves test point location, description, pro tips, and image
-    - Displays inline image and instructions to the engineer
-    - No user confirmation needed
-    
-    PHASE 2 - AUTONOMOUS STABILIZATION:
-    - Starts sampling immediately after guidance is shown
-    - Uses MAD-based outlier rejection for robust readings
-    - Requires 3 consecutive stable samples (dwell time)
-    - Returns only the stable reading
-    - Never asks user to type "ready" or "next"
+    Uses MultimeterStabilizer for noise filtering and stable reading extraction.
     
     Args:
-        test_point_id: The test point identifier (e.g., "TP2")
+        test_point: The test point identifier (e.g., "TP2", "output_rail")
         measurement_type: Type of measurement - "voltage_dc", "voltage_ac", 
                          "resistance", "current_dc", "continuity"
-        timeout: Maximum time to wait for stable reading in seconds (default 15s)
+        max_duration: Maximum time to wait for stable reading in seconds (default 180s)
         equipment_model: Equipment model identifier (default: cctv-psu-24w-v1)
         
     Returns:
-        Dict with measurement value, unit, guidance info, and status.
+        Dict with measurement value, confidence, stability status, and guidance.
         - "status": "success" (stable reading obtained), "timeout" (no stable reading), or "error"
+        - "value": The stabilized measurement value
+        - "confidence": "HIGH", "MEDIUM", or "LOW"
+        - "stability_status": "stable", "stabilizing", or "unstable"
+        - "samples_used": Number of samples used for stabilization
         - "guidance": Contains test point info, image URL, and instructions
-        - "stabilization_info": Sample count and method used
         
     Example:
-        read_multimeter(test_point_id="TP2", measurement_type="voltage_dc")
+        read_multimeter(test_point="TP2", measurement_type="voltage_dc")
         returns: {
             "status": "success", 
             "test_point": "TP2", 
-            "value": 224.5, 
+            "value": 24.0, 
             "unit": "V",
-            "guidance": {...},  # Test point guidance info
-            "stabilization_info": {"samples": 25, "method": "MAD-based"}
+            "confidence": "HIGH",
+            "stability_status": "stable",
+            "samples_used": 15,
+            "guidance": {...}
         }
     """
+    from src.infrastructure.multimeter_stabilizer import MultimeterStabilizer
     from src.studio.background_usb_reader import ensure_reader_running, get_background_reader
     
     # =========================================================================
@@ -397,17 +400,20 @@ def read_multimeter(
     try:
         guidance_result = get_test_point_guidance.invoke({
             "equipment_model": equipment_model,
-            "test_point_id": test_point_id
+            "test_point_id": test_point
         })
     except Exception as e:
         guidance_result = {
             "error": f"Failed to get guidance: {str(e)}",
-            "test_point": test_point_id
+            "test_point": test_point
         }
     
     # =========================================================================
     # PHASE 2: Autonomous stabilization - start sampling immediately
     # =========================================================================
+    
+    # Create MultimeterStabilizer with max_duration
+    stabilizer = MultimeterStabilizer(max_duration=max_duration)
     
     # Ensure background reader is running
     if not ensure_reader_running():
@@ -423,7 +429,7 @@ def read_multimeter(
             "error": "Could not connect to multimeter",
             "available_ports": available_ports,
             "instruction": "Please connect the multimeter via USB",
-            "test_point": test_point_id,
+            "test_point": test_point,
             "guidance": guidance_result,
             "message": "Multimeter not connected. Please connect and try again."
         }
@@ -441,72 +447,455 @@ def read_multimeter(
     }
     mtype_enum = measurement_type_map.get(measurement_type.lower(), "DC_VOLTAGE")
     
-    # Wait for stable reading - this is now autonomous, no human input needed
-    reading = reader.get_reading_with_stabilization(timeout=timeout, measurement_type=mtype_enum)
+    # Wait for stable reading using the stabilizer
+    start_time = time.time()
+    last_value = None
     
-    # Get sample count for feedback
-    sample_count = reader.get_sample_count()
-    stabilizer_stats = reader.get_stabilizer_stats()
-    
-    if reading:
-        reading.test_point_id = test_point_id
+    while time.time() - start_time < max_duration:
+        # Get reading from background reader
+        reading = reader.get_reading_with_stabilization(timeout=1.0, measurement_type=mtype_enum)
         
-        # Get structured stability info with trimmed mean
-        stable_result = reader.get_stable_result()
+        if reading and reading.value is not None:
+            # Add to stabilizer
+            stabilizer.add_sample(reading.value)
+            last_value = reading.value
+            
+            # Check if we have a stable reading
+            stable_result = stabilizer.get_stable_reading()
+            
+            if stable_result.get("stability_status") == "stable" and stable_result.get("confidence") == "HIGH":
+                # We have a good stable reading!
+                result = {
+                    "value": round(stable_result["value"], 2),
+                    "unit": reading.unit,
+                    "status": "success",
+                    "test_point": test_point,
+                    "measurement_type": mtype_enum,
+                    "measurement_type_requested": measurement_type,
+                    "confidence": stable_result.get("confidence", "LOW"),
+                    "stability_status": stable_result.get("stability_status", "unknown"),
+                    "samples_used": stable_result.get("samples_used", 0),
+                    "guidance": guidance_result,
+                    "message": f"Stable reading obtained using {stable_result.get('samples_used', 0)} samples"
+                }
+                return result
         
-        # Build result in the requested format
-        result = {
-            "value": round(reading.value, 2) if reading.value is not None else None,
-            "unit": reading.unit,
-            "status": "success",
-            "test_point": test_point_id,
-            "measurement_type": reading.measurement_type,
-            "measurement_type_requested": measurement_type,
-            "guidance": guidance_result,
-            "stability": stable_result if stable_result else {
-                "min": None,
-                "max": None,
-                "samples": 0,
-                "method": "trimmed_mean"
-            }
-        }
-        return result
+        # Small delay to avoid busy waiting
+        time.sleep(0.1)
     
-    # Timeout - no stable reading after timeout
-    # Return best effort with guidance for repositioning
-    stabilizer_stats = reader.get_stabilizer_stats()
-    valid_samples = stabilizer_stats.get("valid_samples", 0)
-    
-    if valid_samples >= 5:
-        # Had some readings but couldn't stabilize
+    # Timeout - check if we have any reading at all
+    if last_value is not None:
+        # We have some readings but couldn't stabilize
+        stable_result = stabilizer.get_stable_reading()
         return {
             "status": "timeout_unstable",
-            "test_point": test_point_id,
+            "test_point": test_point,
             "measurement_type": mtype_enum,
             "measurement_type_requested": measurement_type,
             "guidance": guidance_result,
+            "value": round(last_value, 2),
+            "unit": reading.unit if reading else "V",
+            "confidence": stable_result.get("confidence", "LOW"),
+            "stability_status": stable_result.get("stability_status", "unstable"),
+            "samples_used": stabilizer.get_sample_count(),
             "note": "Readings were unstable - probes may need repositioning",
-            "is_stable": False,
-            "samples_collected": sample_count,
-            "valid_samples": valid_samples,
             "message": "The readings kept fluctuating. Please ensure probes have good contact "
-                      "and hold them steady. The multimeter will sample automatically."
+                      "and hold them steady."
         }
     
-    # Complete timeout - no or very few readings
+    # Complete timeout - no readings obtained
     return {
         "status": "timeout",
-        "test_point": test_point_id,
+        "test_point": test_point,
         "measurement_type": mtype_enum,
         "measurement_type_requested": measurement_type,
-        "timeout_seconds": timeout,
+        "max_duration_seconds": max_duration,
         "guidance": guidance_result,
-        "samples_collected": sample_count,
-        "instruction": "Position your multimeter probes on the test point - I will automatically read the stable value",
-        "message": f"I couldn't detect a stable reading after {timeout} seconds. "
-                   f"Are the probes properly connected? Please position them on the test point "
-                   f"and hold steady while I sample."
+        "samples_collected": stabilizer.get_sample_count(),
+        "message": "No reading available",
+        "error": "No reading available - please check probe connections"
     }
+
+
+@tool
+def get_diagnostic_step(
+    current_state: Dict[str, Any],
+    equipment_model: str = "cctv-psu-24w-v1"
+) -> dict:
+    """
+    Get the current diagnostic step for the step-by-step diagnostic flow.
+    
+    Returns the current step information including test point, probe placement
+    instructions, image URL, and expected value.
+    
+    Args:
+        current_state: Current diagnostic state including:
+            - current_step: Current step index
+            - current_hypothesis: Current hypothesis being tested
+            - equipment_config: Cached equipment configuration
+        equipment_model: Equipment model identifier (default: cctv-psu-24w-v1)
+        
+    Returns:
+        Dict with current diagnostic step containing:
+        - test_point_name: Test point identifier
+        - probe_placement_instructions: How to place probes
+        - image_url: GitHub raw URL for reference image
+        - expected_value: Expected measurement value/range
+        - hypothesis_being_tested: Which hypothesis this step tests
+        - step_number: Current step index
+        
+    Example:
+        get_diagnostic_step(current_state={"current_step": 0, "current_hypothesis": "F1: Output Failure"})
+        returns: {
+            "test_point_name": "TP2",
+            "probe_placement_instructions": "Place red probe on TP2, black on ground",
+            "image_url": "https://raw.githubusercontent.com/.../main.png",
+            "expected_value": "24V DC",
+            "hypothesis_being_tested": "Output capacitor failure",
+            "step_number": 0
+        }
+    """
+    from src.domain.diagnostic_state import DiagnosticEngine, DiagnosticState
+    
+    try:
+        # Reconstruct engine from state
+        state = DiagnosticState.from_dict(current_state)
+        
+        # Load config if not in state
+        if not state.equipment_config:
+            config_loader = _get_equipment_config()(equipment_model)
+            from src.domain.diagnostic_state import DiagnosticEngine
+            engine = DiagnosticEngine(
+                equipment_config_loader=config_loader,
+                state=state
+            )
+            engine.load_equipment_config(equipment_model)
+        else:
+            from src.domain.diagnostic_state import DiagnosticEngine
+            engine = DiagnosticEngine(state=state)
+        
+        # Get current step
+        step = engine.get_current_step()
+        
+        if step is None:
+            return {
+                "status": "no_more_steps",
+                "message": "No more diagnostic steps available",
+                "test_point_name": None,
+                "probe_placement_instructions": None,
+                "image_url": None,
+                "expected_value": None,
+                "hypothesis_being_tested": None,
+                "step_number": None
+            }
+        
+        # Build response with image URL
+        image_url = step.image_url
+        if image_url and not image_url.startswith("http"):
+            # Convert local path to GitHub raw URL
+            image_url = f"https://raw.githubusercontent.com/Michael-Gichamu/biomed-troubleshooter/main/data/equipment/{equipment_model}-test-points/{image_url}"
+        
+        return {
+            "status": "success",
+            "test_point_name": step.test_point_name,
+            "probe_placement_instructions": step.probe_placement_instructions,
+            "image_url": image_url,
+            "expected_value": step.expected_value,
+            "hypothesis_being_tested": step.hypothesis_being_tested,
+            "step_number": step.step_number,
+            "signal_id": step.signal_id,
+            "message": f"Step {step.step_number + 1}: Measure {step.test_point_name}"
+        }
+        
+    except Exception as e:
+        return {
+            "status": "error",
+            "error": str(e),
+            "message": "Failed to get diagnostic step"
+        }
+
+
+@tool
+def record_measurement(
+    test_point: str,
+    measurement_result: Dict[str, Any],
+    current_state: Dict[str, Any],
+    equipment_model: str = "cctv-psu-24w-v1"
+) -> dict:
+    """
+    Record a measurement result to the diagnostic state.
+    
+    Records the measurement and advances the diagnostic workflow.
+    
+    Args:
+        test_point: Test point identifier (e.g., "TP2")
+        measurement_result: Measurement result dictionary containing:
+            - value: Measured numeric value
+            - unit: Unit of measurement (V, A, Ohm)
+            - confidence: Confidence level (HIGH, MEDIUM, LOW)
+            - stability_status: stable, stabilizing, or unstable
+        current_state: Current diagnostic state dictionary
+        equipment_model: Equipment model identifier (default: cctv-psu-24w-v1)
+        
+    Returns:
+        Dict confirming recording with:
+        - status: "recorded" or "error"
+        - test_point: The test point recorded
+        - measurement: The recorded measurement
+        - next_step: Information about next diagnostic step
+        
+    Example:
+        record_measurement(
+            test_point="TP2",
+            measurement_result={"value": 24.0, "unit": "V", "confidence": "HIGH"},
+            current_state={"current_step": 0}
+        )
+        returns: {"status": "recorded", "test_point": "TP2", "measurement": {...}}
+    """
+    from src.domain.diagnostic_state import DiagnosticEngine, DiagnosticState
+    
+    try:
+        # Reconstruct engine from state
+        state = DiagnosticState.from_dict(current_state)
+        
+        # Load config if not in state
+        if not state.equipment_config:
+            config_loader = _get_equipment_config()(equipment_model)
+            engine = DiagnosticEngine(
+                equipment_config_loader=config_loader,
+                state=state
+            )
+            engine.load_equipment_config(equipment_model)
+        else:
+            engine = DiagnosticEngine(state=state)
+        
+        # Record the measurement
+        engine.record_measurement(test_point, measurement_result)
+        
+        return {
+            "status": "recorded",
+            "test_point": test_point,
+            "measurement": measurement_result,
+            "message": f"Measurement recorded for {test_point}"
+        }
+        
+    except Exception as e:
+        return {
+            "status": "error",
+            "error": str(e),
+            "message": f"Failed to record measurement: {str(e)}"
+        }
+
+
+@tool
+def evaluate_measurement(
+    measurement_result: Dict[str, Any],
+    expected_value: str,
+    current_state: Dict[str, Any],
+    equipment_model: str = "cctv-psu-24w-v1"
+) -> dict:
+    """
+    Evaluate if a measurement is normal or abnormal compared to expected value.
+    
+    Always explains: measured value, expected value, interpretation, and conclusion.
+    
+    Args:
+        measurement_result: Measurement result dictionary containing:
+            - value: Measured numeric value
+            - unit: Unit of measurement
+            - confidence: Confidence level
+        expected_value: Expected value/range as string (e.g., "24V DC", "12-24V")
+        current_state: Current diagnostic state dictionary
+        equipment_model: Equipment model identifier (default: cctv-psu-24w-v1)
+        
+    Returns:
+        Dict with evaluation containing:
+        - measured_value: The actual measured value
+        - expected_value: The expected value
+        - interpretation: "normal" or "abnormal"
+        - conclusion: Detailed explanation
+        - is_within_threshold: Boolean
+        
+    Example:
+        evaluate_measurement(
+            measurement_result={"value": 24.0, "unit": "V"},
+            expected_value="24V DC",
+            current_state={}
+        )
+        returns: {
+            "measured_value": 24.0,
+            "expected_value": "24V DC",
+            "interpretation": "normal",
+            "conclusion": "Output voltage is within expected range",
+            "is_within_threshold": True
+        }
+    """
+    from src.domain.diagnostic_state import DiagnosticEngine, DiagnosticState
+    
+    try:
+        # Get measured value
+        measured_value = measurement_result.get("value")
+        unit = measurement_result.get("unit", "")
+        
+        if measured_value is None:
+            return {
+                "measured_value": None,
+                "expected_value": expected_value,
+                "interpretation": "unknown",
+                "conclusion": "No measurement value provided",
+                "is_within_threshold": False,
+                "message": "Cannot evaluate without a measurement value"
+            }
+        
+        # Parse expected value to determine range
+        # Simple parsing for common formats like "24V DC", "12-24V", "5V +/- 10%"
+        expected_str = expected_value.lower().strip()
+        
+        # Try to extract numeric expected value
+        import re
+        numbers = re.findall(r'\d+\.?\d*', expected_str)
+        
+        is_normal = False
+        interpretation = "abnormal"
+        
+        if numbers:
+            expected_num = float(numbers[0])
+            
+            # Check for range format (e.g., "12-24V")
+            if '-' in expected_str and len(numbers) >= 2:
+                min_val = float(numbers[0])
+                max_val = float(numbers[1])
+                is_normal = min_val <= measured_value <= max_val
+            else:
+                # Single value - use +/- 10% tolerance
+                tolerance = expected_num * 0.10
+                is_normal = (expected_num - tolerance) <= measured_value <= (expected_num + tolerance)
+        
+        if is_normal:
+            interpretation = "normal"
+            conclusion = f"Measured {measured_value}{unit} is within expected range ({expected_value})"
+        else:
+            interpretation = "abnormal"
+            conclusion = f"Measured {measured_value}{unit} is outside expected range ({expected_value})"
+        
+        return {
+            "measured_value": measured_value,
+            "unit": unit,
+            "expected_value": expected_value,
+            "interpretation": interpretation,
+            "conclusion": conclusion,
+            "is_within_threshold": is_normal,
+            "message": conclusion
+        }
+        
+    except Exception as e:
+        return {
+            "measured_value": measurement_result.get("value"),
+            "expected_value": expected_value,
+            "interpretation": "error",
+            "conclusion": f"Evaluation failed: {str(e)}",
+            "is_within_threshold": False,
+            "error": str(e)
+        }
+
+
+@tool
+def check_fault_confirmed(
+    current_measurements: Dict[str, Any],
+    hypothesis: str,
+    current_state: Dict[str, Any],
+    equipment_model: str = "cctv-psu-24w-v1"
+) -> dict:
+    """
+    Check if the fault hypothesis is confirmed based on current measurements.
+    
+    If fault is confirmed, includes repair guidance.
+    
+    Args:
+        current_measurements: Dictionary of measurements keyed by test point
+        hypothesis: Current hypothesis being tested (e.g., "F1: Output Failure")
+        current_state: Current diagnostic state dictionary
+        equipment_model: Equipment model identifier (default: cctv-psu-24w-v1)
+        
+    Returns:
+        Dict containing:
+        - is_confirmed: Boolean indicating if fault is confirmed
+        - fault_id: Fault identifier if confirmed
+        - repair_guidance: List of repair steps if confirmed
+        - conclusion: Explanation of the decision
+        
+    Example:
+        check_fault_confirmed(
+            current_measurements={"TP2": {"value": 0.0, "unit": "V"}},
+            hypothesis="F1: Output Failure",
+            current_state={}
+        )
+        returns: {
+            "is_confirmed": True,
+            "fault_id": "F1",
+            "repair_guidance": [...],
+            "conclusion": "Zero output confirmed - fault confirmed"
+        }
+    """
+    from src.domain.diagnostic_state import DiagnosticEngine, DiagnosticState
+    
+    try:
+        # Reconstruct engine from state
+        state = DiagnosticState.from_dict(current_state)
+        
+        # Load config if not in state
+        if not state.equipment_config:
+            config_loader = _get_equipment_config()(equipment_model)
+            engine = DiagnosticEngine(
+                equipment_config_loader=config_loader,
+                state=state
+            )
+            engine.load_equipment_config(equipment_model)
+        else:
+            engine = DiagnosticEngine(state=state)
+        
+        # Set current hypothesis
+        engine._state.current_hypothesis = hypothesis
+        
+        # Evaluate step result
+        # Use the first measurement for evaluation
+        if current_measurements:
+            first_test_point = list(current_measurements.keys())[0]
+            measurement = current_measurements[first_test_point]
+            evaluation = engine.evaluate_step_result(measurement)
+        else:
+            evaluation = {"status": "no_measurements"}
+        
+        # Check if fault is confirmed
+        if evaluation.get("status") == "fault_confirmed":
+            # Get repair guidance
+            repair = engine.get_repair_guidance()
+            
+            return {
+                "is_confirmed": True,
+                "fault_id": evaluation.get("fault_id"),
+                "fault_name": evaluation.get("fault_name"),
+                "repair_guidance": repair.get("recovery_steps", []),
+                "conclusion": evaluation.get("message", "Fault confirmed based on measurements"),
+                "diagnosis_summary": repair.get("diagnosis_summary", {})
+            }
+        else:
+            # Not confirmed - continue diagnostics
+            return {
+                "is_confirmed": False,
+                "fault_id": None,
+                "repair_guidance": None,
+                "conclusion": "Fault not confirmed - continue with next diagnostic step",
+                "next_action": "Proceed to next measurement step",
+                "evaluation_status": evaluation.get("status")
+            }
+            
+    except Exception as e:
+        return {
+            "is_confirmed": False,
+            "error": str(e),
+            "conclusion": f"Failed to check fault confirmation: {str(e)}"
+        }
 
 
 @tool

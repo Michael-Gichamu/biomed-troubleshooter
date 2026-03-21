@@ -50,27 +50,31 @@ ai-agent/
 │
 ├── src/
 │   ├── application/            # LangGraph workflow definition
-│   │   ├── agent.py            # Main diagnostic workflow (6 nodes)
+│   │   ├── agent.py            # Main diagnostic workflow (legacy)
+│   │   ├── diagnostic_agent.py # NEW: Step-by-step LangGraph workflow
 │   │   └── conversational_agent.py  # Conversational variant
 │   │
 │   ├── domain/                 # Business logic (no framework dependencies)
-│   │   └── models.py           # Domain models & services
-│   │                           
+│   │   ├── models.py           # Domain models & services
+│   │   └── diagnostic_state.py # NEW: Diagnostic state management
+│   │
 │   ├── infrastructure/         # External integrations
 │   │   ├── config.py           # Centralized configuration
 │   │   ├── chromadb_client.py  # ChromaDB (embedded mode)
-│   │   ├── llm_client.py      # Groq/Ollama LLM wrapper
+│   │   ├── llm_client.py       # Groq/Ollama LLM wrapper
+│   │   ├── llm_manager.py      # LLM provider management
 │   │   ├── usb_multimeter.py   # Serial communication
 │   │   ├── equipment_config.py # YAML loader
-│   │   └── rag_repository.py  # RAG operations
+│   │   ├── rag_repository.py   # RAG operations
+│   │   └── multimeter_stabilizer.py # NEW: Stabilization engine
 │   │
 │   ├── interfaces/             # User-facing interfaces
-│   │   ├── cli.py             # Command-line interface
-│   │   └── mode_router.py     # Mock/USB mode selection
+│   │   ├── cli.py              # Command-line interface
+│   │   └── mode_router.py      # Mock/USB mode selection
 │   │
 │   └── studio/                 # LangGraph Studio integration
 │       ├── langgraph_studio.py # Studio entry point
-│       ├── tools.py            # LangGraph tools
+│       ├── tools.py            # LangGraph tools (RAG + measurement)
 │       ├── conversational_agent.py # Studio agent
 │       └── background_usb_reader.py # Async USB reading
 │
@@ -104,20 +108,18 @@ graph TB
         ROUTE[Mode Router]
     end
 
-    subgraph "LangGraph Workflow<br/>src/application/agent.py"
-        VALID[validate_input]
-        INTERPRET[interpret_signals]
-        RETRIEVE[retrieve_evidence]
-        ANALYZE[analyze_fault]
-        RECOMMEND[generate_recommendations]
-        RESPOND[generate_response]
+    subgraph "LangGraph Workflow<br/>src/application/diagnostic_agent.py"
+        RAG[RAG_NODE<br/>Retrieve diagnostic knowledge]
+        PLAN[PLAN_NODE<br/>Select hypothesis]
+        STEP[STEP_NODE<br/>Atomic diagnostic step<br/>Show → Measure → Evaluate → Reason → Explain]
+        DECISION[DECISION_NODE<br/>Determine next action]<n    INTERRUPT[INTERRUPT_NODE<br/>Wait for user "Next"]
+        REPAIR[REPAIR_NODE<br/>Output repair steps]
     end
 
     subgraph "Domain Layer<br/>src/domain/"
+        DIAG_STATE[DiagnosticState<br/>diagnostic_state.py]
+        DIAG_ENGINE[DiagnosticEngine<br/>diagnostic_state.py]
         MODELS[Models & Services]
-        INTERPRETER[Signal Interpreter]
-        MATCHER[Fault Matcher]
-        GENERATOR[Hypothesis Generator]
     end
 
     subgraph "Infrastructure<br/>src/infrastructure/"
@@ -125,133 +127,28 @@ graph TB
         CHROMA[ChromaDB<br/>(embedded)]
         LLM[LLM Client (Groq)]
         EQUIP[Equipment Config]
+        STABILIZER[MultimeterStabilizer<br/>multimeter_stabilizer.py]
     end
 
     MOCK --> ROUTE
     USB --> ROUTE
     ROUTE --> CLI
-    CLI --> VALID
-    VALID --> INTERPRET
-    INTERPRET --> RETRIEVE
-    RETRIEVE --> ANALYZE
-    ANALYZE --> RECOMMEND
-    RECOMMEND --> RESPOND
+    CLI --> RAG
 
-    INTERPRET -.-> INTERPRETER
-    ANALYZE -.-> MATCHER
-    ANALYZE -.-> LLM
-    RETRIEVE -.-> CHROMA
-    RECOMMEND -.-> GENERATOR
-    INTERPRETER -.-> EQUIP
-    MATCHER -.-> EQUIP
-    GENERATOR -.-> EQUIP
-```
+    RAG --> PLAN
+    PLAN --> STEP
+    STEP --> DECISION
+    DECISION -->|Fault confirmed| REPAIR
+    DECISION -->|More tests needed| INTERRUPT
+    INTERRUPT -->|NEXT pressed| STEP
 
----
-
-## Data Flow
-
-### Phase 1: Input Collection
-
-```
-┌─────────────────┐     ┌──────────────────┐     ┌─────────────────────┐
-│ Mock (JSON)     │     │ USB Multimeter   │     │ CLI Parameters      │
-│                 │     │ (Serial Read)    │     │                     │
-│ raw_measurements│     │ raw_measurements │     │ equipment_model     │
-│ [{test_point,   │     │ [{test_point,    │     │ trigger_content     │
-│   value, unit}] │     │   value, unit}]  │     │                     │
-└────────┬────────┘     └────────┬─────────┘     └──────────┬──────────┘
-         │                       │                          │
-         └───────────────────────┼──────────────────────────┘
-                                 ▼
-                    ┌─────────────────────┐
-                    │   AgentState        │
-                    │   (LangGraph State) │
-                    │                     │
-                    │ trigger_type        │
-                    │ trigger_content     │
-                    │ equipment_model     │
-                    │ raw_measurements   │
-                    └─────────────────────┘
-```
-
-### Phase 2: Signal Interpretation
-
-```python
-# src/domain/models.py - SignalInterpreter
-class SignalInterpreter:
-    def interpret(measurements, equipment_config):
-        # Load thresholds from YAML
-        thresholds = equipment_config.thresholds
-        
-        # Map each measurement to semantic state
-        for measurement in measurements:
-            threshold = thresholds[measurement.test_point]
-            
-            if measurement.value > threshold.max:
-                state = SignalState.OVER_VOLTAGE
-            elif measurement.value < threshold.min:
-                state = SignalState.UNDER_VOLTAGE
-            else:
-                state = SignalState.NORMAL
-        
-        return signal_states, overall_status, anomaly_count
-```
-
-### Phase 3: Evidence Retrieval (ChromaDB Embedded)
-
-```python
-# src/infrastructure/chromadb_client.py
-# Uses embedded ChromaDB - no server needed
-
-from chromadb import Client as ChromaClient
-
-# Initialize (no host/port needed - runs embedded)
-chroma_client = ChromaClient()
-
-# Query (same API as server mode)
-results = collection.query(
-    query_texts=[query],
-    n_results=3
-)
-```
-
-### Phase 4: Fault Analysis
-
-```python
-# src/domain/models.py - FaultMatcher + LLM
-class FaultMatcher:
-    def match(signal_states, equipment_config):
-        # Rule-based matching first
-        for fault_signature in equipment_config.faults:
-            if self._matches(signal_states, fault_signature):
-                return fault_hypothesis
-        
-        # Fall back to LLM for complex cases
-        return llm_client.analyze(signal_states, evidence)
-```
-
-### Phase 5: Recommendation Generation
-
-```python
-# src/domain/models.py - RecommendationGenerator
-class RecommendationGenerator:
-    def generate(fault_id, equipment_config):
-        # Load recovery steps from YAML
-        recovery = equipment_config.recovery_steps[fault_id]
-        
-        # Build prioritized recommendations
-        recommendations = [
-            Recommendation(
-                priority=step.priority,
-                action=step.action,
-                instruction=step.instruction,
-                safety_warning=step.warning
-            )
-            for step in recovery.steps
-        ]
-        
-        return recommendations
+    RAG -.-> CHROMA
+    PLAN -.-> EQUIP
+    STEP -.-> STABILIZER
+    STEP -.-> EQUIP
+    DECISION -.-> CHROMA
+    DIAG_STATE -.-> MODELS
+    DIAG_ENGINE -.-> EQUIP
 ```
 
 ---
@@ -260,59 +157,196 @@ class RecommendationGenerator:
 
 ### LangGraph Workflow Nodes
 
+The diagnostic agent uses an 8-node LangGraph workflow with interrupt-based step control:
+
 | Node | File | Responsibility |
 |------|------|----------------|
-| [`validate_input`](src/application/agent.py:45) | agent.py | Validates equipment_model and measurements exist |
-| [`interpret_signals`](src/application/agent.py:78) | agent.py | Converts raw measurements to semantic states |
-| [`retrieve_evidence`](src/application/agent.py:112) | agent.py | Queries ChromaDB for supporting docs |
-| [`analyze_fault`](src/application/agent.py:145) | agent.py | Matches signals to faults + LLM reasoning |
-| [`generate_recommendations`](src/application/agent.py:178) | agent.py | Builds recovery steps from YAML |
-| [`generate_response`](src/application/agent.py:211) | agent.py | Constructs final structured response |
+| [`rag_node`](src/application/diagnostic_agent.py:85) | diagnostic_agent.py | Query ChromaDB for diagnostic guidance |
+| [`plan_node`](src/application/diagnostic_agent.py:141) | diagnostic_agent.py | Generate hypothesis list from RAG + config |
+| [`instruction_node`](src/application/diagnostic_agent.py:273) | diagnostic_agent.py | Display test point, image, probe instructions |
+| [`interrupt_node`](src/application/diagnostic_agent.py:314) | diagnostic_agent.py | **CRITICAL**: Pause workflow, wait for user |
+| [`measure_node`](src/application/diagnostic_agent.py:356) | diagnostic_agent.py | Take stabilized measurement |
+| [`evaluate_node`](src/application/diagnostic_agent.py:439) | diagnostic_agent.py | Compare against expected values |
+| [`reason_node`](src/application/diagnostic_agent.py:529) | diagnostic_agent.py | Decide: continue or repair |
+| [`repair_node`](src/application/diagnostic_agent.py:620) | diagnostic_agent.py | Output repair guidance |
 
-### Autonomous Measurement Flow (NEW!)
-
-The conversational agent now uses an autonomous two-phase measurement flow:
+### Workflow Diagram (CORRECTED)
 
 ```mermaid
-graph TB
-    A[Agent calls read_multimeter] --> B[Phase 1: Get Guidance<br/>Show test point image, location, tips]
-    B --> C[Phase 2: Autonomous Sampling<br/>System samples continuously]
-    C --> D{Stabilization Check}
-    D -->|Not stable| C
-    D -->|3+ consecutive stable| E[STABLE: Return median<br/>of stable cluster]
-    C --> F{Timeout?}
-    F -->|Yes| G[Return timeout<br/>with guidance]
-    
-    style B fill:#e1f5fe
-    style C fill:#e8f5e8
-    style E fill:#c8e6c9
-    style G fill:#ffcdd2
+graph TD
+    RAG[RAG_NODE<br/>Retrieve diagnostic knowledge] --> PLAN[PLAN_NODE<br/>Select hypothesis]
+    PLAN --> STEP[STEP_NODE<br/>Atomic diagnostic step<br/>Show test point → Show image → Measure → Stabilize → Evaluate → Reason → Explain]
+    STEP --> DECISION[DECISION_NODE<br/>Determine next action]
+    DECISION -->|Fault confirmed| REPAIR[REPAIR_NODE<br/>Output repair steps]
+    DECISION -->|More tests needed| INTERRUPT[INTERRUPT_NODE<br/>Wait for user "Next"]
+    INTERRUPT -->|NEXT pressed| STEP
+    REPAIR --> END
+
+    style RAG fill:#e3f2fd
+    style PLAN fill:#e3f2fd
+    style STEP fill:#fff3e0
+    style DECISION fill:#f3e5f5
+    style INTERRUPT fill:#ffcdd2
+    style REPAIR fill:#c8e6c9
 ```
 
-**Key Components:**
+**Node Responsibilities:**
 
-| Component | File | Purpose |
-|-----------|------|---------|
-| [`RobustStabilizer`](src/studio/background_usb_reader.py:45) | background_usb_reader.py | MAD-based outlier rejection |
-| [`MeasurementPhase`](src/studio/background_usb_reader.py:27) | background_usb_reader.py | State machine enum |
-| [`read_multimeter`](src/studio/tools.py:343) | tools.py | Integrated guidance + sampling tool |
+| Node | Purpose | Key Behavior |
+|------|---------|--------------|
+| RAG_NODE | Query ChromaDB for fault hypotheses | Retrieves top-3 relevant docs |
+| PLAN_NODE | Select next hypothesis from RAG results | Builds ordered hypothesis list |
+| STEP_NODE | **ATOMIC**: Complete diagnostic step | 1)Show test point 2)Show probe placement 3)Show ONE image 4)Call read_multimeter 5)Stabilize 6)Evaluate 7)Reason 8)Explain to user 9)Decide next action |
+| DECISION_NODE | **CRITICAL**: Determine next action | FAULT CONFIRMED → REPAIR, or MORE TESTS → INTERRUPT |
+| INTERRUPT_NODE | **CRITICAL**: Pause AFTER step completes | Uses `langgraph.types.interrupt()` - user presses "Next" to continue |
+| REPAIR_NODE | Terminal node | Outputs confirmed fault + repair steps |
+
+**Key Correction:** INTERRUPT happens AFTER the full STEP completes, NOT before measurement. This ensures the user sees the test instructions and image before the system pauses for confirmation.
+
+---
+
+## New Components
+
+### MultimeterStabilizer
+
+File: [`src/infrastructure/multimeter_stabilizer.py`](src/infrastructure/multimeter_stabilizer.py:21)
+
+Provides stable reading extraction using statistical algorithms:
+
+```python
+class MultimeterStabilizer:
+    def __init__(
+        self,
+        max_samples: int = 50,
+        min_samples: int = 5,
+        max_duration: float = 180.0,
+        window_size: int = 10,
+        stability_threshold: float = 0.01,
+        cluster_tolerance: float = 0.05,
+        zero_threshold: float = 0.01
+    ):
+        """Initialize stabilizer with statistical parameters."""
+```
 
 **Stabilization Algorithm:**
-1. Maintain rolling window of 30 samples
-2. Apply MAD (Median Absolute Deviation) for outlier detection
-3. Find clusters of 5+ consecutive stable readings
-4. Require 3 consecutive stable samples (dwell time)
-5. Return trimmed mean of newest stable cluster
+1. Maintain rolling window of 10 samples
+2. Check stability: std_dev < 1% of mean
+3. If stable → return mean of window
+4. If unstable → apply trimmed mean (10% top/bottom)
+5. Apply cluster detection → select largest cluster within ±5%
+6. Validate zero readings with majority rule
 
-### Infrastructure Components
+### DiagnosticState
+
+File: [`src/domain/diagnostic_state.py`](src/domain/diagnostic_state.py:23)
+
+Tracks complete state of diagnostic session:
+
+```python
+class DiagnosticState(BaseModel):
+    equipment_model: str
+    current_step: int
+    completed_steps: List[int]
+    measurements: Dict[str, Any]
+    current_hypothesis: str
+    hypothesis_list: List[str]
+    waiting_for_next: bool  # Key: indicates paused state
+    diagnosis_progress: Literal["in_progress", "completed", "fault_confirmed"]
+    tested_points: List[str]
+    eliminated_faults: List[str]
+    retrieved_context: Dict[str, Any]
+```
+
+### DiagnosticEngine
+
+File: [`src/domain/diagnostic_state.py`](src/domain/diagnostic_state.py:238)
+
+Manages diagnostic workflow orchestration:
+
+```python
+class DiagnosticEngine:
+    def load_equipment_config(self, equipment_model: str) -> Dict:
+        """Load ONCE at start, cache in state."""
+
+    def initialize_diagnosis(self, symptoms: str) -> DiagnosticState:
+        """Start new diagnosis, retrieve RAG context."""
+
+    def _build_diagnostic_steps(self) -> None:
+        """Build steps from current hypothesis."""
+```
+
+---
+
+## Data Flow
+
+### Phase 1: Initialization
+
+```
+User Input (symptoms) → RAG Query → Hypothesis List → First Test Point
+```
+
+### Phase 2: Step-by-Step Execution (Repeats)
+
+```
+PLAN → STEP → DECISION
+              │
+    ┌─────────┴─────────┐
+    │                   │
+    ▼                   ▼
+FAULT CONFIRMED    MORE TESTS NEEDED
+    │                   │
+    ▼                   ▼
+REPAIR (end)      INTERRUPT (wait for NEXT)
+                       │
+                       ▼
+                   STEP (next)
+```
+
+**STEP is atomic - performs all 9 operations in sequence:**
+1. Show test point name
+2. Show probe placement instructions
+3. Show exactly ONE image
+4. Call read_multimeter
+5. Stabilize measurement
+6. Evaluate against expected values
+7. Reason about the result
+8. Explain to user: measured value, expected value, interpretation, conclusion
+9. Decide next action (passes to DECISION node)
+
+```
+INSTRUCTION → INTERRUPT (wait) → MEASURE → EVALUATE → REASON
+                                              │
+                    ┌─────────────────────────┼─────────────────────────┐
+                    │                         │                         │
+                    ▼                         ▼                         ▼
+             More tests needed          Fault confirmed           Uncertain
+                    │                         │                         │
+                    ▼                         ▼                         ▼
+               RAG (next)              REPAIR (end)             RAG (retry)
+```
+
+### Phase 3: Repair (Terminal)
+
+```
+REPAIR → Recovery Steps → END
+```
+
+---
+
+## Infrastructure Components
 
 | Component | File | Purpose |
 |-----------|------|---------|
 | [`AppConfig`](src/infrastructure/config.py:18) | config.py | Centralized configuration dataclass |
 | [`ChromaDBClient`](src/infrastructure/chromadb_client.py:15) | chromadb_client.py | ChromaDB embedded client |
 | [`LLMClient`](src/infrastructure/llm_client.py:20) | llm_client.py | Groq/Ollama LLM abstraction |
+| [`LLMManager`](src/infrastructure/llm_manager.py:30) | llm_manager.py | Multi-provider LLM management |
 | [`USBMultimeter`](src/infrastructure/usb_multimeter.py:40) | usb_multimeter.py | Serial communication with MS8250D |
 | [`EquipmentConfigLoader`](src/infrastructure/equipment_config.py:20) | equipment_config.py | YAML parsing for equipment |
+| [`MultimeterStabilizer`](src/infrastructure/multimeter_stabilizer.py:21) | multimeter_stabilizer.py | **NEW**: Stabilization engine |
+| [`RAGRepository`](src/infrastructure/rag_repository.py:25) | rag_repository.py | RAG operations |
+| [`DiagnosticState`](src/domain/diagnostic_state.py:23) | diagnostic_state.py | **NEW**: State management |
+| [`DiagnosticEngine`](src/domain/diagnostic_state.py:238) | diagnostic_state.py | **NEW**: Workflow orchestration |
 
 ---
 
@@ -325,17 +359,17 @@ graph TB
 @dataclass
 class AppConfig:
     mode: str = "mock"          # "mock" or "usb"
-    
+
     llm: LLMConfig              # Provider: "groq" or "ollama"
                                 # Model: "llama-3.3-70b-versatile"
                                 # Temperature: 0.0-1.0
-    
+
     embedding: EmbeddingConfig  # Provider: "sentence-transformers"
                                 # Model: "all-MiniLM-L6-v2"
-    
+
     usb: USBConfig              # Port: "COM3" (auto-detect)
                                 # Baud: 2400
-    
+
     mock: MockConfig            # Default scenario name
 ```
 
@@ -352,7 +386,6 @@ test_points:
     nominal_voltage: 24.0
     tolerance: 0.10
     unit: V
-  # ... more test points
 
 faults:
   overvoltage_output:
@@ -361,6 +394,11 @@ faults:
         state: over_voltage
     hypothesis: "Zener diode failure"
     confidence_weight: 0.9
+    hypotheses:
+      - rank: 1
+        component: zener_diode
+        cause: Zener voltage regulator failure
+        confidence: high
 
 recovery:
   overvoltage_output:
@@ -376,73 +414,64 @@ recovery:
 
 ## Design Principles
 
-### 1. Data-Driven Everything
-Equipment-specific logic lives in YAML, not code:
-- Thresholds → YAML
-- Fault signatures → YAML
-- Recovery steps → YAML
-- Equipment docs → Markdown
+### 1. Step-by-Step Control (NOT Conversational)
+- Each diagnostic step is atomic: show → measure → evaluate → decide
+- Interrupt between steps using `langgraph.types.interrupt()`
+- User must confirm "Next" before measurement proceeds
 
-### 2. Immutable State
-LangGraph passes `AgentState` dataclass between nodes:
-```python
-@dataclass
-class AgentState:
-    trigger_type: str
-    trigger_content: str
-    equipment_model: str
-    raw_measurements: List[Measurement]
-    signal_states: List[SignalState] = None
-    evidence: List[str] = None
-    hypothesis: Dict = None
-    recommendations: List[Dict] = None
-    error: str = None
-```
+### 2. RAG-Grounded Evidence
+- ALL diagnostic guidance comes from ChromaDB
+- No free-form LLM responses without RAG context
+- Prevents hallucinations in fault diagnosis
 
-### 3. Explicit Contracts
-Each node declares inputs/outputs:
-```python
-def validate_input(state: AgentState) -> AgentState:
-    """Validates required fields in input state.
-    
-    Input: state.trigger_type, state.equipment_model, state.raw_measurements
-    Output: state.error (if validation fails)
-    """
-```
+### 3. Stabilized Measurements
+- Multimter readings stabilized before interpretation
+- Rolling window + cluster detection algorithm
+- Confidence levels: HIGH / MEDIUM / LOW
 
-### 4. Hybrid Intelligence
+### 4. Deterministic + Probabilistic
 - **Deterministic**: Rule-based matching for known fault patterns
 - **Probabilistic**: LLM reasoning for ambiguous cases
 - **Fallback chain**: Rules first → LLM for edge cases
 
 ### 5. Embedded Dependencies
-ChromaDB runs in embedded mode - no Docker or server required:
-```python
-# Simple as:
-from chromadb import Client
-client = Client()  # Works out of the box!
-```
+ChromaDB runs in embedded mode - no Docker or server required
 
 ---
 
 ## Running the System
 
-### Mock Mode (No Hardware)
+### LangGraph Studio Mode
 ```bash
 pip install -r requirements.txt
+langgraph dev --port 2024
+# Open browser to interact with agent
+```
+
+### Mock Mode (No Hardware)
+```bash
 python -m src.interfaces.cli --mock
 # Uses scenarios from data/mock_signals/
 ```
 
-### USB Mode (Real Hardware - Mastech MS8250D)
-```bash
-pip install -r requirements.txt
-python -m src.interfaces.cli --usb CCTV-PSU-24W-V1
-# Connects to Mastech MS8250D via USB (CP210x adapter)
-```
+---
 
-### LangGraph Studio
-```bash
-langgraph dev --port 2024
-# Opens web UI for debugging
-```
+## Key Differences from Old System
+
+| Old System | New System |
+|------------|------------|
+| Conversational flow | Step-by-step workflow |
+| Continuous measurement | Interrupt between steps |
+| Raw multimeter readings | Stabilized readings |
+| Ad-hoc hypothesis testing | RAG-driven ordered hypotheses |
+| No state persistence | DiagnosticState with serialization |
+| Single-pass workflow | Loop until fault confirmed |
+
+---
+
+## Memory Stewardship
+
+This file is part of the `.coding-agent/` memory system. Any architectural changes must be reflected here.
+
+**Last Updated**: 2026-03-21
+**Key Changes**: Added step-by-step diagnostic engine with interrupt-based workflow

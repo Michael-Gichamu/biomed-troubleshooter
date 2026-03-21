@@ -93,6 +93,16 @@ class LogParser:
             "patterns": ["connection error", "connection refused", "network error"],
             "retryable": True,
             "type": "connection_error"
+        },
+        "payload_too_large": {
+            "patterns": ["413", "payload too large", "request too large"],
+            "retryable": True,
+            "type": "payload_too_large"
+        },
+        "tool_call_error": {
+            "patterns": ["tool call validation failed", "parameters for tool"],
+            "retryable": True,
+            "type": "tool_call_error"
         }
     }
     
@@ -210,8 +220,11 @@ class LLMManager:
         model = self.models[self.current_model_index]
         
         # Determine provider from model name
-        if model.startswith("gpt-") or model.startswith("openai/"):
-            # OpenAI model
+        # Note: gpt-oss-120b is a Groq-hosted model using OpenAI-compatible API
+        # We use ChatGroq for all Groq models to ensure correct endpoint
+        if model.startswith("openai/") and not model.startswith("gpt-"):
+            # Only use OpenAI client for true OpenAI models (e.g., gpt-4, gpt-4o)
+            # NOT for Groq-hosted models like gpt-oss-120b
             provider = "openai"
             model_name = model.replace("openai/", "")
             self._current_llm = ChatOpenAI(
@@ -222,7 +235,7 @@ class LLMManager:
                 timeout=60
             )
         else:
-            # Default to Groq
+            # All other models (including gpt-oss-120b, llama-*, etc.) use Groq
             provider = "groq"
             self._current_llm = ChatGroq(
                 model=model,
@@ -293,7 +306,7 @@ class LLMManager:
     
     def rotate(self) -> bool:
         """
-        Rotate to next API key or model.
+        Rotate to next API key (model rotation disabled when only 1 model).
         
         Returns:
             True if rotation was successful, False if no more options
@@ -306,8 +319,8 @@ class LLMManager:
             self._initialize_llm()
             return True
         
-        # If all keys exhausted, try switching to next model
-        if self.current_model_index < len(self.models) - 1:
+        # Only rotate models if there's more than 1 model configured
+        if len(self.models) > 1 and self.current_model_index < len(self.models) - 1:
             self.current_model_index += 1
             self.current_key_index = 0  # Reset to first key
             self.model_retry_count = 0
@@ -317,7 +330,7 @@ class LLMManager:
             return True
         
         # No more options
-        logger.error("All API keys and models exhausted!")
+        logger.error("All API keys exhausted and model rotation disabled (only 1 model)!")
         return False
     
     def increment_retry(self):

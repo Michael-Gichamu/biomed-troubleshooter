@@ -1,20 +1,42 @@
 # Current Project Status
 
-> Last updated: 2026-03-20
+> Last updated: 2026-03-21
 > This document reflects the actual current state of the codebase.
 
 ---
 
 ## Current Milestone
 
-**Phase: Autonomous Stabilization Flow Complete**
+**Phase: Diagnostic Agent Refactoring - CORRECTED WORKFLOW (COMPLETE)**
 
-The multimeter measurement flow has been refactored to:
-- Eliminate manual "ready/next" confirmation after test-point guidance
-- Implement MAD-based robust stabilization algorithm
-- Enable autonomous sampling with dwell-time enforcement
-- Return only stable readings to the agent
-- Faster, less frustrating UX for engineers
+Corrected the diagnostic workflow to fix architectural issues:
+
+**Corrected Flow:** `RAG → PLAN → STEP → DECISION → (FAULT CONFIRMED → REPAIR) or (MORE TESTS → INTERRUPT → NEXT → STEP)`
+
+**Key Corrections:**
+- STEP is now an atomic unit that performs 9 operations: Show test point → Show probe placement → Show ONE image → Call read_multimeter → Stabilize → Evaluate → Reason → Explain → Decide
+- DECISION node determines next action: FAULT CONFIRMED → REPAIR, or MORE TESTS → INTERRUPT
+- **INTERRUPT now happens AFTER the full STEP completes**, not before measurement
+- This ensures user sees test instructions and image before the system pauses
+
+**Previous issues fixed:**
+- Instructions hidden when tool calls OFF → INSTRUCTION_NODE generates visible text
+- Interrupt placed AFTER measurement → INTERRUPT_NODE now AFTER step completion
+- Agent auto-advances → INTERRUPT pauses after EVERY step
+- No root cause reasoning → REASONING_NODE uses RAG to trace upstream
+- Wrong termination → REPAIR_NODE is terminal (no "Press NEXT")
+- Duplicate images → displayed_images tracking
+- Weak state tracking → Full state with tested_points, eliminated_faults
+
+**Latest completed feature:** Corrected diagnostic workflow documentation - INTERRUPT now after STEP
+
+**Current blockers:** None - documentation updated
+
+**Next steps:** Validate system works end-to-end
+
+**New dependencies:** numpy (for statistical calculations in stabilizer)
+
+See: [`plans/diagnostic-agent-refactor-plan.md`](plans/diagnostic-agent-refactor-plan.md)
 
 ---
 
