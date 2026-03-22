@@ -1,16 +1,19 @@
 """
-Conversational LangGraph Studio Troubleshooting Agent
+Conversational LangGraph Studio Diagnostic Agent
 
-This module provides a conversational, human-in-the-loop troubleshooting agent
-for LangGraph Studio. The agent guides engineers through diagnostic workflows
-with LLM-powered conversation and tool-based measurements.
+This module provides a hypothesis-driven diagnostic workflow for LangGraph Studio.
+The agent guides engineers through diagnostic workflows with structured measurement
+and evaluation steps.
 
 Workflow Phases:
-- initial: Engineer provides equipment model + problem
-- clarifying: Agent asks clarifying questions  
-- measuring: Agent guides to test points, collects measurements
-- diagnosing: Agent analyzes accumulated evidence
-- complete: Final diagnosis and recommendations provided
+- RAG_NODE: Fetch diagnostic knowledge from RAG repository
+- HYPOTHESES_NODE: Generate fault hypotheses with probabilities
+- STEP_NODE: Perform atomic diagnostic step (measure, evaluate)
+- REASON_NODE: Update hypotheses based on measurement results
+- DECISION_NODE: Route based on hypothesis state (deterministic)
+- REPAIR_NODE: Provide repair instructions for confirmed fault
+- INTERRUPT_NODE: Pause for user to continue to next test point
+- RESUME_NODE: Process user's "Next" response and continue
 """
 
 from dataclasses import dataclass, field
@@ -18,6 +21,8 @@ from datetime import datetime
 from typing import Any, Optional, Literal, Sequence, Annotated
 import uuid
 import os
+import json
+import re
 
 # Load environment variables from .env file
 from dotenv import load_dotenv
@@ -26,20 +31,32 @@ load_dotenv()
 from langgraph.graph import StateGraph, START, END
 from langgraph.graph.message import add_messages
 from langgraph.checkpoint.memory import MemorySaver
-from langgraph.prebuilt import ToolNode
-from langchain_core.messages import BaseMessage, HumanMessage, AIMessage
+from langgraph.types import interrupt
+from langchain_core.messages import BaseMessage, HumanMessage, AIMessage, SystemMessage, ToolMessage
 from langchain_core.tools import BaseTool
 
 from src.studio.tools import get_tools
 
 
-# =============================================================================
-# CONVERSATIONAL AGENT STATE
-# =============================================================================
+def extract_text_from_content(content) -> str:
+    """Extract text from message content, handling both string and list formats.
+    
+    In LangGraph, message content can be either:
+    - A string: "Hello world"
+    - A list of content blocks: [{"type": "text", "text": "..."}, ...]
+    """
+    if isinstance(content, str):
+        return content
+    elif isinstance(content, list):
+        # Extract text from content blocks
+        text_parts = []
+        for block in content:
+            if isinstance(block, dict):
+                if block.get("type") == "text":
+                    text_parts.append(block.get("text", ""))
+        return " ".join(text_parts)
+    return ""
 
-from langgraph.types import interrupt
-from langchain_core.messages import SystemMessage, ToolMessage
-import json
 
 # =============================================================================
 # CONVERSATIONAL AGENT STATE
@@ -48,62 +65,81 @@ import json
 @dataclass
 class ConversationalAgentState:
     """
-    State for conversational LangGraph Studio troubleshooting agent.
-    Includes step tracking for human-in-the-loop diagnostic workflow.
+    State for hypothesis-driven diagnostic workflow.
+    
+    This state tracks all information needed for the diagnostic workflow:
+    - Equipment model and configuration (fetched ONCE in RAG_NODE)
+    - Hypothesis tracking and probability updates
+    - Measurements and fault identification
+    - Control flags for workflow routing
     """
+    # Messaging
     messages: Annotated[list[BaseMessage], add_messages] = field(default_factory=list)
+    
+    # Equipment (fetched ONCE at start - in RAG_NODE)
     equipment_model: str = ""
-    current_test_point: str = ""
-    is_awaiting_human: bool = False
-    is_session_complete: bool = False
-    is_paused_for_human: bool = False  # Flag to indicate we're waiting for user confirmation
-    last_tool_result: dict = field(default_factory=dict)
-    iteration_count: int = 0  # Track iterations to prevent infinite loops
-    measurements: list = field(default_factory=list)  # Track all measurements taken
+    config_cached: bool = False  # Track if equipment config has been fetched
+    equipment_config: dict = field(default_factory=dict)  # Store all config data
+    test_points: list = field(default_factory=list)  # List of test point definitions
+    expected_values: dict = field(default_factory=dict)  # test_point_id -> {min, max, unit}
     
-    # Step tracking for human-in-the-loop
-    current_step: int = 1  # Current step number (1-indexed)
-    total_steps: int = 5  # Total steps planned for diagnosis
-    step_description: str = ""  # Description of current step
-    pending_instruction: str = ""  # Instruction to show user after resume
+    # RAG knowledge
+    rag_knowledge: list = field(default_factory=list)  # Diagnostic knowledge from RAG
     
-    # Auto-measurement tracking - forces read_multimeter after guidance
-    awaiting_test_point_guidance: bool = False  # Set to True after showing guidance
-    last_guidance_test_point: str = ""  # The test point we just showed guidance for
+    # Hypothesis-driven diagnostic tracking
+    hypotheses: list = field(default_factory=list)  # List of possible fault hypotheses
+    hypothesis_probabilities: dict = field(default_factory=dict)  # hypothesis -> probability
+    eliminated_faults: list = field(default_factory=list)  # Faults eliminated by measurements
+    current_hypothesis: str = ""  # Current working hypothesis being tested
+    test_point_rankings: list = field(default_factory=list)  # Ranked test points by information value
+    diagnostic_reasoning: list = field(default_factory=list)  # Reasoning chain for diagnosis
+    
+    # Diagnostic workflow (legacy - kept for compatibility)
+    diagnostic_plan: list = field(default_factory=list)  # List of test points to check
+    current_step: int = 0  # Index into diagnostic_plan
+    completed_steps: list = field(default_factory=list)  # Completed step indices
+    
+    # Measurements
+    measurements: list = field(default_factory=list)  # All measurements taken
+    suspected_faults: list = field(default_factory=list)  # Faults identified
+    confirmed_fault: str = ""  # Final confirmed fault
+    
+    # Step execution state
+    next_test_point: str = ""  # Next TP to measure
+    current_test_point: str = ""  # Current TP being measured
+    step_result: dict = field(default_factory=dict)  # Holds: measurement, evaluation, reasoning, decision
+    
+    # Control flags
+    waiting_for_next: bool = False  # True when paused at INTERRUPT_NODE
+    diagnosis_complete: bool = False  # True when at END
+    diagnosis_status: str = ""  # Status message for completion (e.g., "Inconclusive", "Max steps reached")
+    
+    # Iteration tracking (for safety limits)
+    iteration_count: int = 0
+    max_steps: int = 9  # Maximum diagnostic steps for hypothesis-driven approach
+
 
 # =============================================================================
-# HELPER: IMAGE EMBEDDING
+# HELPER FUNCTIONS
 # =============================================================================
 
 def format_message_content(text: str, image_data: Optional[dict] = None) -> str:
     """
     Format message content with inline markdown image rendering.
-    
-    Returns a markdown string with inline image:
-    - Image: ![Test Point](image_url)
-    - Text: follows after
-    
-    Or returns the original text string if no image_data is provided.
     """
     if not image_data:
         return text
     
-    # Extract image URL
     image_url = image_data.get('image_url')
-    
     if not image_url:
         return text
     
-    # Build markdown content with image inline
     test_point_info = image_data.get('test_point', '')
     location_desc = image_data.get('location_description', '')
     
-    # Use markdown format for inline image rendering
-    # Use test point info as alt text for the image
     alt_text = test_point_info if test_point_info else "Test Point"
     markdown_image = f"![{alt_text}]({image_url})"
     
-    # Add text content - include location info as header
     header = ""
     if test_point_info:
         header = f"### {test_point_info}"
@@ -111,38 +147,24 @@ def format_message_content(text: str, image_data: Optional[dict] = None) -> str:
             header += f" - {location_desc}"
         header += "\n\n"
     
-    # Combine markdown image with text content
     markdown_content = f"{markdown_image}\n\n{header}{text}"
-    
     return markdown_content
 
-# =============================================================================
-# NODES
-# =============================================================================
-
-# =============================================================================
-# HELPER: TOKEN MANAGEMENT
-# =============================================================================
-
-import re
 
 def clean_messages_for_llm(messages: list[BaseMessage]) -> list[BaseMessage]:
     """
-    Strip large base64 data URIs from message history to prevent token limits
-    and state bloat in LangGraph Studio.
+    Strip large base64 data URIs from message history to prevent token limits.
     """
-    cleaned = []
-    # Regex to find markdown image tags with base64 data
+    import re
     base64_re = re.compile(r'!\[.*?\]\(data:.*?;base64,.*?\)')
     
+    cleaned = []
     for msg in messages:
-        # Clone the message to avoid side effects on the original UI representation
         new_msg = msg.copy()
         
         if isinstance(new_msg.content, str):
             new_msg.content = base64_re.sub("[IMAGE DATA STRIPPED FOR STABILITY]", new_msg.content)
         elif isinstance(new_msg.content, list):
-            # Clean multimodal content blocks
             new_content = []
             for block in new_msg.content:
                 if isinstance(block, dict) and block.get("type") == "image_url":
@@ -151,519 +173,856 @@ def clean_messages_for_llm(messages: list[BaseMessage]) -> list[BaseMessage]:
                     new_content.append(block)
             new_msg.content = new_content
             
-        # Also check ToolMessage content which might be JSON containing base64
         if isinstance(new_msg, ToolMessage):
             try:
                 data = json.loads(new_msg.content)
                 if isinstance(data, dict):
-                    # No longer stripping base64 - we now use URL-based images
                     new_msg.content = json.dumps(data)
             except:
                 pass
         cleaned.append(new_msg)
     return cleaned
 
+
 # =============================================================================
-# SYSTEM PROMPT
+# NODE DEFINITIONS
 # =============================================================================
 
-SYSTEM_PROMPT = """You are a professional Biomedical Engineering Diagnostic Assistant. 
+# =============================================================================
+# RAG_NODE - Fetch diagnostic knowledge and equipment config ONCE
+# =============================================================================
 
-# TOOLS AVAILABLE - YOU MUST USE THESE TOOLS
-
-You have access to the following tools. When you need information, you MUST call these tools - do NOT guess or hallucinate:
-
-1. **query_diagnostic_knowledge** - Query the diagnostic knowledge base for troubleshooting guidance. Use when you need diagnostic procedures or fault analysis.
-   - Args: query, equipment_model, category (optional), top_k (optional)
-
-2. **get_equipment_configuration** - Get equipment details including model info, test points, and expected values.
-   - Args: equipment_model, request_type (optional: "all", "test_points", "model_info")
-   - MUST call this first to get valid test points for the equipment
-
-3. **get_test_point_guidance** - Get detailed guidance for measuring a specific test point (location, image, pro tips).
-   - Args: equipment_model, test_point_id
-   - MUST call this before measuring to show user where to place probes
-
-4. **read_multimeter** - Automatically collect measurement readings from USB multimeter.
-   - Args: equipment_model, test_point_id
-   - Call this AFTER get_test_point_guidance to collect the actual measurement
-
-5. **enter_manual_reading** - Allow user to manually enter a reading if multimeter is unavailable.
-   - Args: equipment_model, test_point_id, reading_value, mode (optional)
-
-**CRITICAL TOOL USAGE RULES:**
-- When the user provides an equipment model → MUST call `get_equipment_configuration` to get valid test points
-- Before any measurement → MUST call `get_test_point_guidance` first to show probe location
-- After showing guidance → MUST call `read_multimeter` to collect the measurement
-- Never ask user to manually report values → Always use `read_multimeter` or `enter_manual_reading`
-
-STRICT DIAGNOSTIC BEHAVIOR RULES:
-
-1. **NEVER HALLUCINATE** - Only use values from tool output. Never assume or guess measurement values.
-
-2. **NEVER GUESS TEST POINTS** - Only use valid test points from equipment configuration. Call `get_equipment_configuration` or `get_test_point_guidance` to get the valid list.
-
-3. **VALIDATE TOOL RESULTS** - If tool result contains guidance.error or invalid test point, discard it and choose a valid one from config.
-
-4. **MANDATORY PAUSE AFTER EVERY MEASUREMENT** - After getting ANY measurement result, you MUST:
-   - STOP your response
-   - Say EXACTLY: "Press NEXT to continue diagnosis"
-   - Do NOT continue automatically - wait for user confirmation
-
-5. **DISPLAY IMAGES INLINE** - Use markdown format: `![Test Point](image_url)`
-
-6. **RESPONSE FORMAT** - After each measurement, follow this structure:
-   - WHY: Explain why this test point was selected
-   - MEASUREMENT RESULT: Show the value clearly (e.g., "Voltage: 24.2V DC")
-   - INTERPRETATION: Explain what the reading means (normal/abnormal/fault indicator)
-   - NEXT ACTION: What you plan to do next
-   - PAUSE: "Press NEXT to continue diagnosis"
-
-DIAGNOSTIC PRINCIPLES:
-1. EQUIPMENT FIRST: You MUST identify the equipment model before providing any diagnostic guidance. If the `equipment_model` is not provided in your state, your ONLY goal is to ask the user for the model identifier (e.g., "cctv-psu-24w-v1"). NEVER assume a model.
-2. DOCUMENT-FIRST: Once a model is identified, you MUST consult the equipment configuration and diagnostic knowledge base to identify probable faults before suggesting tests.
-
-**MEASUREMENT FLOW WITH MANDATORY PAUSE:**
-
-1. When you need to measure a test point, call `read_multimeter` - it will:
-   - FIRST: Show the test point guidance (image, location, pro tips)
-   - THEN: Automatically start sampling and wait for stabilization
-   - FINALLY: Return the stable reading
-
-2. After showing guidance, tell the user to place probes and HOLD STEADY while sampling occurs:
-   - GOOD: "Place the probes on the marked test point and hold them steady while I sample for a few seconds."
-
-3. After getting the measurement result, you MUST pause:
-   - Present the result using the response format (WHY, MEASUREMENT RESULT, INTERPRETATION, NEXT ACTION)
-   - End with "Press NEXT to continue diagnosis"
-   - DO NOT proceed to next step without user confirmation
-
-**STEP TRACKING:**
-- Always show current step like "Step X of Y: [Description]"
-- Update current_step and total_steps as you progress
-
-**INTERPRETATION:**
-- After each measurement, interpret the result against RAG thresholds
-- If a reading is OUT OF RANGE or indicates a fault, IMMEDIATELY conclude with diagnosis
-- DO NOT continue to additional test points if you've already identified the fault
-
-**TIMEOUT HANDLING:**
-If `read_multimeter` returns status "timeout" or "timeout_unstable":
-- Explain what happened and offer guidance
-- Say "Press NEXT to continue diagnosis" to wait for user to retry
-
-**ITERATION LIMIT:**
-- The session will auto-terminate after 10 measurement iterations
-- Provide your best diagnosis with available data if you reach this limit
-
-**TALK-BEFORE-ACT - CRITICAL FOR UX:**
-Before calling ANY tool, ALWAYS provide a brief conversational update to the user. This ensures the user sees text in the LangGraph Studio UI even when "Show Tool Calls" is toggled off.
-
-IMAGE RENDERING:
-- You ARE capable of showing images. When the user asks for one, or when you are guiding them to a test point, ALWAYS call a tool that provides image data (e.g., `get_equipment_configuration` with `request_type="all"` or `get_test_point_guidance`). 
-- Images are shown inline using markdown format: ![Test Point](image_url). Do NOT include base64 text in your response.
-
-STATE TRACKING:
-- current_step: Tracks which diagnostic step you're on (1, 2, 3, etc.)
-- total_steps: Total planned steps for this diagnosis
-- Update these values as you progress through the diagnosis.
-"""
-
-# Maximum iterations to prevent infinite loops
-MAX_ITERATIONS = 10
-
-
-def agent_node(state: ConversationalAgentState):
-    """The planning/reasoning node."""
-    from src.infrastructure.llm_manager import invoke_with_tools_and_retry
-    tools = get_tools()
+def rag_node(state: ConversationalAgentState):
+    """
+    RAG_NODE: Fetch diagnostic knowledge from RAG repository.
     
-    # Clean history to keep token count low
-    cleaned_messages = clean_messages_for_llm(state.messages)
+    This is called ONCE at the start of the diagnostic workflow:
+    1. Query RAG for diagnostic procedures for the equipment model
+    2. Fetch equipment configuration (test points, expected values, faults)
+    3. Store all data in state for later use
     
-    # Detect equipment model from history if not in state
+    CRITICAL: Equipment config is fetched here ONCE and stored in state.
+    It should NEVER be fetched again in later nodes.
+    """
+    from src.studio.tools import query_diagnostic_knowledge, get_equipment_configuration
+    
+    # First check if equipment_model is already in state
     equipment_model = state.equipment_model
+    
+    # If not in state, try to extract from message history
     if not equipment_model:
-        for m in reversed(state.messages):
-            if isinstance(m, (HumanMessage, AIMessage, ToolMessage)):
-                content = m.content if isinstance(m.content, str) else str(m.content)
-                # Simple regex for model pattern or look for tool calls
-                match = re.search(r"cctv-psu-[a-z0-9-]+", content.lower())
+        pattern = r"cctv-psu-[a-z0-9-]+"
+        
+        # Iterate through messages in reverse (newest first) to find equipment model
+        for message in reversed(state.messages):
+            # Only check human (user) messages
+            if isinstance(message, HumanMessage):
+                text_content = extract_text_from_content(message.content)
+                match = re.search(pattern, text_content, re.IGNORECASE)
                 if match:
-                    equipment_model = match.group(0)
+                    equipment_model = match.group(0).lower()
                     break
     
-    # System prompt enrichment with state
-    sys_content = SYSTEM_PROMPT
-    if equipment_model:
-        sys_content += f"\n\nCURRENT EQUIPMENT: {equipment_model}"
+    # If still not found, return error
+    if not equipment_model:
+        return {
+            "messages": [AIMessage(content="Error: No equipment model provided. Please specify the equipment model to begin diagnosis.")]
+        }
     
-    # Add step tracking info to system prompt
-    sys_content += f"\n\nDIAGNOSIS PROGRESS: Step {state.current_step} of {state.total_steps}"
-    if state.step_description:
-        sys_content += f" - {state.step_description}"
+    # Step 1: Query RAG for diagnostic knowledge
+    try:
+        rag_result = query_diagnostic_knowledge.invoke({
+            "query": "diagnostic procedures troubleshooting",
+            "equipment_model": equipment_model,
+            "top_k": 5
+        })
+        rag_knowledge = rag_result.get("results", []) if isinstance(rag_result, dict) else []
+    except Exception as e:
+        rag_knowledge = [{"error": str(e)}]
     
-    # CRITICAL: After EVERY measurement, the agent MUST include "Press NEXT to continue diagnosis"
-    # The system will automatically pause after tools run, but the agent response should also
-    # clearly indicate waiting for user confirmation.
-    sys_content += """
+    # Step 2: Fetch equipment configuration ONCE (CRITICAL - never fetch again)
+    try:
+        config_result = get_equipment_configuration.invoke({
+            "equipment_model": equipment_model,
+            "request_type": "all"
+        })
+    except Exception as e:
+        config_result = {"error": str(e), "test_points": [], "thresholds": {}, "faults": []}
     
-    **MANDATORY RESPONSE FORMAT AFTER MEASUREMENTS:**
-    After getting any measurement result, your response MUST end with:
-    "Press NEXT to continue diagnosis"
+    # Extract test points
+    test_points = config_result.get("test_points", []) if isinstance(config_result, dict) else []
     
-    Do NOT continue automatically - wait for the user to confirm before proceeding.
-    """
+    # Extract expected values from thresholds
+    thresholds = config_result.get("thresholds", {}) if isinstance(config_result, dict) else {}
+    expected_values = {}
+    for signal_id, threshold_data in thresholds.items():
+        states = threshold_data.get("states", {})
+        if "normal" in states:
+            normal_state = states["normal"]
+            expected_values[signal_id] = {
+                "min": normal_state.get("min", 0),
+                "max": normal_state.get("max", 999999),
+                "unit": "V",  # Default unit
+                "description": normal_state.get("description", "")
+            }
     
-    sys_msg = SystemMessage(content=sys_content)
+    # Extract faults for later use
+    faults = config_result.get("faults", []) if isinstance(config_result, dict) else []
     
-    # Run LLM with retry logic (handles RateLimitError, APIError, etc. with key/model rotation)
-    response = invoke_with_tools_and_retry([sys_msg] + cleaned_messages, tools)
-    
-    # Image Enrichment: Find latest guidance image or reference image
-    image_data = None
-    # We look through history to find the most recent ToolMessage that contains image URL.
-    # We search the ORIGINAL state.messages which have the URL-based image data.
-    # We increase search depth to ensure images from early steps are still available.
-    for m in reversed(state.messages):
-        if isinstance(m, ToolMessage):
-            try:
-                res_data = json.loads(m.content)
-                if isinstance(res_data, dict):
-                    # Priority 1: Direct test point image (URL-based now)
-                    if res_data.get("image_url"):
-                        image_data = res_data
-                        break
-                    # Priority 2: Visual guide annotations from test point guidance
-                    elif res_data.get("visual_guide") and isinstance(res_data["visual_guide"], list) and res_data["visual_guide"]:
-                        # Fallback if image_url is present
-                        if res_data.get("image_url"):
-                            image_data = res_data
-                            break
-                    # Priority 3: Bulk image list
-                    elif "images" in res_data and res_data["images"]:
-                        overview = next((img for img in res_data["images"] if "overview" in str(img.get("description", "")).lower() or "overview" in str(img.get("filename", "")).lower()), None)
-                        image_data = overview or res_data["images"][0]
-                        break
-            except:
-                continue
-    
-    # Format content blocks. Place image FIRST for maximum prominence.
-    # Handle case where response or response.content might be None
-    if response is None:
-        response = AIMessage(content="Error: No response from LLM")
-    elif response.content is None:
-        response.content = ""
-    response.content = format_message_content(response.content, image_data)
-    
-    # Session completion check
-    is_complete = False
-    content_str = str(response.content)
-    if "SESSION COMPLETED" in content_str:
-        is_complete = True
-    
+    # Store everything in state
     return {
-        "messages": [response], 
-        "is_session_complete": is_complete,
-        "equipment_model": equipment_model,
-        "iteration_count": state.iteration_count + 1,
-        "is_paused_for_human": False,  # Pause is handled in post_tool_route after tools run
-        "current_step": state.current_step,
-        "total_steps": state.total_steps,
-        "awaiting_test_point_guidance": False,  # No longer needed - we pause after every measurement
-        "last_guidance_test_point": state.last_guidance_test_point
+        "rag_knowledge": rag_knowledge,
+        "equipment_config": config_result,
+        "test_points": test_points,
+        "expected_values": expected_values,
+        "suspected_faults": faults,
+        "config_cached": True,
+        "messages": [AIMessage(content=f"Diagnostic knowledge loaded for {equipment_model}. Found {len(test_points)} test points and {len(faults)} potential faults.")]
     }
 
-def tool_node(state: ConversationalAgentState):
-    """Standard tool execution node with a twist for images."""
-    last_msg = state.messages[-1]
-    if not hasattr(last_msg, "tool_calls") or not last_msg.tool_calls:
-        return {}
+
+# =============================================================================
+# HYPOTHESES_NODE - Generate fault hypotheses using RAG and LLM
+# =============================================================================
+
+def hypotheses_node(state: ConversationalAgentState):
+    """
+    HYPOTHESES_NODE: Generate hypothesis-driven diagnostic approach.
+    
+    Instead of a static diagnostic plan, this node:
+    1. Takes symptom from user input
+    2. Queries RAG for possible fault hypotheses
+    3. Generates initial hypotheses with probabilities
+    4. Selects best first test based on information value
+    
+    Output: hypotheses list, hypothesis_probabilities, first test point, test_point_rankings
+    """
+    from src.infrastructure.llm_manager import invoke_with_retry
+    
+    # Build context for LLM
+    equipment_model = state.equipment_model
+    test_points = state.test_points
+    rag_knowledge = state.rag_knowledge
+    faults = state.suspected_faults
+    
+    # Get user's problem description (symptom) from messages
+    symptom_description = ""
+    for msg in state.messages:
+        if isinstance(msg, HumanMessage):
+            content = msg.content if isinstance(msg.content, str) else str(msg.content)
+            symptom_description += content + " "
+    
+    # Format test points for LLM
+    test_points_str = "\n".join([
+        f"- {tp.get('signal_id', tp.get('test_point', 'unknown'))}: {tp.get('name', '')} ({tp.get('parameter', '')})"
+        for tp in test_points[:15]
+    ])
+    
+    # Format faults for LLM
+    faults_str = "\n".join([
+        f"- {f.get('fault_id', '')}: {f.get('name', '')} - {f.get('description', '')[:150]}"
+        for f in faults[:10]
+    ]) if faults else "No fault definitions available"
+    
+    # Format RAG knowledge
+    rag_str = "\n".join([
+        f"- {k.get('content', '')[:200]}"
+        for k in rag_knowledge[:3]
+    ]) if rag_knowledge else "No diagnostic knowledge available"
+    
+    # Create hypothesis generation prompt
+    hypothesis_prompt = f"""You are a diagnostic hypothesis generator. Based on the symptom, generate fault hypotheses.
+
+EQUIPMENT: {equipment_model}
+USER'S SYMPTOM: {symptom_description}
+
+AVAILABLE TEST POINTS:
+{test_points_str}
+
+KNOWN FAULTS:
+{faults_str}
+
+DIAGNOSTIC KNOWLEDGE:
+{rag_str}
+
+Generate 3-5 most likely fault hypotheses based on the symptom.
+For each hypothesis, provide:
+1. A unique hypothesis ID (e.g., HYPOTHESIS_1, HYPOTHESIS_2)
+2. Fault ID from the known faults (if applicable)
+3. Brief description of what this fault would cause
+4. Initial probability (0.0-1.0) based on how well it matches the symptom
+
+Output as JSON array:
+[
+  {{"id": "HYPOTHESIS_1", "fault_id": "F001", "description": "...", "probability": 0.4}},
+  {{"id": "HYPOTHESIS_2", "fault_id": null, "description": "...", "probability": 0.3}}
+]
+
+Only output the JSON array, nothing else."""
+    
+    # Call LLM for hypothesis generation
+    hypotheses = []
+    hypothesis_probabilities = {}
+    
+    try:
+        response = invoke_with_retry([{"role": "user", "content": hypothesis_prompt}])
+        content = response.content if response else "[]"
         
-    tools_map = {t.name: t for t in get_tools()}
-    results = []
-    measurements = []
+        # Parse JSON array from response
+        import re
+        json_match = re.search(r'\[.*?\]', content, re.DOTALL)
+        if json_match:
+            hypotheses = json.loads(json_match.group(0))
+            for h in hypotheses:
+                hypothesis_probabilities[h.get('id', '')] = h.get('probability', 0.1)
+    except Exception as e:
+        # Fallback: create generic hypotheses from faults
+        for i, fault in enumerate(faults[:5]):
+            h = {
+                "id": f"HYPOTHESIS_{i+1}",
+                "fault_id": fault.get('fault_id', ''),
+                "description": fault.get('description', '')[:100],
+                "probability": 1.0 / min(len(faults), 5)
+            }
+            hypotheses.append(h)
+            hypothesis_probabilities[h['id']] = h['probability']
     
-    for tool_call in last_msg.tool_calls:
-        tool = tools_map.get(tool_call["name"])
-        if tool:
-            print(f"[TOOL] Running {tool_call['name']}...")
-            result = tool.invoke(tool_call["args"])
-            
-            results.append(ToolMessage(
-                tool_call_id=tool_call["id"],
-                content=json.dumps(result) if isinstance(result, dict) else str(result)
-            ))
-            
-            # Track measurements for diagnostic analysis
-            if tool_call["name"] in ("read_multimeter", "enter_manual_reading") and isinstance(result, dict):
-                if "value" in result and "test_point" in result:
-                    measurement = {
-                        "test_point": result.get("test_point"),
-                        "value": result.get("value"),
-                        "unit": result.get("unit", "V"),
-                        "measurement_type": result.get("measurement_type", "unknown"),
-                        "is_stable": result.get("is_stable", True)
-                    }
-                    measurements.append(measurement)
+    # Filter out empty hypotheses
+    hypotheses = [h for h in hypotheses if h.get('id')]
     
-    # Note: We no longer track awaiting_test_point_guidance - pause is now mandatory after every measurement
+    # Normalize probabilities to sum to 1
+    total_prob = sum(hypothesis_probabilities.values())
+    if total_prob > 0:
+        for h_id in hypothesis_probabilities:
+            hypothesis_probabilities[h_id] /= total_prob
+    
+    # Select best first test based on information value
+    # Query LLM to rank test points
+    ranking_prompt = f"""Rank test points by information value for diagnosing the given symptom.
+
+EQUIPMENT: {equipment_model}
+USER'S SYMPTOM: {symptom_description}
+
+AVAILABLE TEST POINTS:
+{test_points_str}
+
+HYPOTHESES:
+{chr(10).join([h.get('description', '') for h in hypotheses])}
+
+Rank the test points by how much information they would provide to distinguish between hypotheses.
+Output as JSON array of test point IDs in order of information value (highest first):
+["TP3", "TP1", "TP5", ...]
+
+Only output the JSON array, nothing else."""
+    
+    test_point_rankings = []
+    try:
+        response = invoke_with_retry([{"role": "user", "content": ranking_prompt}])
+        content = response.content if response else "[]"
+        
+        import re
+        json_match = re.search(r'\[.*?\]', content, re.DOTALL)
+        if json_match:
+            test_point_rankings = json.loads(json_match.group(0))
+    except:
+        # Fallback: use all test points in order
+        test_point_rankings = [tp.get('signal_id', tp.get('test_point', '')) for tp in test_points]
+    
+    # Filter out empty strings
+    test_point_rankings = [tp for tp in test_point_rankings if tp]
+    
+    # Set current hypothesis to the highest probability one
+    current_hypothesis = ""
+    if hypotheses:
+        current_hypothesis = max(hypotheses, key=lambda h: hypothesis_probabilities.get(h['id'], 0)).get('id', '')
+    
+    # Create diagnostic_plan for backward compatibility
+    diagnostic_plan = test_point_rankings[:state.max_steps]
+    
+    # Create user-facing message
+    hypothesis_message = f"### Hypothesis-Driven Diagnosis\n\n"
+    hypothesis_message += f"Based on the symptom, I've generated {len(hypotheses)} hypotheses:\n\n"
+    
+    sorted_hypotheses = sorted(hypotheses, key=lambda h: hypothesis_probabilities.get(h['id'], 0), reverse=True)
+    for h in sorted_hypotheses:
+        prob = hypothesis_probabilities.get(h['id'], 0)
+        hypothesis_message += f"- **{h.get('id', '')}**: {h.get('description', '')} (P={prob:.1%})\n"
+    
+    hypothesis_message += f"\n**Highest Probability Hypothesis:** {current_hypothesis}\n"
+    hypothesis_message += f"\n**First Test Point:** {test_point_rankings[0] if test_point_rankings else 'None'}\n"
+    hypothesis_message += f"\nPress NEXT to begin diagnosis."
+    
     return {
-        "messages": results,
-        "measurements": state.measurements + measurements
+        "hypotheses": hypotheses,
+        "hypothesis_probabilities": hypothesis_probabilities,
+        "eliminated_faults": [],
+        "current_hypothesis": current_hypothesis,
+        "test_point_rankings": test_point_rankings,
+        "diagnostic_reasoning": [f"Initial hypotheses generated: {len(hypotheses)} fault hypotheses"],
+        "diagnostic_plan": diagnostic_plan,
+        "current_step": 0,
+        "messages": [AIMessage(content=hypothesis_message)]
     }
 
+
 # =============================================================================
-# HUMAN-IN-THE-LOOP NODES
+# STEP_NODE - Atomic diagnostic step with hypothesis guidance
 # =============================================================================
 
-def wait_for_human(state: ConversationalAgentState):
+def step_node(state: ConversationalAgentState):
     """
-    Wait for human confirmation before continuing.
-    This node uses interrupt() to pause the graph and wait for user input.
+    STEP_NODE: Performs the ENTIRE diagnostic step atomically with hypothesis guidance:
     
-    STRICT DIAGNOSTIC RULE: After EVERY measurement, we MUST pause and wait for user to press NEXT.
+    1. Show current hypothesis being tested
+    2. Show test point name and location
+    3. Show probe placement instructions
+    4. Show test point image
+    5. Call read_multimeter
+    6. Wait for stabilization (handled by read_multimeter)
+    7. Evaluate measured value vs expected range
+    8. Route to REASON node for hypothesis update
     
-    The interrupt message tells the user to press NEXT to continue diagnosis.
+    Returns: measurement, evaluation, decision (pending REASON update)
     """
-    # Get the last AI message to include in the interrupt
-    last_msg = state.messages[-1]
+    from src.studio.tools import get_test_point_guidance, read_multimeter
+    from src.infrastructure.llm_manager import invoke_with_retry
     
-    # Determine the step context for the interrupt message
-    step_context = f"Step {state.current_step} of {state.total_steps}"
-    if state.step_description:
-        step_context += f": {state.step_description}"
+    # Get current test point from test_point_rankings (hypothesis-driven)
+    if state.current_step >= len(state.test_point_rankings):
+        return {
+            "step_result": {
+                "decision": "no_more_tests",
+                "reasoning": "No more test points available to check"
+            },
+            "messages": [AIMessage(content="No more test points available. Proceeding to reasoning...")]
+        }
     
-    # Create a clear instruction message - MUST say "Press NEXT to continue diagnosis"
+    test_point_id = state.test_point_rankings[state.current_step]
+    
+    # Get expected values for this test point
+    expected = state.expected_values.get(test_point_id, {"min": 0, "max": 999, "unit": "V"})
+    
+    # Get current hypothesis info
+    current_hyp_desc = ""
+    for h in state.hypotheses:
+        if h.get('id') == state.current_hypothesis:
+            current_hyp_desc = h.get('description', '')
+            break
+    
+    # Step 1-4: Get guidance (shows location, image, probe placement)
+    try:
+        guidance = get_test_point_guidance.invoke({
+            "equipment_model": state.equipment_model,
+            "test_point_id": test_point_id
+        })
+    except Exception as e:
+        guidance = {"error": str(e), "name": test_point_id, "test_point": test_point_id}
+    
+    # Step 5: Take measurement
+    try:
+        measurement_result = read_multimeter.invoke({
+            "equipment_model": state.equipment_model,
+            "test_point": test_point_id,
+            "measurement_type": "voltage_dc"
+        })
+    except Exception as e:
+        measurement_result = {"status": "error", "error": str(e), "test_point": test_point_id}
+    
+    # Extract measurement value
+    measurement_value = measurement_result.get("value", 0)
+    measurement_unit = measurement_result.get("unit", expected.get("unit", "V"))
+    status = measurement_result.get("status", "unknown")
+    
+    # Step 6: Evaluate against expected range
+    is_fault = False
+    evaluation = "normal"
+    
+    if status == "success":
+        min_val = expected.get("min", 0)
+        max_val = expected.get("max", 999999)
+        if not (min_val <= measurement_value <= max_val):
+            is_fault = True
+            evaluation = "fault"
+    
+    # Step 7-8: Explain result to user and prepare for REASON node
+    explanation = f"### Test Point: {test_point_id}\n\n"
+    
+    # Add hypothesis being tested
+    if state.current_hypothesis:
+        explanation += f"**Testing Hypothesis:** {state.current_hypothesis}\n"
+        if current_hyp_desc:
+            explanation += f"{current_hyp_desc}\n\n"
+    
+    # Add image if available
+    guidance_image = guidance.get("image_url", "")
+    if guidance_image:
+        explanation += f"![{test_point_id}]({guidance_image})\n\n"
+    
+    explanation += f"**Measurement Result:** {measurement_value} {measurement_unit}\n"
+    explanation += f"**Status:** {status}\n"
+    explanation += f"**Expected Range:** {expected.get('min', 0)} - {expected.get('max', 999999)} {measurement_unit}\n"
+    explanation += f"**Evaluation:** {evaluation.upper()}\n\n"
+    
+    # Store preliminary result - REASON node will update decision
+    explanation += "Analyzing result against hypothesis..."
+    
+    # Prepare measurement record
+    measurement_record = {
+        "test_point": test_point_id,
+        "value": measurement_value,
+        "unit": measurement_unit,
+        "status": status,
+        "evaluation": evaluation,
+        "expected_min": expected.get("min", 0),
+        "expected_max": expected.get("max", 999999),
+        "hypothesis_being_tested": state.current_hypothesis,
+        "timestamp": str(datetime.now())
+    }
+    
+    return {
+        "current_test_point": test_point_id,
+        "step_result": {
+            "measurement": measurement_record,
+            "evaluation": evaluation,
+            "reasoning": "",  # Will be filled by REASON node
+            "decision": "pending_reasoning",  # Will be updated by REASON node
+            "next_test_point": state.test_point_rankings[state.current_step + 1] if state.current_step + 1 < len(state.test_point_rankings) else None
+        },
+        "measurements": state.measurements + [measurement_record],
+        "next_test_point": state.test_point_rankings[state.current_step + 1] if state.current_step + 1 < len(state.test_point_rankings) else "",
+        "messages": [AIMessage(content=explanation)],
+        "iteration_count": state.iteration_count + 1
+    }
+
+
+# =============================================================================
+# REASON_NODE - Update hypotheses based on measurement result
+# =============================================================================
+
+def reason_node(state: ConversationalAgentState):
+    """
+    REASON_NODE: Evaluate measurement result against hypotheses and update probabilities.
+    
+    This node:
+    1. Evaluates measurement result against expected values
+    2. Updates hypothesis probabilities based on result
+    3. Eliminates faults that are disproven by measurements
+    4. Checks if any hypothesis is confirmed (>90% probability)
+    5. Selects next best test if diagnosis continues
+    
+    Returns: updated hypotheses, probabilities, decision
+    """
+    from src.infrastructure.llm_manager import invoke_with_retry
+    
+    # Get last measurement
+    if not state.measurements:
+        return {
+            "step_result": {
+                "decision": "error",
+                "reasoning": "No measurements available"
+            }
+        }
+    
+    last_measurement = state.measurements[-1]
+    test_point_id = last_measurement.get("test_point", "")
+    measurement_value = last_measurement.get("value", 0)
+    measurement_unit = last_measurement.get("unit", "V")
+    evaluation = last_measurement.get("evaluation", "normal")
+    
+    # Get expected values
+    expected = state.expected_values.get(test_point_id, {"min": 0, "max": 999, "unit": "V"})
+    
+    # Get current hypothesis details
+    current_hyp = None
+    for h in state.hypotheses:
+        if h.get('id') == state.current_hypothesis:
+            current_hyp = h
+            break
+    
+    # Build prompt for hypothesis update
+    hypotheses_str = "\n".join([
+        f"- {h.get('id', '')}: {h.get('description', '')} (current P={state.hypothesis_probabilities.get(h.get('id'), 0):.2f})"
+        for h in state.hypotheses
+    ])
+    
+    eval_prompt = f"""Evaluate the measurement result against the hypotheses and update probabilities.
+
+TEST POINT: {test_point_id}
+MEASUREMENT: {measurement_value} {measurement_unit}
+EXPECTED: {expected.get('min', 0)} - {expected.get('max', 999999)} {measurement_unit}
+EVALUATION: {evaluation}
+
+CURRENT HYPOTHESES:
+{hypotheses_str}
+
+Based on this measurement result:
+1. Which hypotheses does this result SUPPORT? (increase probability)
+2. Which hypotheses does this result CONTRADICT? (decrease probability to 0)
+3. Is any hypothesis now CONFIRMED (>90% probability)?
+
+Output JSON with:
+{{
+  "reasoning": "Brief analysis of what this measurement tells us",
+  "probability_updates": {{"HYPOTHESIS_1": 0.3, "HYPOTHESIS_2": 0.0, ...}},
+  "eliminated_faults": ["HYPOTHESIS_2", ...],
+  "confirmed_hypothesis": "HYPOTHESIS_1" or null,
+  "new_current_hypothesis": "HYPOTHESIS_3" or null
+}}
+
+Only output JSON, nothing else."""
+    
+    # Call LLM for reasoning
+    reasoning = ""
+    eliminated_faults = list(state.eliminated_faults)
+    confirmed_hypothesis = None
+    
+    try:
+        response = invoke_with_retry([{"role": "user", "content": eval_prompt}])
+        content = response.content if response else "{}"
+        
+        import re
+        json_match = re.search(r'\{.*?\}', content, re.DOTALL)
+        if json_match:
+            result = json.loads(json_match.group(0))
+            reasoning = result.get('reasoning', '')
+            
+            # Update probabilities
+            prob_updates = result.get('probability_updates', {})
+            for h_id, new_prob in prob_updates.items():
+                if h_id in state.hypothesis_probabilities:
+                    state.hypothesis_probabilities[h_id] = new_prob
+            
+            # Track eliminated faults
+            new_eliminated = result.get('eliminated_faults', [])
+            for e in new_eliminated:
+                if e not in eliminated_faults:
+                    eliminated_faults.append(e)
+            
+            # Check for confirmed hypothesis
+            confirmed_hypothesis = result.get('confirmed_hypothesis')
+    except Exception as e:
+        reasoning = f"Error in reasoning: {str(e)}"
+    
+    # Normalize probabilities to sum to 1 (excluding eliminated)
+    active_probs = {h_id: prob for h_id, prob in state.hypothesis_probabilities.items() 
+                   if h_id not in eliminated_faults}
+    total_active = sum(active_probs.values())
+    if total_active > 0:
+        for h_id in active_probs:
+            state.hypothesis_probabilities[h_id] = active_probs[h_id] / total_active
+    
+    # Select new current hypothesis if needed
+    new_current_hypothesis = state.current_hypothesis
+    if confirmed_hypothesis:
+        new_current_hypothesis = confirmed_hypothesis
+    elif not new_current_hypothesis or new_current_hypothesis in eliminated_faults:
+        # Select highest probability non-eliminated hypothesis
+        best_h = None
+        best_prob = -1
+        for h in state.hypotheses:
+            h_id = h.get('id', '')
+            if h_id not in eliminated_faults:
+                prob = state.hypothesis_probabilities.get(h_id, 0)
+                if prob > best_prob:
+                    best_prob = prob
+                    best_h = h_id
+        new_current_hypothesis = best_h or ""
+    
+    # Determine decision based on results
+    decision = "continue_diagnosis"
+    if confirmed_hypothesis:
+        decision = "fault_confirmed"
+    elif not new_current_hypothesis or len([h for h in state.hypotheses if h.get('id') not in eliminated_faults]) == 0:
+        decision = "all_eliminated"
+    
+    # Build explanation
+    explanation = f"### Hypothesis Analysis\n\n"
+    explanation += f"**Measurement:** {test_point_id} = {measurement_value} {measurement_unit}\n"
+    explanation += f"**Evaluation:** {evaluation.upper()}\n\n"
+    
+    if reasoning:
+        explanation += f"**Analysis:** {reasoning}\n\n"
+    
+    explanation += "**Updated Hypothesis Probabilities:**\n"
+    sorted_hyps = sorted(state.hypotheses, key=lambda h: state.hypothesis_probabilities.get(h.get('id'), 0), reverse=True)
+    for h in sorted_hyps:
+        h_id = h.get('id', '')
+        prob = state.hypothesis_probabilities.get(h_id, 0)
+        status = "ELIMINATED" if h_id in eliminated_faults else f"{prob:.1%}"
+        explanation += f"- {h_id}: {status}\n"
+    
+    explanation += f"\n**Current Hypothesis:** {new_current_hypothesis}\n"
+    
+    # Update diagnostic reasoning chain
+    diagnostic_reasoning = list(state.diagnostic_reasoning)
+    diagnostic_reasoning.append(f"Step {state.current_step + 1}: Tested {test_point_id}, result={evaluation}. {reasoning[:100] if reasoning else ''}")
+    
+    return {
+        "hypothesis_probabilities": state.hypothesis_probabilities,
+        "eliminated_faults": eliminated_faults,
+        "current_hypothesis": new_current_hypothesis,
+        "diagnostic_reasoning": diagnostic_reasoning,
+        "step_result": {
+            "measurement": last_measurement,
+            "evaluation": evaluation,
+            "reasoning": reasoning,
+            "decision": decision,
+            "next_test_point": state.test_point_rankings[state.current_step + 1] if state.current_step + 1 < len(state.test_point_rankings) else None
+        },
+        "messages": [AIMessage(content=explanation)]
+    }
+
+
+# =============================================================================
+# DECISION_NODE - Hypothesis-driven routing with proper termination
+# =============================================================================
+
+def decision_node(state: ConversationalAgentState):
+    """
+    DECISION_NODE: Routes based on hypothesis-driven termination conditions.
+    
+    Checks conditions in order:
+    1. IF confirmed_fault is not None → GO TO REPAIR
+    2. ELSE IF step_result.decision == "fault_confirmed" → GO TO REPAIR
+    3. ELSE IF all hypotheses eliminated → Diagnosis = Inconclusive, STOP
+    4. ELSE IF current_step >= max_steps → Diagnosis = Max steps reached, STOP
+    5. ELSE IF no remaining useful tests → Diagnosis = Insufficient data, STOP
+    6. ELSE → Continue diagnosis loop (GO TO INTERRUPT)
+    """
+    # Check if fault already confirmed
+    if state.confirmed_fault:
+        return {"next_node": "repair"}
+    
+    decision = state.step_result.get("decision", "continue_diagnosis")
+    
+    # 1. Fault confirmed from reasoning
+    if decision == "fault_confirmed":
+        return {"next_node": "repair"}
+    
+    # 2. All hypotheses eliminated
+    active_hypotheses = [h for h in state.hypotheses if h.get('id') not in state.eliminated_faults]
+    if len(active_hypotheses) == 0:
+        return {
+            "next_node": "end",
+            "diagnosis_status": "inconclusive",
+            "diagnosis_complete": True,
+            "messages": [AIMessage(content="## Diagnosis Complete - Inconclusive\n\nAll hypotheses have been eliminated by measurements. Unable to determine the fault.")]
+        }
+    
+    # 3. Max steps reached
+    if state.current_step >= state.max_steps:
+        return {
+            "next_node": "end",
+            "diagnosis_status": "max_steps_reached",
+            "diagnosis_complete": True,
+            "messages": [AIMessage(content=f"## Diagnosis Complete - Max Steps Reached\n\nAfter {state.max_steps} diagnostic steps, no conclusive fault was identified.")]
+        }
+    
+    # 4. No more test points available
+    if state.current_step >= len(state.test_point_rankings):
+        return {
+            "next_node": "end",
+            "diagnosis_status": "insufficient_data",
+            "diagnosis_complete": True,
+            "messages": [AIMessage(content="## Diagnosis Complete - Insufficient Data\n\nNo more test points available to continue diagnosis.")]
+        }
+    
+    # 5. Continue diagnosis
+    return {"next_node": "interrupt"}
+
+
+# =============================================================================
+# REPAIR_NODE - Provide repair instructions
+# =============================================================================
+
+def repair_node(state: ConversationalAgentState):
+    """
+    REPAIR_NODE: Based on confirmed fault, get repair instructions.
+    
+    This node is triggered when:
+    - A fault is confirmed (from hypothesis reasoning)
+    - OR only one possible hypothesis remains
+    
+    1. Identify the fault based on current hypothesis
+    2. Get repair instructions from equipment config
+    3. Add to messages
+    4. Set diagnosis_complete = True
+    5. Route to END
+    """
+    from src.infrastructure.llm_manager import invoke_with_retry
+    
+    # Get fault information from config
+    faults = state.suspected_faults
+    
+    # Get current hypothesis
+    current_hypothesis = state.current_hypothesis
+    
+    # Find fault associated with current hypothesis
+    fault_id = ""
+    fault_name = "Unknown Fault"
+    for h in state.hypotheses:
+        if h.get('id') == current_hypothesis:
+            fault_id = h.get('fault_id', '')
+            break
+    
+    # Get last measurement
+    last_measurement = state.measurements[-1] if state.measurements else {}
+    test_point = last_measurement.get("test_point", "")
+    value = last_measurement.get("value", 0)
+    
+    # Find matching fault
+    repair_instructions = "No specific repair instructions found."
+    
+    if faults:
+        # If we have a fault_id from hypothesis, use it
+        if fault_id:
+            for fault in faults:
+                if fault.get("fault_id", "") == fault_id:
+                    fault_name = fault.get('name', 'Unknown')
+                    recovery = fault.get('recovery', [])
+                    if recovery:
+                        repair_steps = "\n".join([
+                            f"{i+1}. {r.get('step', '')}: {r.get('instruction', '')}"
+                            for i, r in enumerate(recovery)
+                        ])
+                        repair_instructions = f"### Repair Procedure for {fault_name}\n\n{repair_steps}"
+                    break
+        else:
+            # Use LLM to match measurement to fault
+            faults_str = "\n".join([
+                f"- {f.get('fault_id', '')}: {f.get('name', '')}\n  {f.get('description', '')}\n  Recovery: {f.get('recovery', [])}"
+                for f in faults[:5]
+            ])
+            
+            match_prompt = f"""Based on the measurement at {test_point} = {value}, which fault best matches?
+
+FAULTS:
+{faults_str}
+
+Output ONLY the fault ID that best matches, nothing else."""
+            
+            try:
+                response = invoke_with_retry([{"role": "user", "content": match_prompt}])
+                matched_fault_id = response.content.strip() if response else ""
+            except:
+                matched_fault_id = ""
+            
+            # Find the matched fault
+            for fault in faults:
+                if fault.get("fault_id", "") == matched_fault_id:
+                    fault_name = fault.get("name", "Unknown")
+                    recovery = fault.get("recovery", [])
+                    if recovery:
+                        repair_steps = "\n".join([
+                            f"{i+1}. {r.get('step', '')}: {r.get('instruction', '')}"
+                            for i, r in enumerate(recovery)
+                        ])
+                        repair_instructions = f"### Repair Procedure for {fault_name}\n\n{repair_steps}"
+                    break
+    
+    # Final message
+    final_message = f"## Diagnosis Complete\n\n"
+    final_message += f"**Confirmed Fault:** {fault_name}\n"
+    final_message += f"**Hypothesis:** {current_hypothesis}\n"
+    final_message += f"**Test Point:** {test_point}\n"
+    final_message += f"**Measurement:** {value}\n\n"
+    final_message += repair_instructions
+    final_message += f"\n\n**SESSION COMPLETED**"
+    
+    return {
+        "confirmed_fault": fault_name,
+        "diagnosis_complete": True,
+        "messages": [AIMessage(content=final_message)]
+    }
+
+
+# =============================================================================
+# INTERRUPT_NODE - Pause for user to continue
+# =============================================================================
+
+def interrupt_node(state: ConversationalAgentState):
+    """
+    INTERRUPT_NODE: Use interrupt() to pause and wait for user to press NEXT.
+    
+    This pauses AFTER step_node completes and AFTER decision_node routes to interrupt.
+    Never interrupt before measurement, evaluation, or reasoning.
+    """
+    step_num = state.current_step + 1
+    total_steps = len(state.test_point_rankings)
+    
+    # Show current hypothesis status
+    current_hyp_info = ""
+    if state.current_hypothesis:
+        prob = state.hypothesis_probabilities.get(state.current_hypothesis, 0)
+        current_hyp_info = f"\n\n**Current Hypothesis:** {state.current_hypothesis} (P={prob:.1%})"
+    
     instruction = (
-        f"{step_context} - Measurement complete. "
-        "Press NEXT to continue diagnosis"
+        f"Step {step_num} complete.{current_hyp_info}\n\n"
+        "Press NEXT to continue diagnosis."
     )
     
+    # Mark waiting state
+    state.waiting_for_next = True
+    
     # Use interrupt to pause and wait for human
-    # The human's response will be passed to resume_from_human
     human_response = interrupt({
         "instruction": instruction,
         "current_step": state.current_step,
-        "total_steps": state.total_steps,
-        "measurements_taken": len(state.measurements)
+        "total_steps": total_steps,
+        "measurements_taken": len(state.measurements),
+        "current_hypothesis": state.current_hypothesis
     })
     
-    # This code only runs after interrupt resumes
     return {
-        "is_paused_for_human": False
+        "waiting_for_next": True
     }
 
 
-def resume_from_human(state: ConversationalAgentState):
+# =============================================================================
+# RESUME_NODE - Process user's "Next" response
+# =============================================================================
+
+def resume_node(state: ConversationalAgentState):
     """
-    Resume from human interruption.
-    This node processes the user's "next" response and continues the diagnosis.
+    RESUME_NODE: Process user's "Next" response.
+    
+    Increment current_step and route back to STEP_NODE.
     """
-    # Get the last human message
-    last_msg = state.messages[-1]
+    return {
+        "current_step": state.current_step + 1,
+        "waiting_for_next": False
+    }
+
+
+# =============================================================================
+# CONDITIONAL EDGES
+# =============================================================================
+
+def route_from_decision(state: ConversationalAgentState) -> str:
+    """Route based on decision_node output."""
+    next_node = state.step_result.get("next_node", "interrupt")
     
-    # Extract user response
-    user_response = ""
-    if isinstance(last_msg, HumanMessage):
-        if isinstance(last_msg.content, str):
-            user_response = last_msg.content.strip().lower()
-        elif isinstance(last_msg.content, list):
-            for block in last_msg.content:
-                if isinstance(block, dict) and block.get("type") == "text":
-                    user_response = block.get("text", "").strip().lower()
-                    break
-    
-    # Check if user wants to continue
-    if "next" in user_response or "continue" in user_response:
-        # Increment step counter
-        return {
-            "is_paused_for_human": False,
-            "current_step": state.current_step + 1
-        }
+    if next_node == "repair":
+        return "repair"
+    elif next_node == "end":
+        return "end"
+    elif next_node == "interrupt":
+        return "interrupt"
     else:
-        # User provided other input - let agent handle it
-        return {
-            "is_paused_for_human": False
-        }
+        return "interrupt"
 
 
-# =============================================================================
-# ROUTING
-# =============================================================================
-
-def should_continue(state: ConversationalAgentState):
-    """
-    Route after agent node - checks for session completion or max iterations.
+def route_from_interrupt(state: ConversationalAgentState) -> str:
+    """Route after interrupt - always go to step_node for next test."""
+    # Check if we've exceeded max steps
+    if state.current_step >= state.max_steps:
+        return "end"
     
-    AUTONOMOUS FLOW: No more waiting for human confirmation.
-    After agent decides on next action, we either:
-    - Call tools (if needed)
-    - Diagnose (if max iterations reached)
-    - End (if session complete)
+    # Check if there are any remaining test points
+    if state.current_step >= len(state.test_point_rankings):
+        return "end"
     
-    The flow continues automatically without human "next" confirmation.
-    """
-    # Defensive: handle empty messages
-    if not state.messages:
-        return "tools"  # Default to tools if no messages
-    
-    # Check if session is complete
-    if state.is_session_complete:
-        return END
-    
-    # NOTE: We no longer pause for human confirmation
-    # The is_paused_for_human flag is still tracked for backward compatibility
-    # but we don't route to wait_for_human anymore
-    
-    # Check if we've exceeded max iterations - force diagnose
-    if state.iteration_count >= MAX_ITERATIONS:
-        return "diagnose"
-    
-    last_msg = state.messages[-1]
-    if hasattr(last_msg, "tool_calls") and last_msg.tool_calls:
-        return "tools"
-        
-    return END
-
-
-def post_tool_route(state: ConversationalAgentState):
-    """
-    Route after tools node - ALWAYS pause for human after measurements.
-    
-    STRICT DIAGNOSTIC RULE: After EVERY measurement, we MUST pause for user confirmation.
-    
-    - If read_multimeter returns "success" → route to wait_for_human (PAUSE REQUIRED)
-    
-    - If read_multimeter returns "timeout" or "timeout_unstable" → route to wait_for_human
-      (User will confirm retry or continue)
-    
-    - If fault detected → route to wait_for_human (User will confirm diagnosis)
-    
-    The key change: After any measurement, we ALWAYS pause for human "next" confirmation.
-    The agent must not auto-proceed - must wait for user to press NEXT.
-    """
-    # Defensive: handle empty messages
-    if not state.messages:
-        return "agent"
-    
-    # After tools run, check if this was a measurement tool
-    last_msg = state.messages[-1]
-    
-    # Check if last tool was a measurement
-    if isinstance(last_msg, ToolMessage):
-        try:
-            result = json.loads(last_msg.content)
-            if isinstance(result, dict):
-                # Check for measurement status
-                status = result.get("status", "")
-                
-                # Handle timeout cases - still pause for human to confirm retry
-                if status in ("timeout", "timeout_unstable"):
-                    return "wait_for_human"
-                
-                # Handle success - PAUSE FOR HUMAN before continuing
-                # This is the KEY CHANGE: always pause after measurements
-                if status == "success" or "value" in result:
-                    return "wait_for_human"
-        except:
-            pass
-    
-    # For non-measurement tools, continue to agent
-    return "agent"
-
-
-def handle_timeout_node(state: ConversationalAgentState):
-    """
-    Handle timeout from read_multimeter.
-    
-    AUTONOMOUS FLOW: Instead of asking user to type something specific,
-    we provide guidance and let the agent decide next steps.
-    
-    The agent will:
-    1. Explain the situation to the user
-    2. Offer to retry or accept manual input
-    3. Continue the diagnostic flow
-    
-    We no longer use interrupt() - we just return and let the agent
-    handle the retry logic naturally.
-    """
-    last_msg = state.messages[-1]
-    test_point = "unknown"
-    guidance_info = None
-    
-    # Get test point and guidance from the timeout result
-    if isinstance(last_msg, ToolMessage):
-        try:
-            result = json.loads(last_msg.content)
-            test_point = result.get("test_point", "unknown")
-            guidance_info = result.get("guidance")
-        except:
-            pass
-    
-    # NO INTERRUPT - just continue to agent to handle retry
-    # The agent will see the timeout status and can:
-    # - Call read_multimeter again for retry
-    # - Call enter_manual_reading
-    # - Provide guidance to the user
-    
-    return {
-        "is_paused_for_human": False,
-        "last_tool_result": {
-            "status": "timeout_handled",
-            "test_point": test_point,
-            "guidance_available": guidance_info is not None
-        }
-    }
-
-# =============================================================================
-# DIAGNOSE NODE - Provides diagnosis when max iterations reached
-# =============================================================================
-
-def diagnose_node(state: ConversationalAgentState):
-    """
-    Diagnose node that provides final analysis when max iterations reached.
-    This node analyzes accumulated measurements and provides a conclusion.
-    """
-    from src.infrastructure.llm_manager import invoke_with_retry
-    from langchain_core.messages import SystemMessage
-    
-    # Build measurement summary for diagnosis
-    measurement_summary = ""
-    if state.measurements:
-        measurement_summary = "\n".join([
-            f"- {m.get('test_point')}: {m.get('value')} {m.get('unit')} ({m.get('measurement_type')})"
-            for m in state.measurements
-        ])
-    else:
-        measurement_summary = "No measurements recorded."
-    
-    # Create diagnosis prompt
-    diagnose_prompt = f"""You have reached the maximum number of diagnostic iterations (10). 
-
-Based on the accumulated evidence, provide a final diagnosis:
-
-MEASUREMENTS COLLECTED:
-{measurement_summary}
-
-Please provide:
-1. Your best assessment of the fault
-2. Recommended next steps or actions
-3. Any additional tests that might help (if applicable)
-
-End your response with "SESSION COMPLETED" to close this session.
-"""
-    
-    # Use retry logic for diagnosis (handles RateLimitError, APIError, etc.)
-    response = invoke_with_retry([{"role": "system", "content": diagnose_prompt}])
-    
-    # Add measurement summary as context
-    response.content = f"[Diagnostic Summary - {len(state.measurements)} measurements taken]\n\n" + str(response.content)
-    
-    return {
-        "messages": [response],
-        "is_session_complete": True
-    }
+    return "step"
 
 
 # =============================================================================
@@ -671,56 +1030,64 @@ End your response with "SESSION COMPLETED" to close this session.
 # =============================================================================
 
 def create_conversational_graph():
-    """Build the custom interactive graph with human-in-the-loop support."""
+    """Build the hypothesis-driven diagnostic workflow graph."""
     builder = StateGraph(ConversationalAgentState)
     
     # Add all nodes
-    builder.add_node("agent", agent_node)
-    builder.add_node("tools", tool_node)
-    builder.add_node("diagnose", diagnose_node)
-    builder.add_node("wait_for_human", wait_for_human)
-    builder.add_node("resume_from_human", resume_from_human)
-    builder.add_node("handle_timeout", handle_timeout_node)
+    builder.add_node("rag", rag_node)
+    builder.add_node("hypotheses", hypotheses_node)
+    builder.add_node("step", step_node)
+    builder.add_node("reason", reason_node)
+    builder.add_node("decision", decision_node)
+    builder.add_node("repair", repair_node)
+    builder.add_node("interrupt", interrupt_node)
+    builder.add_node("resume", resume_node)
     
-    # Start at agent
-    builder.add_edge(START, "agent")
+    # Start at RAG_NODE
+    builder.add_edge(START, "rag")
     
-    # Agent node routing: tools, diagnose, wait_for_human, or END
+    # RAG → HYPOTHESES: After fetching knowledge and config, generate hypotheses
+    builder.add_edge("rag", "hypotheses")
+    
+    # HYPOTHESES → STEP: After generating hypotheses, go to first step
+    builder.add_edge("hypotheses", "step")
+    
+    # STEP → REASON: After each step, evaluate result against hypotheses
+    builder.add_edge("step", "reason")
+    
+    # REASON → DECISION: After updating hypotheses, make routing decision
+    builder.add_edge("reason", "decision")
+    
+    # DECISION → REPAIR, END, or INTERRUPT (deterministic routing)
     builder.add_conditional_edges(
-        "agent",
-        should_continue,
+        "decision",
+        route_from_decision,
         {
-            "tools": "tools",
-            "diagnose": "diagnose",
-            "wait_for_human": "wait_for_human",
-            END: END
+            "repair": "repair",
+            "interrupt": "interrupt",
+            "end": "end"
         }
     )
     
-    # Tools routing: after measurement, ALWAYS pause for human confirmation
-    # This implements the strict diagnostic rule: "Press NEXT to continue diagnosis"
+    # INTERRUPT → RESUME: Wait for user input
+    builder.add_edge("interrupt", "resume")
+    
+    # RESUME → STEP: After user confirms, go to next step
     builder.add_conditional_edges(
-        "tools",
-        post_tool_route,
+        "resume",
+        route_from_interrupt,
         {
-            "agent": "agent",
-            "wait_for_human": "wait_for_human",
-            "handle_timeout": "handle_timeout"
+            "step": "step",
+            "end": "end"
         }
     )
     
-    # After waiting for human, resume processing
-    builder.add_edge("wait_for_human", "resume_from_human")
-    builder.add_edge("resume_from_human", "agent")
-    
-    # After timeout handling, resume to agent to process user response
-    builder.add_edge("handle_timeout", "resume_from_human")
-    
-    # Final edges
-    builder.add_edge("diagnose", END)
+    # REPAIR → END: Final state
+    builder.add_edge("repair", END)
     
     checkpointer = MemorySaver()
     return builder.compile(checkpointer=checkpointer)
+
 
 # =============================================================================
 # GRAPH FACTORY FOR LANGGRAPH STUDIO
@@ -729,8 +1096,6 @@ def create_conversational_graph():
 def graph():
     """
     Return the compiled conversational graph for LangGraph Studio.
-    
-    This is the factory function that LangGraph Studio calls.
     """
     return create_conversational_graph()
 
@@ -740,7 +1105,9 @@ def graph():
 # =============================================================================
 
 if __name__ == "__main__":
-    # Test the graph creation
-    print("Creating interactive graph...")
+    from datetime import datetime
+    print("Creating hypothesis-driven diagnostic graph...")
     g = create_conversational_graph()
     print("Success!")
+    print("\nWorkflow: START → RAG → HYPOTHESES → STEP → REASON → DECISION → (REPAIR | INTERRUPT → RESUME → STEP)")
+    print("Hypothesis-driven routing with proper termination conditions.")

@@ -473,5 +473,5 @@ python -m src.interfaces.cli --mock
 
 This file is part of the `.coding-agent/` memory system. Any architectural changes must be reflected here.
 
-**Last Updated**: 2026-03-21
-**Key Changes**: Added step-by-step diagnostic engine with interrupt-based workflow
+**Last Updated**: 2026-03-22
+**Key Changes**: Added hypothesis-driven diagnostic system with REASON node and proper termination conditions

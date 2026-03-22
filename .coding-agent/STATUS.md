@@ -1,42 +1,63 @@
 # Current Project Status
 
-> Last updated: 2026-03-21
+> Last updated: 2026-03-22
 > This document reflects the actual current state of the codebase.
 
 ---
 
 ## Current Milestone
 
-**Phase: Diagnostic Agent Refactoring - CORRECTED WORKFLOW (COMPLETE)**
+**Phase: Hypothesis-Driven Diagnostic System (COMPLETE)**
 
-Corrected the diagnostic workflow to fix architectural issues:
+Implemented a hypothesis-driven diagnostic system in [`src/studio/conversational_agent.py`](src/studio/conversational_agent.py):
 
-**Corrected Flow:** `RAG → PLAN → STEP → DECISION → (FAULT CONFIRMED → REPAIR) or (MORE TESTS → INTERRUPT → NEXT → STEP)`
+**New Flow:** `RAG → HYPOTHESES → STEP → REASON → DECISION → (FAULT CONFIRMED → REPAIR) or (MORE TESTS → INTERRUPT → NEXT → STEP) or END)`
 
-**Key Corrections:**
-- STEP is now an atomic unit that performs 9 operations: Show test point → Show probe placement → Show ONE image → Call read_multimeter → Stabilize → Evaluate → Reason → Explain → Decide
-- DECISION node determines next action: FAULT CONFIRMED → REPAIR, or MORE TESTS → INTERRUPT
-- **INTERRUPT now happens AFTER the full STEP completes**, not before measurement
-- This ensures user sees test instructions and image before the system pauses
+**Key Changes:**
 
-**Previous issues fixed:**
-- Instructions hidden when tool calls OFF → INSTRUCTION_NODE generates visible text
-- Interrupt placed AFTER measurement → INTERRUPT_NODE now AFTER step completion
-- Agent auto-advances → INTERRUPT pauses after EVERY step
-- No root cause reasoning → REASONING_NODE uses RAG to trace upstream
-- Wrong termination → REPAIR_NODE is terminal (no "Press NEXT")
-- Duplicate images → displayed_images tracking
-- Weak state tracking → Full state with tested_points, eliminated_faults
+1. **State Updated with Hypothesis Tracking** (Lines 64-118):
+   - `hypotheses`: list of possible fault hypotheses
+   - `hypothesis_probabilities`: dict mapping hypothesis to probability
+   - `eliminated_faults`: list of faults eliminated by measurements
+   - `current_hypothesis`: current working hypothesis being tested
+   - `test_point_rankings`: ranked test points by information value
+   - `diagnostic_reasoning`: reasoning chain for diagnosis
+   - `max_steps`: maximum diagnostic steps (default 9)
 
-**Latest completed feature:** Corrected diagnostic workflow documentation - INTERRUPT now after STEP
+2. **Replaced PLAN with HYPOTHESES Node** (Lines 287-464):
+   - Takes symptom from user input
+   - Queries RAG for possible fault hypotheses
+   - Generates initial hypotheses with probabilities
+   - Selects best first test based on information value
 
-**Current blockers:** None - documentation updated
+3. **Updated STEP Node** (Lines 471-553):
+   - Uses `test_point_rankings` instead of static plan
+   - Shows user what hypothesis is being tested
+   - Routes to REASON node for hypothesis updates
 
-**Next steps:** Validate system works end-to-end
+4. **Added REASON Node** (Lines 560-682):
+   - Evaluates measurement result against expected values
+   - Updates hypothesis probabilities based on result
+   - Eliminates faults that are disproven
+   - Checks if any hypothesis is confirmed (>90% probability)
 
-**New dependencies:** numpy (for statistical calculations in stabilizer)
+5. **Updated DECISION Node with Proper Termination** (Lines 689-732):
+   - IF confirmed_fault → GO TO REPAIR
+   - IF step_result.decision == "fault_confirmed" → GO TO REPAIR
+   - IF all hypotheses eliminated → Diagnosis = Inconclusive, STOP
+   - IF current_step >= max_steps → Diagnosis = Max steps reached, STOP
+   - IF no remaining useful tests → Diagnosis = Insufficient data, STOP
+   - ELSE → Continue diagnosis (GO TO INTERRUPT)
 
-See: [`plans/diagnostic-agent-refactor-plan.md`](plans/diagnostic-agent-refactor-plan.md)
+6. **Fixed REPAIR Node** (Lines 739-812):
+   - Uses current hypothesis to identify fault
+   - Only triggers when fault is confirmed from hypothesis reasoning
+
+**Latest completed feature:** Hypothesis-driven diagnostic system in conversational_agent.py
+
+**Current blockers:** None
+
+**Next steps:** Validate system works end-to-end with LangGraph Studio
 
 ---
 
