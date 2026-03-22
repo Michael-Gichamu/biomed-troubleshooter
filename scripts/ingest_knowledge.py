@@ -6,12 +6,19 @@ Supports: .md, .txt, .pdf (text extraction)
 
 Usage:
     python scripts/ingest_knowledge.py
+    python scripts/ingest_knowledge.py --clear
     python scripts/ingest_knowledge.py --folder data/knowledge/equipment
     python scripts/ingest_knowledge.py --file my_doc.md
+    python scripts/ingest_knowledge.py --clear --folder data/knowledge
+
+Use --clear whenever you have updated any documentation files.
+It deletes the existing ChromaDB storage and re-ingests from scratch,
+ensuring no stale chunks from old document versions remain in the vector store.
 """
 
 import os
 import sys
+import shutil
 import argparse
 from pathlib import Path
 from typing import List, Dict, Optional
@@ -21,6 +28,42 @@ from datetime import datetime
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from src.infrastructure.rag_repository import RAGRepository
+
+
+# =============================================================================
+# ChromaDB Clear
+# =============================================================================
+
+def clear_chromadb(chromadb_path: str = "data/chromadb", verbose: bool = True) -> bool:
+    """
+    Delete the ChromaDB storage folder so re-ingestion starts from scratch.
+
+    This must be done whenever documentation files are updated.
+    Without clearing, the old chunks remain in the vector store alongside
+    the new ones, and retrieval will return a mix of stale and current content.
+
+    Args:
+        chromadb_path: Path to the ChromaDB local storage folder
+        verbose: Print progress messages
+
+    Returns:
+        True if cleared successfully or folder did not exist, False on error
+    """
+    db_path = Path(chromadb_path)
+
+    if not db_path.exists():
+        if verbose:
+            print(f"[CLEAR] ChromaDB folder not found at '{db_path}' — nothing to clear.")
+        return True
+
+    try:
+        shutil.rmtree(db_path)
+        if verbose:
+            print(f"[CLEAR] Deleted ChromaDB storage at '{db_path}' — ready for fresh ingestion.")
+        return True
+    except Exception as e:
+        print(f"[ERROR] Failed to delete ChromaDB storage at '{db_path}': {e}")
+        return False
 
 
 # =============================================================================
@@ -37,15 +80,15 @@ def load_pdf_file(filepath: Path) -> str:
     """Load text content from a PDF file."""
     try:
         import pypdf
-        
+
         text = []
         with open(filepath, 'rb') as f:
             reader = pypdf.PdfReader(f)
             for page in reader.pages:
                 text.append(page.extract_text())
-        
+
         return '\n'.join(text)
-    
+
     except ImportError:
         print("  [WARN] pypdf not installed. Install with: pip install pypdf")
         return ""
@@ -57,15 +100,15 @@ def load_pdf_file(filepath: Path) -> str:
 def load_document(filepath: Path) -> Optional[str]:
     """
     Load document content based on file type.
-    
+
     Args:
         filepath: Path to the document
-        
+
     Returns:
         Document text content or None if unsupported
     """
     suffix = filepath.suffix.lower()
-    
+
     if suffix in ['.md', '.txt', '.markdown']:
         return load_text_file(filepath)
     elif suffix == '.pdf':
@@ -86,34 +129,34 @@ def chunk_by_paragraphs(
 ) -> List[str]:
     """
     Split content into chunks by paragraphs.
-    
+
     Args:
         content: Document text
         max_chunk_size: Maximum characters per chunk
         overlap: Characters to overlap between chunks
-        
+
     Returns:
         List of text chunks
     """
     paragraphs = content.split('\n\n')
     chunks = []
     current_chunk = ""
-    
+
     for para in paragraphs:
         para = para.strip()
         if not para:
             continue
-        
+
         if len(current_chunk) + len(para) + 2 <= max_chunk_size:
             current_chunk += "\n\n" + para if current_chunk else para
         else:
             if current_chunk:
                 chunks.append(current_chunk.strip())
             current_chunk = para
-    
+
     if current_chunk:
         chunks.append(current_chunk.strip())
-    
+
     return chunks
 
 
@@ -121,10 +164,10 @@ def chunk_by_headers(content: str) -> List[Dict]:
     """
     Split markdown content by headers.
     Each chunk is a section with its header.
-    
+
     Args:
         content: Markdown document text
-        
+
     Returns:
         List of chunk dictionaries with header and content
     """
@@ -132,7 +175,7 @@ def chunk_by_headers(content: str) -> List[Dict]:
     chunks = []
     current_header = "Introduction"
     current_content = []
-    
+
     for line in lines:
         # Check for markdown headers
         if line.startswith('#'):
@@ -144,13 +187,13 @@ def chunk_by_headers(content: str) -> List[Dict]:
                         'header': current_header,
                         'content': chunk_text
                     })
-            
+
             # Start new section
             current_header = line.lstrip('#').strip()
             current_content = []
         else:
             current_content.append(line)
-    
+
     # Save last section
     if current_content:
         chunk_text = '\n'.join(current_content).strip()
@@ -159,23 +202,23 @@ def chunk_by_headers(content: str) -> List[Dict]:
                 'header': current_header,
                 'content': chunk_text
             })
-    
+
     return chunks
 
 
 def smart_chunk(content: str, filepath: Path) -> List[Dict]:
     """
     Intelligently chunk document based on content type.
-    
+
     Args:
         content: Document text
         filepath: Source file path
-        
+
     Returns:
         List of chunk dictionaries
     """
     chunks = []
-    
+
     # For markdown files, use header-based chunking
     if filepath.suffix.lower() in ['.md', '.markdown']:
         header_chunks = chunk_by_headers(content)
@@ -192,7 +235,7 @@ def smart_chunk(content: str, filepath: Path) -> List[Dict]:
                 'text': chunk,
                 'section': f"Part {i+1}"
             })
-    
+
     return chunks
 
 
@@ -203,11 +246,11 @@ def smart_chunk(content: str, filepath: Path) -> List[Dict]:
 def extract_metadata(content: str, filepath: Path) -> Dict:
     """
     Extract metadata from document content.
-    
+
     Args:
         content: Document text
         filepath: Source file path
-        
+
     Returns:
         Metadata dictionary
     """
@@ -217,34 +260,34 @@ def extract_metadata(content: str, filepath: Path) -> Dict:
         'ingested_at': datetime.utcnow().isoformat(),
         'file_type': filepath.suffix.lower(),
     }
-    
+
     # Try to extract equipment model from content
     import re
-    
+
     # Look for equipment model patterns
     model_patterns = [
         r'Equipment[:\s]+([A-Z0-9\-]+)',
         r'Model[:\s]+([A-Z0-9\-]+)',
         r'equipment_model[:\s]+([A-Z0-9\-]+)',
     ]
-    
+
     for pattern in model_patterns:
         match = re.search(pattern, content, re.IGNORECASE)
         if match:
             metadata['equipment_model'] = match.group(1)
             break
-    
+
     # Look for component mentions
-    component_keywords = ['power supply', 'psu', 'transformer', 'rectifier', 
+    component_keywords = ['power supply', 'psu', 'transformer', 'rectifier',
                           'capacitor', 'resistor', 'diode', 'transistor']
     found_components = []
     for kw in component_keywords:
         if kw.lower() in content.lower():
             found_components.append(kw)
-    
+
     if found_components:
         metadata['components'] = ', '.join(found_components)
-    
+
     return metadata
 
 
@@ -259,32 +302,32 @@ def ingest_file(
 ) -> int:
     """
     Ingest a single file into the knowledge base.
-    
+
     Args:
         filepath: Path to the file
         rag: RAG repository instance
         verbose: Print progress messages
-        
+
     Returns:
         Number of chunks ingested
     """
     if verbose:
         print(f"\n[FILE] {filepath}")
-    
+
     # Load document
     content = load_document(filepath)
     if not content:
         return 0
-    
+
     # Extract metadata
     base_metadata = extract_metadata(content, filepath)
-    
+
     # Chunk document
     chunks = smart_chunk(content, filepath)
-    
+
     if verbose:
         print(f"  [CHUNKS] {len(chunks)} sections")
-    
+
     # Ingest each chunk
     ingested = 0
     for i, chunk in enumerate(chunks):
@@ -293,7 +336,7 @@ def ingest_file(
             'chunk_index': i,
             'section': chunk.get('section', f'Part {i+1}')
         }
-        
+
         try:
             rag.add_document(
                 content=chunk['text'],
@@ -303,7 +346,7 @@ def ingest_file(
         except Exception as e:
             if verbose:
                 print(f"  [ERROR] Failed to ingest chunk {i}: {e}")
-    
+
     return ingested
 
 
@@ -315,13 +358,13 @@ def ingest_folder(
 ) -> int:
     """
     Ingest all documents in a folder.
-    
+
     Args:
         folder: Path to the folder
         rag: RAG repository instance
         recursive: Search subfolders
         verbose: Print progress messages
-        
+
     Returns:
         Total number of chunks ingested
     """
@@ -329,10 +372,10 @@ def ingest_folder(
         print(f"\n{'='*60}")
         print(f"INGESTING FOLDER: {folder}")
         print(f"{'='*60}")
-    
+
     # Find all supported files
     extensions = ['.md', '.txt', '.markdown', '.pdf']
-    
+
     if recursive:
         files = []
         for ext in extensions:
@@ -341,19 +384,19 @@ def ingest_folder(
         files = []
         for ext in extensions:
             files.extend(folder.glob(f'*{ext}'))
-    
+
     # Filter out README files (optional)
     files = [f for f in files if f.name.lower() != 'readme.md']
-    
+
     if verbose:
         print(f"Found {len(files)} document(s)")
-    
+
     # Ingest each file
     total_ingested = 0
     for filepath in files:
         ingested = ingest_file(filepath, rag, verbose)
         total_ingested += ingested
-    
+
     return total_ingested
 
 
@@ -362,38 +405,68 @@ def main():
     parser = argparse.ArgumentParser(
         description="Ingest documents into the AI Agent knowledge base"
     )
-    
+
     parser.add_argument(
         '--folder', '-f',
         type=str,
         default='data/knowledge',
         help='Folder containing documents (default: data/knowledge)'
     )
-    
+
     parser.add_argument(
         '--file',
         type=str,
         help='Single file to ingest'
     )
-    
+
     parser.add_argument(
         '--no-recursive',
         action='store_true',
         help='Do not search subfolders'
     )
-    
+
     parser.add_argument(
         '--quiet', '-q',
         action='store_true',
         help='Suppress output'
     )
-    
+
+    parser.add_argument(
+        '--clear',
+        action='store_true',
+        help=(
+            'Delete existing ChromaDB storage before ingesting. '
+            'Use this whenever documentation files have been updated '
+            'to ensure no stale chunks remain in the vector store.'
+        )
+    )
+
+    parser.add_argument(
+        '--chromadb-path',
+        type=str,
+        default='data/chromadb',
+        help='Path to ChromaDB local storage folder (default: data/chromadb)'
+    )
+
     args = parser.parse_args()
-    
-    # Initialize RAG
-    print("Initializing RAG repository...")
+    verbose = not args.quiet
+
+    # ── Step 1: Clear ChromaDB if requested ──────────────────────────────────
+    if args.clear:
+        success = clear_chromadb(
+            chromadb_path=args.chromadb_path,
+            verbose=verbose
+        )
+        if not success:
+            print("[ABORT] Could not clear ChromaDB storage. Ingestion cancelled.")
+            return 1
+
+    # ── Step 2: Initialize RAG ────────────────────────────────────────────────
+    if verbose:
+        print("Initializing RAG repository...")
+
     rag = RAGRepository()
-    
+
     try:
         rag.initialize()
     except Exception as e:
@@ -401,11 +474,10 @@ def main():
         print("\nMake sure ChromaDB is running:")
         print("  docker run -p 8000:8000 chromadb/chroma")
         return 1
-    
-    # Ingest
-    verbose = not args.quiet
+
+    # ── Step 3: Ingest ────────────────────────────────────────────────────────
     total = 0
-    
+
     if args.file:
         filepath = Path(args.file)
         if not filepath.exists():
@@ -418,18 +490,19 @@ def main():
             print(f"[ERROR] Folder not found: {folder}")
             return 1
         total = ingest_folder(
-            folder, 
-            rag, 
+            folder,
+            rag,
             recursive=not args.no_recursive,
             verbose=verbose
         )
-    
-    # Summary
-    print(f"\n{'='*60}")
-    print(f"INGESTION COMPLETE")
-    print(f"Total chunks ingested: {total}")
-    print(f"{'='*60}")
-    
+
+    # ── Summary ───────────────────────────────────────────────────────────────
+    if verbose:
+        print(f"\n{'='*60}")
+        print(f"INGESTION COMPLETE")
+        print(f"Total chunks ingested: {total}")
+        print(f"{'='*60}")
+
     return 0
 
 

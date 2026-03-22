@@ -1,455 +1,995 @@
 # =============================================================================
-# Equipment Configuration - 24W CCTV Power Supply
-# =============================================================================
-# All equipment-specific knowledge. NO hard-coded logic in code.
+# Equipment Configuration — CCTV-PSU-24W-V1
+# PCB Marking: SP-80W
 # =============================================================================
 
 metadata:
   equipment_id: "cctv-psu-24w-v1"
-  name: "24W CCTV Power Supply Unit"
+  name: "CCTV Multi-Camera Power Supply 12V"
+  pcb_marking: "SP-80W"
   category: "power_supply"
-  manufacturer: "Generic CCTV"
-  version: "1.0.0"
-  created: "2026-02-03"
+  topology: "flyback_smps"
+  version: "3.0.0"
 
 # =============================================================================
-# SIGNALS - All measurable signals
+# SIGNALS — All measurable signals with physical locations and probe placement
 # =============================================================================
 signals:
-  # Input signals
-  - signal_id: "ac_input"
-    name: "AC Input Voltage"
-    test_point: "AC_IN"
-    parameter: "voltage_rms"
-    unit: "V"
-    measurability: "external"
-    physical_description: "Top-left corner of PCB, large blue two-position screw terminal connector with AC LINE and NEUTRAL markings"
-    component_type: "capacitor"
-    image_url: "https://raw.githubusercontent.com/Michael-Gichamu/biomed-troubleshooter/main/data/equipment/cctv-psu-24w-v1-test-points/ac_input_capacitor.png"
-    diagnostic_meaning: "Confirms AC power is present at input. Zero reading indicates no AC power from wall or power cord issue."
-    expected_behavior: "170-265V AC (typical mains range)"
-    related_tests: []
-    pro_tips:
-      - "Use caution - this point carries mains voltage up to 265V AC"
-      - "Set multimeter to AC voltage mode before connecting"
-      - "If reading 0V, check power cord and switch first"
 
-  # Primary side
-  - signal_id: "bridge_output"
-    name: "Bridge Rectifier Output"
-    test_point: "TP1"
-    parameter: "voltage_dc"
+  # ── INPUT / PRIMARY SIDE ────────────────────────────────────────────────────
+
+  - signal_id: "ac_input"
+    name: "AC Mains Input Voltage"
+    test_point: "AC_IN"
+    parameter: "voltage_ac"
     unit: "V"
-    measurability: "internal"
-    physical_description: "Upper-right corner of PCB, near the four diodes in a black rectangular package (BR1). Look for the large electrolytic capacitor nearby."
-    component_type: "bridge_rectifier"
-    image_url: "https://raw.githubusercontent.com/Michael-Gichamu/biomed-troubleshooter/main/data/equipment/cctv-psu-24w-v1-test-points/bridge_rectifier_diode.png"
-    diagnostic_meaning: "Confirms AC to DC conversion stage. Failure indicates bridge diode issue. Zero or low reading with AC present suggests failed diodes."
-    expected_behavior: "280-380V DC under load (peak of AC input minus diode drops)"
-    related_tests:
-      - "forward_bias_test"
-      - "reverse_bias_test"
+    measurability: "live_only"
+    physical_description: >
+      AC input connector at the input end of the board. Live and Neutral terminals.
+      Fuse F1 (T5A/250V), RT1 (NTC 5D-11 thermistor), and MOV varistor are all
+      in-line in this input section.
+    probe_placement: >
+      Set meter to AC Voltage, 300V range.
+      Probe between Live and Neutral at input connector.
+      Alternatively confirm at wall outlet before opening unit.
+    safety_warning: "LETHAL — 230V AC. CAT II 600V probes minimum."
+    image_url: "https://raw.githubusercontent.com/Michael-Gichamu/biomed-troubleshooter/main/data/equipment/cctv-psu-24w-v1-test-points/ac_input_test_point.png"
+    diagnostic_meaning: >
+      Confirms mains supply is reaching the board.
+      Zero reading indicates upstream fault: power cord, outlet, or circuit breaker.
+      Normal reading confirms the PSU itself must be investigated.
+    expected_behavior: "200–250V AC for 230V supply region; 100–125V AC for 115V region"
     pro_tips:
-      - "This point can read up to 380V DC - use extreme caution"
-      - "If reading negative, swap your multimeter probes"
-      - "A healthy reading here confirms the primary side is working"
+      - "Check at wall outlet first before opening unit"
+      - "Set multimeter to AC voltage mode before connecting probes"
 
   - signal_id: "input_fuse"
-    name: "Input Fuse"
+    name: "Input Fuse F1 — T5A/250V"
     test_point: "F1"
     parameter: "resistance"
     unit: "Ω"
-    measurability: "internal"
-    physical_description: "Near the AC input connector, white cylindrical component with metal end caps. May have visible fuse symbol printed on PCB."
-    component_type: "fuse"
+    measurability: "power_off_only"
+    fuse_specification: "T5A/250V — time-delay (slow-blow), 5 Ampere, 250 Volt"
+    physical_description: >
+      Cylindrical fuse body in PCB clip holder, input section of board near RT1 (NTC 5D-11)
+      and CX1. The fuse rating T5A/250V is marked on the PCB silkscreen adjacent to the holder.
+    probe_placement: >
+      DISCONNECT AC POWER COMPLETELY before measuring.
+      Set meter to resistance (Ω), lowest range.
+      Probe across both metal end-caps of fuse body.
+      Less than 0.1Ω = intact. OL = blown.
+    safety_warning: "Disconnect AC power before measuring. Verify power off at input terminals."
     image_url: "https://raw.githubusercontent.com/Michael-Gichamu/biomed-troubleshooter/main/data/equipment/cctv-psu-24w-v1-test-points/fuse_test_point.png"
-    diagnostic_meaning: "Primary protection device. If open, indicates downstream short in bridge, capacitor, or primary circuitry. Check for shorts before replacing."
-    expected_behavior: "<0.1Ω (continuity) when good"
-    related_tests: []
+    diagnostic_meaning: >
+      F1 is sacrificial protection. It blows as a consequence of a downstream short,
+      primarily Q1 drain-to-source failure. Never replace F1 before testing Q1.
+      A shorted Q1 will blow a new fuse immediately on power-up.
+      If Q1 is shorted, also test D3 — a shorted D3 is the most common root cause of Q1 failure.
+    expected_behavior: "Less than 0.1Ω = intact; OL = blown"
     pro_tips:
-      - "This fuse is a 250V 1A slow-blow type"
-      - "If open, check BR1 and C1 before replacing - there may be a downstream short"
-      - "Use resistance mode with power OFF to test"
+      - "Replace only with T5A/250V time-delay fuse — exact specification"
+      - "Test Q1 D-S resistance before replacing F1"
+      - "If Q1 is shorted, test D3 before replacing anything"
 
-  # Secondary/Output
-  - signal_id: "output_12v"
-    name: "12V Output Rail"
-    test_point: "TP2"
+  - signal_id: "bridge_output"
+    name: "DC Bus Voltage — C1 Primary Bulk Capacitor"
+    test_point: "C1_positive"
     parameter: "voltage_dc"
     unit: "V"
-    measurability: "internal"
-    physical_description: "Bottom-right area of PCB, look for the large output capacitor (C12, 1000μF 16V) with a small test point nearby marked TP2"
-    component_type: "capacitor"
-    image_url: "https://raw.githubusercontent.com/Michael-Gichamu/biomed-troubleshooter/main/data/equipment/cctv-psu-24w-v1-test-points/main_capacitor_test_point.png"
-    diagnostic_meaning: "Main output voltage. Failure here indicates regulation or primary side failure. Check U5, R2 feedback, and secondary components."
-    expected_behavior: "11.4-12.6V DC under no-load; 10.8-13.2V under load"
-    related_tests: []
+    measurability: "live_only"
+    component_confirmed: "Dongbaohe 450V 68μF 105°C — label confirmed from capacitor body"
+    physical_description: >
+      C1 is the large electrolytic capacitor on the PRIMARY side of the board — the half
+      containing Q1 (MOSFET), U3 (M5579P PWM controller), and TR1 (flyback transformer).
+      C1 is rated 450V, which is printed on its body. The positive terminal polarity is
+      marked on the PCB. C1 is the largest capacitor on the primary half.
+      The secondary output capacitors C8, C10, and C14 are on the opposite side of the
+      board and rated approximately 16–25V. They are completely separate components.
+    probe_placement: >
+      Unit POWERED ON.
+      Set meter to DC Voltage, 750V range.
+      RED probe on '+' terminal of C1 (primary side, 450V-rated).
+      BLACK probe on C1 negative terminal or primary ground.
+      Expected: approximately 310V DC for 230VAC mains supply.
+    safety_warning: >
+      LETHAL — C1 stores approximately 310V DC. This charge is retained after AC is
+      disconnected. Discharge procedure: connect 10kΩ 2W resistor across C1 terminals
+      for 30 seconds, then verify less than 10V with meter. CAT III 600V probes required.
+    image_url: "https://raw.githubusercontent.com/Michael-Gichamu/biomed-troubleshooter/main/data/equipment/cctv-psu-24w-v1-test-points/bridge_output_test_point.png"
+    diagnostic_meaning: >
+      Single highest-value diagnostic test. Splits fault space in half.
+      280–340V = primary input stage confirmed working. Fault is in Q1, U3, D3, or secondary.
+      0V = primary input failure. Test bridge rectifier diodes and MOV.
+      140–175V = unit on 115VAC supply — this is NORMAL for that region.
+      Probing C8/C10/C14 (secondary output capacitors, ~12V-rated, output side of board)
+      instead of C1 will return the 12V secondary voltage, not the primary DC bus voltage.
+      These are physically different components on opposite halves of the board.
+    expected_behavior: "280–340V DC for 230VAC supply; 140–175V DC for 115VAC supply"
     pro_tips:
-      - "This is the main output - check here first for no-output faults"
-      - "Load the supply with 12V 1A bulb or resistor to test under load"
-      - "Reading should be 11.4V-12.6V under no-load conditions"
+      - "C1 is Dongbaohe 450V 68μF 105°C — primary side only"
+      - "C8/C10/C14 are secondary output caps (~16-25V rated) — they read ~12V, not 310V"
+      - "A healthy reading here confirms the entire input stage is functional"
+      - "Discharge C1 via 10kΩ 2W resistor for 30s before any power-off work"
+
+  - signal_id: "primary_mosfet"
+    name: "Primary Switching MOSFET Q1 — Drain-Source Resistance"
+    test_point: "Q1_DS"
+    parameter: "resistance"
+    unit: "Ω"
+    measurability: "power_off_only"
+    physical_description: >
+      Q1 is labeled on the primary side of the board, adjacent to U3 (M5579P PWM controller)
+      and TR1 (flyback transformer). Read the part number from the Q1 body to confirm
+      Gate/Drain/Source pin orientation.
+    probe_placement: >
+      POWER OFF. Discharge C1 (10kΩ 2W resistor for 30 seconds). Verify less than 10V.
+      Set meter to resistance (Ω).
+      Probe Q1 Drain and Source pins in BOTH probe orientations.
+      Healthy: greater than 100kΩ in both directions.
+      Shorted: less than 10Ω in both directions.
+      Also test in diode mode: body diode reads 0.5–0.7V one direction, OL reversed.
+    safety_warning: >
+      POWER OFF. Discharge C1 before testing: 10kΩ 2W resistor across C1 for 30 seconds.
+      Verify less than 10V at C1 before touching primary side.
+    image_url: "https://raw.githubusercontent.com/Michael-Gichamu/biomed-troubleshooter/main/data/equipment/cctv-psu-24w-v1-test-points/mosfet_transistor.png"
+    diagnostic_meaning: >
+      Most common cause of blown F1 (T5A/250V). Q1 D-S less than 10Ω = shorted.
+      Also test D3 after finding a shorted Q1 — D3 short is the most frequent root cause
+      of Q1 failure (D3 shorts → secondary is shorted → primary current spike → Q1 overstress).
+      Replace both Q1 and D3 if both are found failed.
+    expected_behavior: "Greater than 100kΩ drain-to-source in both probe orientations"
+    pro_tips:
+      - "Most common cause of blown fuse F1"
+      - "Always test D3 after finding a shorted Q1"
+      - "Discharge C1 (450V 68μF) fully before touching — stored charge is lethal"
+
+  # ── SECONDARY / OUTPUT SIDE ─────────────────────────────────────────────────
+
+  - signal_id: "output_12v"
+    name: "12V Output Rail — J1 Test Point"
+    test_point: "J1"
+    parameter: "voltage_dc"
+    unit: "V"
+    measurability: "live_only"
+    physical_description: >
+      J1 is a test point on the secondary/output side of the board, adjacent to D3
+      (the white-body TO-220 output Schottky rectifier). Alternatively probe the positive
+      terminal of C8, C10, or C14 (output filter capacitors, secondary side), or the
+      positive terminal of the amber multi-way screw terminal block. All are safe 12V points.
+    probe_placement: >
+      Unit POWERED ON.
+      Set meter to DC Voltage, 20V range.
+      RED probe on J1 or positive terminal of any output capacitor or output terminal block.
+      BLACK probe on output ground.
+    image_url: "https://raw.githubusercontent.com/Michael-Gichamu/biomed-troubleshooter/main/data/equipment/cctv-psu-24w-v1-test-points/main_capacitor_test_point.png"
+    diagnostic_meaning: >
+      Primary symptom indicator. First measurement in any diagnostic session.
+      Zero output with zero DC bus = primary input failure.
+      Zero output with DC bus = 280–340V = switching stage or secondary failure.
+      Low output under load = C8/C10/C14 degraded (visually inspect + test capacitance with MS8250D) or D3 degraded.
+      High output (>13.2V) = feedback loop failure — disconnect loads immediately.
+      Cycling output = protection mode — disconnect cameras to isolate internal vs load fault.
+    expected_behavior: "11.4–12.6V DC no-load; 10.8–12.6V DC under rated load"
+    pro_tips:
+      - "Always measure output first to characterise the symptom"
+      - "Probe J1 (adjacent to D3) or any output capacitor positive terminal"
+      - "Load the output with rated cameras or equivalent resistive load for realistic testing"
+
+  - signal_id: "schottky_diode"
+    name: "Output Schottky Rectifier D3"
+    test_point: "D3"
+    parameter: "voltage_forward"
+    unit: "V"
+    measurability: "power_off_only"
+    physical_description: >
+      D3 is a white-body TO-220 package (3 pins) on the secondary/output side of the board,
+      adjacent to J1 test point. D3 carries the full combined output current for all camera
+      channels and is mounted with a heatsink for thermal management.
+      Read the part number from the D3 body to confirm anode/cathode pin orientation.
+    probe_placement: >
+      POWER OFF.
+      Set meter to DIODE TEST mode.
+      RED probe on anode, BLACK probe on cathode (verify from D3 datasheet).
+      Healthy Schottky: 0.15–0.45V forward; OL reverse.
+      Shorted: approximately 0V in both orientations.
+      Open: OL in both orientations.
+    safety_warning: "Power off only for diode testing."
+    image_url: "https://raw.githubusercontent.com/Michael-Gichamu/biomed-troubleshooter/main/data/equipment/cctv-psu-24w-v1-test-points/schottky_diode_test_point.png"
+    diagnostic_meaning: >
+      D3 shorted causes a cascade: secondary short → primary current spike → Q1 overstress
+      → Q1 D-S shorted → F1 (T5A/250V) blows. D3 failure is the most common root cause
+      when both Q1 and F1 are found failed together.
+      D3 open means no rectification path from TR1 secondary — output_12v = 0V even when
+      DC bus is present and Q1 is switching normally.
+      D3 must be replaced only with fast-recovery Schottky type — standard silicon
+      rectifiers (1N400x series) are incompatible with flyback switching frequencies.
+    expected_behavior: "0.15–0.45V forward voltage; OL reverse"
+    pro_tips:
+      - "Always test D3 after finding a shorted Q1 — D3 short is often the root cause"
+      - "Replace only with fast-recovery Schottky, same Vrrm and current rating as original"
+      - "A shorted D3 with an intact Q1 still produces zero output and must be replaced"
+
+  - signal_id: "output_capacitor_esr"
+    name: "Output Filter Capacitors — C8, C10, C14 (Visual + Capacitance Assessment)"
+    test_point: "C8_C10_C14"
+    parameter: "resistance"
+    unit: "Ω"
+    measurability: "power_off_only"
+    physical_description: >
+      Three output filter capacitors — C8, C10, and C14 — on the secondary/output side
+      of the board. All are 105°C grade (-40°C to +105°C operating range).
+      Capacitance values are printed on the top of each capacitor body.
+    probe_placement: >
+      POWER OFF. Discharge each capacitor individually (100Ω resistor briefly).
+      TWO-STEP ASSESSMENT — both required:
+
+      STEP 1 — Visual inspection (most reliable indicator):
+      Examine the top of each capacitor. Confirmed failure if any of these present:
+      - Bulging or domed top (internal pressure — most common sign of degradation)
+      - Blown/cracked top with brown residue (vent has opened)
+      - Brown crusty residue at capacitor base on PCB (leaked electrolyte)
+      - Darkened or blistered plastic sleeve (thermal damage)
+
+      STEP 2 — Capacitance measurement with MASTECH MS8250D:
+      Discharge capacitor. Desolder one lead for isolation (in-circuit readings unreliable).
+      Set MS8250D to capacitance (F) position — auto-range covers 6.6nF to 66mF.
+      Connect probes to capacitor leads. Compare reading to rated value on capacitor body.
+      Replace if reading is more than 20% below rated value, reads OL (open), or
+      resistance mode reads less than 10Ω (shorted).
+    safety_warning: "Power off. Discharge each capacitor (100Ω resistor briefly across leads) before measurement."
+    image_url: "https://raw.githubusercontent.com/Michael-Gichamu/biomed-troubleshooter/main/data/equipment/cctv-psu-24w-v1-test-points/main_capacitor_test_point.png"
+    diagnostic_meaning: >
+      Degraded output capacitors cause voltage droop under load, excessive ripple,
+      and can trigger overcurrent protection causing hiccup mode.
+      This is the most common cause of low output voltage under load.
+      Inspect and test all three (C8, C10, C14) — one failed cap affects the full output.
+      Note: The MS8250D capacitance test detects dead or severely degraded capacitors.
+      A cap with increased internal resistance but retained capacitance passes the electrical
+      test but may still cause ripple — visual inspection (bulging top) is the primary indicator.
+    expected_behavior: "Each capacitor less than 0.2Ω = healthy; 0.2–0.5Ω = degraded; greater than 0.5Ω = replace"
+    pro_tips:
+      - "Three output capacitors confirmed: C8, C10, C14 — test all three"
+      - "Visual inspection first — a bulging top is the primary sign of a failed capacitor"
+      - "MS8250D capacitance range is 6.6nF to 66mF — covers all caps on this board"
+      - "Desolder one lead before measuring capacitance — in-circuit readings are unreliable"
+      - "Replace with low-ESR 105°C grade, same capacitance and voltage rating minimum"
 
   - signal_id: "feedback_ref"
-    name: "Feedback Reference"
-    test_point: "TP3"
+    name: "TL431 Feedback Reference Voltage"
+    test_point: "TL431_REF"
     parameter: "voltage_dc"
     unit: "V"
-    measurability: "internal"
-    physical_description: "Center-left of PCB, near U5 (the black IC with 8 pins). Small test point marked TP3 close to the feedback voltage divider."
-    component_type: "resistor"
+    measurability: "live_only"
+    physical_description: >
+      TL431 shunt regulator: 3-pin TO-92 package (similar appearance to a small transistor)
+      on the secondary side of the board near R2 and R2A. Body marked "TL431" or "431".
+      The REF pin is the feedback sense input — probe this pin for the reference voltage.
+    probe_placement: >
+      Unit POWERED ON.
+      Set meter to DC Voltage, 5V range.
+      RED probe on TL431 REF pin.
+      BLACK probe on output ground.
     image_url: "https://raw.githubusercontent.com/Michael-Gichamu/biomed-troubleshooter/main/data/equipment/cctv-psu-24w-v1-test-points/resistor_1.png"
-    diagnostic_meaning: "Precision 2.5V reference for output regulation. If this is wrong, output voltage will be wrong. Check R2 feedback resistor."
-    expected_behavior: "2.4-2.6V DC (precision reference)"
-    related_tests: []
+    diagnostic_meaning: >
+      TL431 internal reference voltage = 2.495V (TI TL431 datasheet).
+      Approximately 2.495V with output high → optocoupler CTR has degraded.
+      Greater than 2.6V with output high → R2 (240kΩ) has drifted or failed open.
+      Less than 2.2V → R2/R2A divider values have changed or TL431 has failed.
+      Zero volts → secondary side is dead, no power at feedback network.
+    expected_behavior: "2.44–2.55V DC when feedback loop is actively regulating"
     pro_tips:
-      - "This is the precision 2.5V reference for output regulation"
-      - "If this is wrong, output voltage will be wrong"
-      - "Check R2 (470Ω resistor) if this voltage is off"
+      - "TL431 internal reference is 2.495V — this is the target REF pin voltage"
+      - "REF ≈ 2.495V AND output high points to optocoupler, not divider resistors"
+      - "REF > 2.6V AND output high points to R2 (240kΩ) open or drifted"
+
+  - signal_id: "feedback_resistor"
+    name: "Feedback Divider Resistors R2 and R2A"
+    test_point: "R2_R2A"
+    parameter: "resistance"
+    unit: "Ω"
+    measurability: "power_off_only"
+    physical_description: >
+      R2 and R2A are both labeled on the PCB, secondary side, near TL431.
+      R2 is the upper divider resistor (240kΩ, Red-Yellow-Yellow-Gold colour bands).
+      R2A is the lower divider resistor (approximately 62kΩ).
+      Together they set the 12V output regulation point via the TL431 reference.
+    probe_placement: >
+      POWER OFF.
+      Desolder one end of each resistor for accurate out-of-circuit measurement.
+      Set meter to appropriate resistance range.
+      R2 expected: approximately 240kΩ.
+      R2A expected: approximately 62kΩ.
+      Verify: Vout = 2.495 × (1 + R2/R2A) = 12V → ratio R2/R2A ≈ 3.81
+    safety_warning: "Power off before measuring."
+    image_url: "https://raw.githubusercontent.com/Michael-Gichamu/biomed-troubleshooter/main/data/equipment/cctv-psu-24w-v1-test-points/resistor_1.png"
+    diagnostic_meaning: >
+      R2 failed open causes feedback reference to rise above 2.495V, driving output to maximum.
+      R2 drifted high shifts output voltage proportionally upward.
+      If output is high and TL431 REF is above 2.6V, measure R2 out-of-circuit.
+      Replace with 240kΩ ±1% metal film resistor.
+    expected_behavior: "R2 approximately 240kΩ; R2A approximately 62kΩ; ratio satisfies 12V = 2.495 × (1 + R2/R2A)"
+    pro_tips:
+      - "Measure R2 with a multimeter — do not rely on colour band reading alone"
+      - "R2 open is the primary cause of output overvoltage when TL431 REF > 2.6V"
+      - "Replace with 240kΩ ±1% metal film resistor if found open or significantly drifted"
 
   - signal_id: "output_current"
-    name: "Output Current"
+    name: "Total Output Current"
     test_point: "I_OUT"
     parameter: "current"
     unit: "A"
-    measurability: "internal"
-    physical_description: "Near the output connector, look for a small resistor (typically 0.1Ω-0.5Ω) in series with the positive output rail"
-    component_type: "resistor"
+    measurability: "live_only"
+    physical_description: >
+      Measure in series with the positive output conductor between the PSU output
+      terminal and the camera load. Use a DC clamp meter or break the output wire
+      and insert a multimeter in series.
+    probe_placement: >
+      Set meter to DC current (A), 10A range.
+      Insert meter in series with positive output conductor, or use DC clamp meter.
     image_url: "https://raw.githubusercontent.com/Michael-Gichamu/biomed-troubleshooter/main/data/equipment/cctv-psu-24w-v1-test-points/resistor_1.png"
-    diagnostic_meaning: "Monitors load current for overcurrent protection. High current indicates output short or overload condition."
-    expected_behavior: "0-2.0A normal; 2.0-2.5A overload; >2.5A overcurrent (protection)"
-    related_tests: []
+    diagnostic_meaning: >
+      Total output current above rated maximum causes thermal stress on Q1 and D3.
+      Sustained overload is the primary cause of thermal shutdown (SIG-007).
+      Measure to confirm load is within rated limits before concluding thermal failure
+      is due to component degradation.
+    expected_behavior: "0–2A for 24W rated output at 12V; sustained above 2A = overload"
     pro_tips:
-      - "Use current measurement or measure voltage drop across sense resistor"
-      - "Divide the voltage drop by the resistor value to get current"
-      - "Overcurrent protection triggers around 2.0A-2.5A"
+      - "Divide rated power by output voltage: 24W ÷ 12V = 2A maximum"
+      - "Current above 2A sustained indicates overload — check camera count and cable length"
 
-  - signal_id: "feedback_resistor"
-    name: "Feedback Resistor"
-    test_point: "R2"
-    parameter: "resistance"
-    unit: "Ω"
-    measurability: "internal"
-    physical_description: "Center area of PCB, small beige or blue rectangular component marked R2. Usually a 470Ω 1% metal film resistor."
-    component_type: "resistor"
-    image_url: "https://raw.githubusercontent.com/Michael-Gichamu/biomed-troubleshooter/main/data/equipment/cctv-psu-24w-v1-test-points/resistor_1.png"
-    diagnostic_meaning: "Sets output voltage via feedback loop. If open, output goes high. If shorted, output drops to near zero."
-    expected_behavior: "465-475Ω (470Ω ±1%)"
-    related_tests: []
-    pro_tips:
-      - "This resistor sets the output voltage - if open, output goes high"
-      - "If shorted, output voltage will drop to near zero"
-      - "Check this if you have overvoltage or no-output conditions"
-
-  - signal_id: "output_capacitor_esr"
-    name: "Output Capacitor ESR"
-    test_point: "C12"
-    parameter: "resistance"
-    unit: "Ω"
-    measurability: "internal"
-    physical_description: "Bottom-right of PCB, the large electrolytic capacitor (1000μF 16V). Marked C12 on PCB silkscreen."
-    component_type: "capacitor"
-    image_url: "https://raw.githubusercontent.com/Michael-Gichamu/biomed-troubleshooter/main/data/equipment/cctv-psu-24w-v1-test-points/main_capacitor_test_point.png"
-    diagnostic_meaning: "Filter capacitor health indicator. High ESR causes output ripple, voltage droop under load, and can trigger thermal issues."
-    expected_behavior: "<0.2Ω normal; 0.2-0.5Ω degraded; >0.5Ω failed"
-    related_tests: []
-    pro_tips:
-      - "High ESR causes output ripple and voltage droop under load"
-      - "Use an ESR meter for accurate readings - multimeter won't work"
-      - "Replace with low-ESR capacitor if reading above 0.5Ω"
-
-  # Thermal
-  - signal_id: "u5_temperature"
-    name: "U5 Case Temperature"
-    test_point: "U5"
-    parameter: "temperature"
-    unit: "°C"
-    measurability: "internal"
-    physical_description: "Center-right of PCB, black 8-pin IC in rectangular package. This is the buck converter controller IC."
-    component_type: "mosfet"
-    image_url: "https://raw.githubusercontent.com/Michael-Gichamu/biomed-troubleshooter/main/data/equipment/cctv-psu-24w-v1-test-points/mosfet_transistor.png"
-    diagnostic_meaning: "Buck converter switching element temperature. High temperature indicates overload, poor heatsinking, or component degradation."
-    expected_behavior: "40-60°C normal under light load; 60-80°C elevated; >80°C warning; >95°C critical"
-    related_tests: []
-    pro_tips:
-      - "Normal operating temperature is 40-60°C under light load"
-      - "Above 80°C indicates thermal issues or overload"
-      - "Use an infrared thermometer or thermal camera for accurate readings"
 
 # =============================================================================
-# THRESHOLDS - Semantic states and numerical boundaries
+# THRESHOLDS — Dict format (signal_id → states)
+# NOTE: This must be a dict, not a list, for correct operation.
 # =============================================================================
 thresholds:
-  # AC Input
-  - signal_id: "ac_input"
+  bridge_output:
     states:
-      normal: { min: 170, max: 265 }
-      degraded: { min: 150, max: 285 }
-      under_voltage: { max: 150 }
-      over_voltage: { min: 285 }
-      missing: { max: 10 }
+      normal:
+        min: 280
+        max: 340
+        description: "Correct DC bus for 230VAC supply. Physics: 230V × √2 = 325V peak, minus drops ≈ 310V DC."
+      low_voltage_input:
+        min: 140
+        max: 175
+        description: "Normal for 115VAC supply — not a fault"
+      degraded:
+        min: 50
+        max: 280
+        description: "DC bus abnormally low — C1 degraded (visually inspect, test capacitance) or bridge partially failed"
+      missing:
+        min: 0
+        max: 50
+        description: "Zero DC bus — bridge rectifier open, MOV shorted, or F1 blown"
 
-  # Bridge Output
-  - signal_id: "bridge_output"
+  ac_input:
     states:
-      normal: { min: 280, max: 380 }
-      degraded: { min: 250, max: 400 }
-      low: { max: 250 }
-      missing: { max: 10 }
+      normal:
+        min: 200
+        max: 250
+        description: "Normal 230VAC mains supply"
+      low_voltage_region:
+        min: 100
+        max: 130
+        description: "Normal 115VAC supply region"
+      degraded:
+        min: 150
+        max: 200
+        description: "Below nominal voltage — check supply quality"
+      missing:
+        min: 0
+        max: 10
+        description: "No AC supply — check power cord, outlet, circuit breaker"
 
-  # 12V Output
-  - signal_id: "output_12v"
+  input_fuse:
     states:
-      normal: { min: 11.4, max: 12.6 }
-      degraded: { min: 10.8, max: 13.2 }
-      under_voltage: { max: 10.8 }
-      over_voltage: { min: 13.2 }
-      missing: { max: 0.5 }
+      normal:
+        min: 0
+        max: 0.1
+        description: "F1 intact. Rating: T5A/250V time-delay."
+      failed:
+        min: 1000
+        max: 999999
+        description: "F1 blown. Test Q1 D-S resistance and D3 before replacing. Replace only with T5A/250V time-delay."
 
-  # Feedback Reference
-  - signal_id: "feedback_ref"
+  primary_mosfet:
     states:
-      normal: { min: 2.4, max: 2.6 }
-      degraded: { min: 2.2, max: 2.8 }
-      failed: { max: 0.2 }
-      over: { min: 2.8 }
+      normal:
+        min: 100000
+        max: 999999
+        description: "Q1 healthy — high D-S resistance in both probe orientations"
+      shorted:
+        min: 0
+        max: 10
+        description: "Q1 failed D-S short. Most common cause of blown F1. Also test D3."
+      degraded:
+        min: 10
+        max: 10000
+        description: "Q1 partially degraded — higher on-resistance, may cause thermal issues"
 
-  # Output Current
-  - signal_id: "output_current"
+  output_12v:
     states:
-      normal: { min: 0, max: 2.0 }
-      overload: { min: 2.0, max: 2.5 }
-      over_current: { min: 2.5 }
-      shorted: { max: 0.01 }
+      normal:
+        min: 11.4
+        max: 12.6
+        description: "Output within ±5% of 12V — regulation healthy"
+      degraded_low:
+        min: 10.8
+        max: 11.4
+        description: "Slightly low — visually inspect C8/C10/C14 for bulging tops; test capacitance with MS8250D"
+      degraded_high:
+        min: 12.6
+        max: 13.2
+        description: "Slightly high — test TL431 REF pin and optocoupler"
+      under_voltage:
+        min: 0.5
+        max: 10.8
+        description: "Significant under-voltage — visually inspect C8/C10/C14, test capacitance with MS8250D, test D3, check feedback"
+      over_voltage:
+        min: 13.2
+        max: 999
+        description: "OVERVOLTAGE — disconnect all cameras immediately. Test TL431 REF, measure R2."
+      missing:
+        min: 0
+        max: 0.5
+        description: "Zero output — measure DC bus at C1 to determine primary vs secondary fault"
 
-  # Feedback Resistor
-  - signal_id: "feedback_resistor"
+  schottky_diode:
     states:
-      normal: { min: 465, max: 475 }
-      degraded: { min: 450, max: 490 }
-      open: { min: 100000 }
-      shorted: { max: 10 }
+      normal:
+        min: 0.15
+        max: 0.45
+        description: "D3 healthy Schottky forward voltage"
+      shorted:
+        min: 0
+        max: 0.1
+        description: "D3 failed shorted. Causes Q1 cascade failure. Replace D3 and Q1."
+      open:
+        min: 999
+        max: 999999
+        description: "D3 failed open. No secondary rectification path. Output = 0V."
 
-  # Output Capacitor ESR
-  - signal_id: "output_capacitor_esr"
+  output_capacitor_esr:
     states:
-      normal: { max: 0.2 }
-      degraded: { max: 0.5 }
-      failed: { min: 0.5 }
+      normal:
+        description: "Flat top, no physical damage, capacitance within 20% of rated value on MS8250D"
+      degraded:
+        description: "Slightly bulging top OR capacitance 20-50% below rated — replace"
+      failed:
+        description: "Bulging/blown top, leaked electrolyte, OR capacitance >50% below rated, OR reads OL or shorted — replace immediately"
 
-  # Temperature
-  - signal_id: "u5_temperature"
+  feedback_ref:
     states:
-      normal: { max: 60 }
-      elevated: { max: 80 }
-      warning: { max: 95 }
-      critical: { min: 95 }
+      normal:
+        min: 2.44
+        max: 2.55
+        description: "TL431 reference at 2.495V — feedback loop regulating correctly"
+      degraded:
+        min: 2.3
+        max: 2.7
+        description: "Reference off nominal — borderline, investigate"
+      failed_low:
+        min: 0
+        max: 2.3
+        description: "Reference too low — R2/R2A drifted or TL431 failed"
+      failed_high:
+        min: 2.7
+        max: 10
+        description: "Reference too high — R2 (240kΩ) failed open or drifted high"
+
+  feedback_resistor:
+    states:
+      normal:
+        min: 220000
+        max: 264000
+        description: "R2 within 240kΩ ±10% — acceptable range"
+      open:
+        min: 1000000
+        max: 999999999
+        description: "R2 failed open — causes output overvoltage. Replace with 240kΩ ±1% metal film."
+      drifted:
+        min: 264000
+        max: 1000000
+        description: "R2 significantly high — output voltage shifted proportionally upward"
+
+  output_current:
+    states:
+      normal:
+        min: 0
+        max: 2.0
+        description: "Within rated 24W output capacity"
+      overload:
+        min: 2.0
+        max: 999
+        description: "Above rated current — check camera count and load for short circuit"
+
 
 # =============================================================================
-# FAULTS - All faults, signatures, and recovery actions
+# SIGNAL DEPENDENCIES — Used by hypothesis engine for chain inference
+# =============================================================================
+signal_dependencies:
+  - upstream: "ac_input"
+    downstream: "bridge_output"
+    relationship: "AC input is required for any DC bus voltage to appear at C1"
+
+  - upstream: "input_fuse"
+    downstream: "bridge_output"
+    relationship: "F1 open guarantees C1 DC bus = 0V regardless of AC input"
+
+  - upstream: "bridge_output"
+    downstream: "output_12v"
+    relationship: >
+      C1 = 0V guarantees output_12v = 0V. Measure C1 DC bus first before any other test.
+      C1 = 280–340V with output = 0V localises fault to Q1, startup circuit, D3, or secondary.
+
+  - upstream: "primary_mosfet"
+    downstream: "output_12v"
+    relationship: "Q1 D-S shorted prevents switching — output = 0V even with C1 at 310V"
+
+  - upstream: "schottky_diode"
+    downstream: "output_12v"
+    relationship: >
+      D3 open = no secondary rectification path = output 0V.
+      D3 shorted = secondary short = Q1 overstress cascade = F1 blown.
+
+  - upstream: "output_capacitor_esr"
+    downstream: "output_12v"
+    relationship: "Degraded C8/C10/C14 (high internal resistance, detectable by bulging top or low capacitance reading on MS8250D) causes output voltage droop under load"
+
+  - upstream: "feedback_resistor"
+    downstream: "feedback_ref"
+    relationship: "R2 open causes TL431 REF to rise above 2.495V, driving output to overvoltage"
+
+  - upstream: "feedback_ref"
+    downstream: "output_12v"
+    relationship: "feedback_ref above 2.495V drives duty cycle increase → output rises above 12V"
+
+
+# =============================================================================
+# FAULTS — List of fault definitions with signatures, hypotheses, and recovery
 # =============================================================================
 faults:
-  # Fault: Output Rail Collapse
-  - fault_id: "output_rail_collapse"
-    name: "Output Rail Collapse"
-    description: "12V output has collapsed to near zero"
-    priority: 1  # Highest priority - most common failure
+
+  - fault_id: "input_stage_failure"
+    name: "Input Stage Failure"
+    description: >
+      Zero DC bus voltage at C1 despite AC input confirmed and F1 intact.
+      Bridge rectifier has failed open, or MOV has shorted, or C1 has internally shorted.
+    priority: 1
+    symptom_pattern: "ac_input=normal, input_fuse=intact, bridge_output=0V, output_12v=0V"
     signatures:
+      - signal_id: "bridge_output"
+        state: "missing"
+        confidence: 0.95
       - signal_id: "output_12v"
         state: "missing"
-        confidence: 0.9
-      - signal_id: "feedback_ref"
-        state: "failed"
-        confidence: 0.6
+        confidence: 0.90
+      - signal_id: "input_fuse"
+        state: "normal"
+        confidence: 0.80
     hypotheses:
       - rank: 1
-        component: "U5"
-        failure_mode: "failed"
-        cause: "Buck converter IC has failed"
-        confidence: 0.85
+        component: "Bridge rectifier"
+        failure_mode: "open_diode"
+        cause: "One or more bridge rectifier diodes failed open — no DC rectification"
+        confidence: 0.55
       - rank: 2
-        component: "BR1"
+        component: "MOV"
+        failure_mode: "shorted"
+        cause: "Surge suppressor MOV failed short — pulls AC line toward ground"
+        confidence: 0.25
+      - rank: 3
+        component: "C1"
+        failure_mode: "internally_shorted"
+        cause: "Primary bulk capacitor C1 (68μF 450V) internally shorted — DC bus pulled to zero"
+        confidence: 0.20
+    recovery:
+      - step: 1
+        action: "safety"
+        target: "Discharge C1"
+        instruction: "Disconnect AC. Connect 10kΩ 2W resistor across C1 terminals for 30 seconds. Verify less than 10V."
+        safety: "C1 stores ~310V DC — lethal even after power disconnect"
+      - step: 2
+        action: "measure"
+        target: "Bridge rectifier diodes individually"
+        instruction: "Diode test mode. Test all 4 bridge diodes. Each healthy diode: 0.5–0.7V forward, OL reverse. OL in forward direction = diode failed open."
+        verification: "All 4 diodes show 0.5–0.7V forward"
+      - step: 3
+        action: "measure"
+        target: "MOV resistance"
+        instruction: "Resistance mode. Healthy MOV = several MΩ both directions. Shorted MOV = less than 10Ω."
+        verification: "MOV reads greater than 1MΩ in both probe orientations"
+      - step: 4
+        action: "replace"
+        target: "Failed component as identified"
+        instruction: "Replace bridge rectifier with equivalent rating (minimum 400V, 2A). Replace MOV if shorted."
+        verification: "bridge_output (C1) reads 280–340V after repair and power-on"
+
+  - fault_id: "switching_stage_failure"
+    name: "Switching Stage Failure"
+    description: >
+      DC bus at C1 is present and correct (280–340V) but 12V output is zero.
+      Fault is in Q1, startup circuit, D3, or U3 (M5579P).
+    priority: 1
+    symptom_pattern: "bridge_output=280-340V, output_12v=0V"
+    signatures:
+      - signal_id: "bridge_output"
+        state: "normal"
+        confidence: 0.90
+      - signal_id: "output_12v"
+        state: "missing"
+        confidence: 0.95
+    hypotheses:
+      - rank: 1
+        component: "Startup circuit"
+        failure_mode: "open"
+        cause: "Startup resistor open — U3 (M5579P) never receives VCC — no switching"
+        confidence: 0.35
+      - rank: 2
+        component: "Q1"
+        failure_mode: "shorted_or_open"
+        cause: "Primary MOSFET Q1 failed — D-S shorted or open — no effective switching"
+        confidence: 0.30
+      - rank: 3
+        component: "D3"
+        failure_mode: "open"
+        cause: "Output Schottky D3 failed open — no secondary rectification path"
+        confidence: 0.20
+      - rank: 4
+        component: "U3 (M5579P)"
         failure_mode: "failed"
-        cause: "Bridge rectifier has failed"
+        cause: "PWM controller U3 failed — no gate drive signal to Q1"
+        confidence: 0.15
+    recovery:
+      - step: 1
+        action: "safety"
+        target: "Discharge C1"
+        instruction: "Disconnect AC. 10kΩ 2W resistor across C1 for 30 seconds. Verify less than 10V."
+      - step: 2
+        action: "measure"
+        target: "Q1 drain-to-source resistance"
+        instruction: "Power off, C1 discharged. Resistance between Q1 Drain and Source, both orientations. Less than 10Ω = shorted."
+        verification: "Q1 D-S greater than 100kΩ in both directions"
+      - step: 3
+        action: "measure"
+        target: "D3 diode test"
+        instruction: "Diode test mode. D3 anode to cathode. 0.15–0.45V forward = healthy. OL forward = open. ~0V both = shorted."
+        verification: "D3 reads 0.15–0.45V forward, OL reverse"
+      - step: 4
+        action: "measure"
+        target: "Startup resistor continuity"
+        instruction: "Resistance mode. OL = startup resistor open — U3 never starts."
+        verification: "Startup circuit shows finite resistance, not OL"
+      - step: 5
+        action: "replace"
+        target: "All identified failed components"
+        instruction: "Replace Q1 and/or D3 as identified. If both Q1 and D3 are shorted, replace both — D3 short caused Q1 failure. Replace startup resistor if open."
+        verification: "output_12v = 11.4–12.6V after repair"
+
+  - fault_id: "fuse_cascade_failure"
+    name: "Blown Fuse F1 — D3-Q1 Cascade"
+    description: >
+      Input fuse F1 (T5A/250V) is blown. Root cause is typically D3 failing shorted,
+      which overloads the transformer secondary, stresses Q1 to failure, and ultimately
+      blows F1. F1 is the last component to fail in this sequence.
+    priority: 1
+    symptom_pattern: "input_fuse=blown, output_12v=0V"
+    signatures:
+      - signal_id: "input_fuse"
+        state: "failed"
+        confidence: 1.0
+      - signal_id: "output_12v"
+        state: "missing"
+        confidence: 0.95
+    hypotheses:
+      - rank: 1
+        component: "D3 and Q1"
+        failure_mode: "cascade_short"
+        cause: "D3 shorted → secondary short → Q1 overstress → Q1 D-S shorted → F1 blown"
+        confidence: 0.65
+      - rank: 2
+        component: "Q1"
+        failure_mode: "shorted"
+        cause: "Q1 failed independently (surge, thermal stress) → F1 blown"
+        confidence: 0.25
+      - rank: 3
+        component: "Bridge rectifier"
+        failure_mode: "internally_shorted"
+        cause: "Bridge rectifier internally shorted — high current from AC mains blows F1"
         confidence: 0.10
     recovery:
       - step: 1
-        action: "inspect"
-        target: "Input fuse F1"
-        instruction: "Check fuse continuity"
-        verification: "Fuse reads <0.1Ω"
-        safety: "Disconnect AC power before inspection"
+        action: "safety"
+        target: "Do not replace F1 yet"
+        instruction: "Disconnect AC. Do not replace F1 before identifying the root cause."
       - step: 2
         action: "measure"
-        target: "Bridge output TP1"
-        instruction: "Measure DC voltage at bridge output"
-        verification: "Should read 280-380V DC"
+        target: "Q1 drain-to-source resistance"
+        instruction: "C1 discharged. Q1 D-S both orientations. Less than 10Ω = shorted."
+      - step: 3
+        action: "measure"
+        target: "D3 diode test"
+        instruction: "Approximately 0V in both orientations = D3 shorted — this is the root cause."
+      - step: 4
+        action: "replace"
+        target: "All shorted semiconductors"
+        instruction: "Replace Q1 if shorted. Replace D3 if shorted. Verify no remaining less than 10Ω readings between any semiconductor pins."
+      - step: 5
+        action: "replace"
+        target: "F1 (T5A/250V time-delay)"
+        instruction: "Install new T5A/250V time-delay fuse. Power on briefly with load connected."
+        verification: "F1 remains intact. output_12v = 11.4–12.6V."
+
+  - fault_id: "low_output_voltage"
+    name: "Low Output Voltage Under Load"
+    description: >
+      Output voltage drops below 10.8V under rated load. Most common cause is degraded
+      output filter capacitors C8, C10, or C14 — detectable by bulging top on visual
+      inspection or reduced capacitance reading on MASTECH MS8250D.
+    priority: 2
+    symptom_pattern: "output_12v=under_voltage under load, bridge_output=normal"
+    signatures:
+      - signal_id: "output_12v"
+        state: "under_voltage"
+        confidence: 0.90
+      - signal_id: "output_capacitor_esr"
+        state: "failed"
+        confidence: 0.70
+    hypotheses:
+      - rank: 1
+        component: "C8, C10, or C14"
+        failure_mode: "degraded"
+        cause: "Output capacitor degraded — increased internal resistance causes voltage droop under load. Visually inspect for bulging top. Confirm with capacitance measurement on MS8250D."
+        confidence: 0.50
+      - rank: 2
+        component: "D3"
+        failure_mode: "degraded"
+        cause: "D3 forward voltage Vf increased — reduces net output voltage"
+        confidence: 0.25
+      - rank: 3
+        component: "R2 or R2A"
+        failure_mode: "drifted"
+        cause: "Feedback divider value changed — output regulation setpoint lowered"
+        confidence: 0.15
+      - rank: 4
+        component: "TR1"
+        failure_mode: "degraded"
+        cause: "Transformer coupling degraded — reduced energy transfer to secondary"
+        confidence: 0.10
+    recovery:
+      - step: 1
+        action: "inspect_and_measure"
+        target: "C8, C10, C14 — visual then capacitance"
+        instruction: "Power off. Discharge each capacitor. STEP 1: Visually inspect top of each — bulging or blown top = replace immediately. STEP 2: Desolder one lead of each, set MS8250D to capacitance (F), measure each. Replace any reading more than 20% below rated value or reads OL/shorted."
+        verification: "All three caps have flat tops and read within 20% of rated capacitance"
+      - step: 2
+        action: "measure"
+        target: "D3 forward voltage"
+        instruction: "Diode test on D3. Forward voltage greater than 0.6V indicates degradation."
+        verification: "D3 forward voltage 0.15–0.45V"
       - step: 3
         action: "replace"
-        target: "U5"
-        instruction: "Replace buck converter IC"
-        verification: "Output returns to 12V ±5%"
-        estimated_time: "15 minutes"
-        difficulty: "moderate"
-        tools: ["Soldering iron", "Thermal paste"]
+        target: "Identified degraded capacitor(s) or degraded D3"
+        instruction: "Replace failed caps with low-ESR 105°C grade (same capacitance and voltage rating). Replace D3 with Schottky of same specification if Vf > 0.6V."
+        verification: "output_12v = 11.4–12.6V under rated load"
 
-  # Fault: Overvoltage Output
   - fault_id: "overvoltage_output"
-    name: "Overvoltage Output"
-    description: "12V output exceeds safe maximum"
-    priority: 4
+    name: "Output Overvoltage"
+    description: >
+      Output voltage exceeds 13.2V. Feedback loop has lost control.
+      Most common causes: optocoupler CTR degradation or R2 failed open.
+      Connected camera electronics are at risk of permanent damage.
+    priority: 1
+    safety_action: "Disconnect ALL cameras and loads immediately before diagnosing"
+    symptom_pattern: "output_12v > 13.2V"
     signatures:
       - signal_id: "output_12v"
         state: "over_voltage"
         confidence: 0.95
     hypotheses:
       - rank: 1
+        component: "Optocoupler"
+        failure_mode: "degraded_ctr"
+        cause: "CTR degraded with age — less feedback reaches U3 — duty cycle increases — output climbs"
+        confidence: 0.50
+      - rank: 2
         component: "R2"
         failure_mode: "open"
-        cause: "Feedback resistor R2 has failed open"
-        confidence: 0.92
+        cause: "R2 (240kΩ) failed open — TL431 REF rises — feedback setpoint shifts — output goes to maximum"
+        confidence: 0.40
+      - rank: 3
+        component: "TL431"
+        failure_mode: "failed"
+        cause: "TL431 shunt regulator failed — incorrect reference voltage"
+        confidence: 0.10
     recovery:
       - step: 1
-        action: "measure"
-        target: "Feedback reference TP3"
-        instruction: "Measure reference voltage"
-        verification: "Should read 2.5V ±0.1V"
+        action: "safety"
+        target: "All camera loads"
+        instruction: "Disconnect ALL cameras immediately. Overvoltage above 15V permanently damages camera sensors."
       - step: 2
         action: "measure"
-        target: "Feedback resistor R2"
-        instruction: "Measure R2 resistance"
-        verification: "Should read 470Ω ±1%"
+        target: "TL431 REF pin voltage"
+        instruction: "Unit powered on, no load. Measure TL431 REF pin. Expected: 2.44–2.55V."
+        verification: "Approximately 2.495V = optocoupler fault. Greater than 2.6V = R2 fault."
       - step: 3
         action: "replace"
-        target: "R2"
-        instruction: "Replace with 470Ω ±1% resistor"
-        verification: "Output returns to 12V ±5%"
+        target: "Optocoupler if REF ≈ 2.495V; R2 if REF > 2.6V"
+        instruction: "Replace optocoupler with same part number. Or desolder R2, measure — if open or significantly above 240kΩ, replace with 240kΩ ±1% metal film."
+        verification: "output_12v = 11.4–12.6V with cameras reconnected"
 
-  # Fault: Thermal Shutdown
-  - fault_id: "thermal_shutdown"
-    name: "Thermal Shutdown"
-    description: "Unit shuts down after operating for several minutes"
-    priority: 5
+  - fault_id: "hiccup_mode"
+    name: "Hiccup Mode — Cycling Output"
+    description: >
+      Output pulses on and off at 0.5–2Hz. Overcurrent or overvoltage protection
+      is repeatedly triggering and resetting.
+    priority: 2
+    symptom_pattern: "output_12v cycling between 0V and normal voltage"
     signatures:
-      - signal_id: "u5_temperature"
-        state: "critical"
-        confidence: 0.9
       - signal_id: "output_12v"
         state: "missing"
-        confidence: 0.7
+        confidence: 0.60
     hypotheses:
       - rank: 1
-        component: "U5"
-        failure_mode: "overheating"
-        cause: "Inadequate heatsinking on buck converter"
-        confidence: 0.87
+        component: "Connected load"
+        failure_mode: "short_or_overload"
+        cause: "Camera or cable drawing more than rated current — OCP triggering and resetting"
+        confidence: 0.40
+      - rank: 2
+        component: "C8, C10, or C14"
+        failure_mode: "degraded"
+        cause: "Degraded output capacitors (high internal resistance) cause ripple that false-triggers overcurrent protection. Inspect for bulging tops."
+        confidence: 0.35
+      - rank: 3
+        component: "Feedback network"
+        failure_mode: "unstable"
+        cause: "Feedback loop instability — loop oscillating"
+        confidence: 0.25
     recovery:
       - step: 1
-        action: "measure"
-        target: "U5 temperature"
-        instruction: "Monitor temperature during operation"
+        action: "test"
+        target: "Disconnect all camera loads"
+        instruction: "Remove all cameras and cables from output terminals. Observe output."
+        verification: "If cycling stops: load fault — reconnect cameras one at a time to find faulty unit. If cycling continues: internal PSU fault — proceed to step 2."
       - step: 2
-        action: "inspect"
-        target: "Heatsink"
-        instruction: "Check heatsink attachment and thermal compound"
-      - step: 3
-        action: "improve"
-        target: "Thermal management"
-        instruction: "Add/replace heatsink or improve airflow"
-        verification: "Temperature stays below 70°C at full load"
+        action: "measure"
+        target: "C8, C10, C14 — visual inspection and capacitance test"
+        instruction: "Power off, discharge each. Visually inspect for bulging tops. Desolder one lead and test capacitance with MS8250D. Replace any showing physical damage or capacitance >20% below rated."
+        verification: "All three capacitors less than 0.2Ω"
 
-  # Fault: Excessive Ripple
-  - fault_id: "excessive_ripple"
-    name: "Excessive Output Ripple"
-    description: "Output voltage ripple exceeds specification"
+  - fault_id: "thermal_shutdown"
+    name: "Thermal Shutdown"
+    description: >
+      Unit operates correctly from cold start, shuts down after 5–30 minutes,
+      recovers after cooling. Thermal protection is triggering.
     priority: 3
+    symptom_pattern: "output_12v=missing after warm-up, recovers when cool"
     signatures:
       - signal_id: "output_12v"
-        state: "degraded"
-        confidence: 0.8
-      - signal_id: "output_capacitor_esr"
-        state: "failed"
-        confidence: 0.9
+        state: "missing"
+        confidence: 0.70
     hypotheses:
       - rank: 1
-        component: "C12"
+        component: "Load"
+        failure_mode: "overload"
+        cause: "Total output current exceeds rated maximum — excess heat in Q1 and D3"
+        confidence: 0.40
+      - rank: 2
+        component: "Q1"
         failure_mode: "degraded"
-        cause: "Output capacitor has high ESR"
-        confidence: 0.90
+        cause: "Q1 partially degraded — higher RDS(on) — more heat generated during switching"
+        confidence: 0.35
+      - rank: 3
+        component: "D3 thermal interface"
+        failure_mode: "degraded"
+        cause: "D3 thermal compound dried — inadequate heat transfer to heatsink"
+        confidence: 0.25
     recovery:
       - step: 1
         action: "measure"
-        target: "C12 ESR"
-        instruction: "Measure capacitor ESR"
-        verification: "Should be <0.2Ω"
+        target: "Total output current under load"
+        instruction: "Measure current to all cameras combined. Maximum rated = 2A for 24W at 12V."
+        verification: "Total output current less than or equal to 2A"
       - step: 2
-        action: "replace"
-        target: "C12"
-        instruction: "Replace with low-ESR 1000μF 16V capacitor"
-        verification: "Ripple <50mV p-p"
-
-  # Fault: Primary Side Failure
-  - fault_id: "primary_side_failure"
-    name: "Primary Side Input Fault"
-    description: "AC input not reaching primary side circuits"
-    priority: 2
-    signatures:
-      - signal_id: "ac_input"
-        state: "normal"
-        confidence: 0.9
-      - signal_id: "bridge_output"
-        state: "low"
-        confidence: 0.95
-    hypotheses:
-      - rank: 1
-        component: "F1"
-        failure_mode: "open"
-        cause: "Input fuse has failed"
-        confidence: 0.88
-    recovery:
-      - step: 1
         action: "inspect"
-        target: "Input fuse F1"
-        instruction: "Visual inspection of fuse"
-      - step: 2
-        action: "measure"
-        target: "F1 resistance"
-        instruction: "Measure fuse continuity"
-        verification: "Should read <0.1Ω"
+        target: "D3 heatsink thermal interface"
+        instruction: "D3 (white TO-220) carries full output current and must have good heatsink contact. Check mounting, clean contact surfaces, reapply thermal compound."
+        verification: "D3 case temperature less than 70°C after 30 minutes at rated load"
       - step: 3
-        action: "replace"
-        target: "F1"
-        instruction: "Replace with 250V 1A slow-blow fuse"
-        verification: "Primary side voltage returns"
+        action: "measure"
+        target: "Q1 during startup (advanced)"
+        instruction: "If load and D3 are both confirmed acceptable, Q1 RDS(on) may have degraded. Consider Q1 replacement."
+
 
 # =============================================================================
 # TROUBLESHOOTING STRATEGIES
 # =============================================================================
 strategies:
-  default: "protection_first"
+  default: "half_split_dc_bus"
   available:
-    - id: "protection_first"
-      name: "Protection-First Reasoning"
-      description: "Check protection circuits first"
+    - id: "half_split_dc_bus"
+      name: "Half-Split at DC Bus"
+      description: >
+        Measure DC bus voltage at C1 (Dongbaohe 450V 68μF) first.
+        A single measurement eliminates approximately 50% of possible fault locations.
+        C1 is on the primary switching side of the board (Q1/U3/TR1 side), rated 450V.
+        C8/C10/C14 are the secondary output capacitors (~16-25V rated) on the output side.
+        These are different components — probe C1, not C8/C10/C14.
       priority_order:
-        - "Check for obvious protection triggers"
-        - "Verify input power integrity"
-        - "Check output short conditions"
-        - "Isolate failure to primary/secondary"
-    - id: "energy_flow"
-      name: "Energy Flow Tracing"
-      description: "Trace power from input to output"
+        - "Confirm AC input is present (200–250V AC)"
+        - "Confirm F1 is intact (resistance, power off)"
+        - "Measure DC bus at C1 positive terminal (750V DC range, live measurement)"
+        - "C1 = 280–340V: test Q1 D-S, D3, startup circuit, U3"
+        - "C1 = 0V: test bridge rectifier diodes and MOV"
+
+    - id: "blown_fuse_protocol"
+      name: "Blown Fuse Protocol"
+      description: >
+        F1 (T5A/250V) blows as a consequence of downstream shorts, not independently.
+        Do not replace F1 before identifying and repairing all shorts.
       priority_order:
-        - "Verify AC input"
-        - "Check primary conversion"
-        - "Verify regulation"
-        - "Check output stage"
-    - id: "binary_partition"
-      name: "Binary Partition"
-      description: "Divide system in half, test each half"
-    - id: "information_gain"
-      name: "Information Gain"
-      description: "Order tests by information gain"
-  active: "protection_first"
+        - "Do NOT replace F1 immediately"
+        - "Test Q1 D-S resistance (less than 10Ω = shorted)"
+        - "If Q1 shorted: test D3 diode (D3 short is common root cause)"
+        - "Replace all shorted semiconductors"
+        - "Verify no remaining shorts before installing new F1 (T5A/250V time-delay)"
+
+    - id: "feedback_trace"
+      name: "Feedback Loop Trace"
+      description: "For degraded output voltage — trace from output back through the feedback network."
+      priority_order:
+        - "Measure output_12v under rated load"
+        - "Visually inspect C8, C10, C14 for bulging tops, then test capacitance with MS8250D (one lead desoldered)"
+        - "Measure TL431 REF pin (expected 2.44–2.55V)"
+        - "Measure R2 resistance out-of-circuit (expected ~240kΩ)"
+
+    - id: "overvoltage_protocol"
+      name: "Overvoltage Protocol"
+      description: "For output above 13.2V — disconnect loads before any measurement."
+      priority_order:
+        - "DISCONNECT ALL CAMERAS AND LOADS IMMEDIATELY"
+        - "Measure TL431 REF pin with no load connected"
+        - "REF ≈ 2.495V: replace optocoupler"
+        - "REF > 2.6V: measure R2 out-of-circuit — replace if open or drifted above 240kΩ"
+
+
+# =============================================================================
+# SAFETY PROTOCOLS
+# =============================================================================
+safety:
+  primary_warning: >
+    Lethal voltages are present on the primary side of this board at all times when AC
+    is connected, and for a period after disconnection due to stored charge in C1.
+    Always discharge C1 before touching primary-side components.
+
+  c1_discharge:
+    component: "C1 — Dongbaohe 450V 68μF 105°C"
+    stored_voltage: "Approximately 310V DC"
+    procedure: "10kΩ 2W resistor across C1 terminals for 30 seconds. Verify less than 10V before touching."
+
+  fuse_specification:
+    rating: "T5A/250V — time-delay (slow-blow), 5 Ampere, 250 Volt"
+    rule: "Replace only with identical T5A/250V time-delay fuse. Never substitute a higher-rated fuse."
+    mandate: "Test Q1 D-S resistance before replacing — a shorted Q1 blows a new fuse immediately"
+
+  probe_ratings:
+    primary_side: "CAT III 600V minimum (C1, Q1 drain, bridge rectifier, TR1 primary)"
+    secondary_side: "CAT II 300V sufficient (J1, C8/C10/C14, TL431, R2/R2A)"
+
+  lethal_points:
+    - "C1 positive terminal — approximately 310V DC stored"
+    - "Q1 drain pin — switched 310V DC"
+    - "Bridge rectifier DC output"
+    - "TR1 primary winding"
+    - "AC input terminals — 230V AC"
+
+  safe_points:
+    - "J1 test point — approximately 12V DC"
+    - "C8, C10, C14 positive terminals — approximately 12V DC"
+    - "Amber output terminal block — approximately 12V DC"
+    - "TL431 REF pin — approximately 2.5V DC"
+    - "R2/R2A resistors — secondary voltage area"
+
 
 # =============================================================================
 # IMAGES
@@ -457,40 +997,30 @@ strategies:
 images:
   - image_id: "pcb_overview"
     filename: "docs/CCTV Power Supply Unit.jpg"
-    description: "Full PCB layout overview"
-    test_points: ["AC_IN", "TP1", "TP2", "TP3", "F1", "U5", "R2", "C12"]
-    annotations:
-      - target: "AC_IN"
-        position: "top-left corner"
-        label: "AC Input Connector"
-      - target: "U5"
-        position: "center-right"
-        label: "Buck Converter IC"
-
-  - image_id: "test_point_tp2"
-    filename: "docs/CCTV Power Supply Unit.jpg"
-    description: "Close-up of TP2 (12V output)"
-    test_points: ["TP2"]
-
-# =============================================================================
-# RECOVERY PROTOCOLS
-# =============================================================================
-recovery_protocols:
-  - protocol_id: "power_cycle"
-    name: "Safe Power Cycle"
-    steps:
-      - step: 1
-        action: "disconnect"
-        instruction: "Disconnect AC power from unit"
-        wait_seconds: 30
-        safety: "Verify power LED is off"
-      - step: 2
-        action: "inspect"
-        instruction: "Check for visible damage or burning"
-      - step: 3
-        action: "connect"
-        instruction: "Reconnect AC power"
-      - step: 4
-        action: "measure"
-        instruction: "Verify output voltage"
-        expected: "12V ±5%"
+    description: "Full SP-80W PCB layout"
+    test_points: ["AC_IN", "C1", "J1", "F1", "Q1", "U3", "R2", "R2A", "C8", "C10", "C14", "D3"]
+    confirmed_labels:
+      input_section:
+        - "F1: T5A/250V (fuse)"
+        - "RT1: NTC 5D-11 (inrush thermistor)"
+        - "MOV: red disc varistor (surge suppressor)"
+        - "CX1, CX2: X-capacitors (EMI filter)"
+        - "MY1: Y-capacitor (EMI filter)"
+      primary_side:
+        - "C1: Dongbaohe 450V 68μF 105°C (primary bulk capacitor)"
+        - "Q1: primary switching MOSFET"
+        - "U3: M5579P PWM controller (8-pin DIP)"
+        - "TR1: flyback transformer (yellow-wound bobbin)"
+      secondary_side:
+        - "D3: output Schottky rectifier (white-body TO-220)"
+        - "J1: 12V output test point (adjacent to D3)"
+        - "C8: output filter capacitor (105°C grade)"
+        - "C10: output filter capacitor (105°C grade)"
+        - "C14: output filter capacitor (105°C grade)"
+        - "R2: upper feedback resistor (240kΩ ±5%)"
+        - "R2A: lower feedback resistor (~62kΩ)"
+        - "TL431: shunt regulator (3-pin TO-92)"
+        - "Optocoupler: 4-pin DIP (crosses isolation barrier)"
+        - "Green LED: power indicator"
+        - "Orange LED: channel indicator"
+        - "Amber terminal block: multi-camera output"

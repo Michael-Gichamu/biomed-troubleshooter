@@ -118,6 +118,9 @@ class ConversationalAgentState:
     iteration_count: int = 0
     max_steps: int = 9  # Maximum diagnostic steps for hypothesis-driven approach
 
+    # Routing (set by decision_node, read by route_from_decision)
+    next_node: str = ""
+
 
 # =============================================================================
 # HELPER FUNCTIONS
@@ -675,6 +678,8 @@ Only output JSON, nothing else."""
     reasoning = ""
     eliminated_faults = list(state.eliminated_faults)
     confirmed_hypothesis = None
+    # Work on a copy — never mutate state in place in LangGraph
+    updated_hypothesis_probabilities = dict(state.hypothesis_probabilities)
     
     try:
         response = invoke_with_retry([{"role": "user", "content": eval_prompt}])
@@ -686,11 +691,11 @@ Only output JSON, nothing else."""
             result = json.loads(json_match.group(0))
             reasoning = result.get('reasoning', '')
             
-            # Update probabilities
+            # Update probabilities on the copy
             prob_updates = result.get('probability_updates', {})
             for h_id, new_prob in prob_updates.items():
-                if h_id in state.hypothesis_probabilities:
-                    state.hypothesis_probabilities[h_id] = new_prob
+                if h_id in updated_hypothesis_probabilities:
+                    updated_hypothesis_probabilities[h_id] = new_prob
             
             # Track eliminated faults
             new_eliminated = result.get('eliminated_faults', [])
@@ -704,12 +709,12 @@ Only output JSON, nothing else."""
         reasoning = f"Error in reasoning: {str(e)}"
     
     # Normalize probabilities to sum to 1 (excluding eliminated)
-    active_probs = {h_id: prob for h_id, prob in state.hypothesis_probabilities.items() 
+    active_probs = {h_id: prob for h_id, prob in updated_hypothesis_probabilities.items() 
                    if h_id not in eliminated_faults}
     total_active = sum(active_probs.values())
     if total_active > 0:
         for h_id in active_probs:
-            state.hypothesis_probabilities[h_id] = active_probs[h_id] / total_active
+            updated_hypothesis_probabilities[h_id] = active_probs[h_id] / total_active
     
     # Select new current hypothesis if needed
     new_current_hypothesis = state.current_hypothesis
@@ -722,7 +727,7 @@ Only output JSON, nothing else."""
         for h in state.hypotheses:
             h_id = h.get('id', '')
             if h_id not in eliminated_faults:
-                prob = state.hypothesis_probabilities.get(h_id, 0)
+                prob = updated_hypothesis_probabilities.get(h_id, 0)
                 if prob > best_prob:
                     best_prob = prob
                     best_h = h_id
@@ -744,10 +749,10 @@ Only output JSON, nothing else."""
         explanation += f"**Analysis:** {reasoning}\n\n"
     
     explanation += "**Updated Hypothesis Probabilities:**\n"
-    sorted_hyps = sorted(state.hypotheses, key=lambda h: state.hypothesis_probabilities.get(h.get('id'), 0), reverse=True)
+    sorted_hyps = sorted(state.hypotheses, key=lambda h: updated_hypothesis_probabilities.get(h.get('id'), 0), reverse=True)
     for h in sorted_hyps:
         h_id = h.get('id', '')
-        prob = state.hypothesis_probabilities.get(h_id, 0)
+        prob = updated_hypothesis_probabilities.get(h_id, 0)
         status = "ELIMINATED" if h_id in eliminated_faults else f"{prob:.1%}"
         explanation += f"- {h_id}: {status}\n"
     
@@ -758,7 +763,7 @@ Only output JSON, nothing else."""
     diagnostic_reasoning.append(f"Step {state.current_step + 1}: Tested {test_point_id}, result={evaluation}. {reasoning[:100] if reasoning else ''}")
     
     return {
-        "hypothesis_probabilities": state.hypothesis_probabilities,
+        "hypothesis_probabilities": updated_hypothesis_probabilities,
         "eliminated_faults": eliminated_faults,
         "current_hypothesis": new_current_hypothesis,
         "diagnostic_reasoning": diagnostic_reasoning,
@@ -818,8 +823,8 @@ def decision_node(state: ConversationalAgentState):
             "messages": [AIMessage(content=f"## Diagnosis Complete - Max Steps Reached\n\nAfter {state.max_steps} diagnostic steps, no conclusive fault was identified.")]
         }
     
-    # 4. No more test points available
-    if state.current_step >= len(state.test_point_rankings):
+    # 4. No more test points available (check NEXT step, since current was just executed)
+    if state.current_step + 1 >= len(state.test_point_rankings):
         return {
             "next_node": "end",
             "diagnosis_status": "insufficient_data",
@@ -999,9 +1004,9 @@ def resume_node(state: ConversationalAgentState):
 # =============================================================================
 
 def route_from_decision(state: ConversationalAgentState) -> str:
-    """Route based on decision_node output."""
-    next_node = state.step_result.get("next_node", "interrupt")
-    
+    """Route based on decision_node output (reads state.next_node set by decision_node)."""
+    next_node = state.next_node or "interrupt"
+
     if next_node == "repair":
         return "repair"
     elif next_node == "end":
@@ -1065,7 +1070,7 @@ def create_conversational_graph():
         {
             "repair": "repair",
             "interrupt": "interrupt",
-            "end": "end"
+            "end": END
         }
     )
     
@@ -1078,7 +1083,7 @@ def create_conversational_graph():
         route_from_interrupt,
         {
             "step": "step",
-            "end": "end"
+            "end": END
         }
     )
     
