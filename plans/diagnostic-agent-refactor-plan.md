@@ -319,14 +319,19 @@ The current `post_tool_route` checks AFTER measurement. The NEW flow:
 - Use MemorySaver checkpointer for thread safety
 - All state changes must be explicit dict returns
 
-## Files to Modify
+## Files Modified
 
-1. **src/studio/diagnostic_agent.py** (NEW)
-   - New 8-node LangGraph implementation
-   - Complete state management
+**COMPLETED REFACTOR:**
+
+1. **src/studio/conversational_agent.py** (REFACTORED)
+   - Single source of truth for troubleshooting workflow
+   - Fixed interrupt/resume behavior
+   - Added completed_steps tracking
+   - Proper step progression: Step 1 → Interrupt → Next → Step 2 → etc.
    
-2. **src/studio/tools.py** (MINOR)
-   - May need minor adjustments for new state structure
+2. **src/application/diagnostic_agent.py** (DELETED)
+   - Removed as part of refactoring
+   - conversational_agent.py now handles all troubleshooting workflow
 
 3. **src/domain/models.py** (POSSIBLE)
    - Add domain models if needed for new state
