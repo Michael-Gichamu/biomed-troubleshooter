@@ -266,9 +266,20 @@ class EquipmentConfig:
             signals[signal.signal_id] = signal
 
         thresholds = {}
-        for t in data.get("thresholds", []):
-            threshold = ThresholdConfig.from_dict(t)
-            thresholds[threshold.signal_id] = threshold
+        thresholds_data = data.get("thresholds", {})
+        # Handle both dict format (preferred) and legacy list format
+        if isinstance(thresholds_data, dict):
+            for signal_id, threshold_dict in thresholds_data.items():
+                # Ensure signal_id is in the data for from_dict
+                threshold_dict_copy = dict(threshold_dict)
+                threshold_dict_copy["signal_id"] = signal_id
+                threshold = ThresholdConfig.from_dict(threshold_dict_copy)
+                thresholds[threshold.signal_id] = threshold
+        elif isinstance(thresholds_data, list):
+            # Legacy list format
+            for t in thresholds_data:
+                threshold = ThresholdConfig.from_dict(t)
+                thresholds[threshold.signal_id] = threshold
 
         faults = {}
         for f in data.get("faults", []):
@@ -276,9 +287,19 @@ class EquipmentConfig:
             faults[fault.fault_id] = fault
 
         images = {}
-        for i in data.get("images", []):
-            image = ImageConfig.from_dict(i)
-            images[image.image_id] = image
+        images_data = data.get("images", {})
+        # Handle both dict format (preferred) and legacy list format
+        if isinstance(images_data, dict):
+            for image_id, image_dict in images_data.items():
+                image_dict_copy = dict(image_dict)
+                image_dict_copy["image_id"] = image_id
+                image = ImageConfig.from_dict(image_dict_copy)
+                images[image.image_id] = image
+        elif isinstance(images_data, list):
+            # Legacy list format
+            for i in images_data:
+                image = ImageConfig.from_dict(i)
+                images[image.image_id] = image
 
         return cls(
             metadata=metadata,
