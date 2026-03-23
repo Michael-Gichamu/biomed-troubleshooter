@@ -280,10 +280,11 @@ def rag_node(state: ConversationalAgentState):
     
     # Store everything in state — equipment_model MUST be returned so downstream nodes have it
     
-    # Build RAG citation message
+    # Build RAG citation message with actual diagnostic content
     rag_citation = ""
     if rag_knowledge and len(rag_knowledge) > 0:
         doc_names = []
+        rag_content_snippets = []
         for r in rag_knowledge[:3]:
             # Try to extract document name from metadata or title
             if isinstance(r, dict):
@@ -293,8 +294,18 @@ def rag_node(state: ConversationalAgentState):
                 elif r.get('content'):
                     # Use first 30 chars of content as identifier if no title
                     doc_names.append(r.get('content', '')[:30] + "...")
+                    # Add actual content snippet
+                    content = r.get('content', '')
+                    if content:
+                        # Take first 200 chars as snippet
+                        snippet = content[:200].strip()
+                        if snippet:
+                            rag_content_snippets.append(f"- {snippet}...")
         if doc_names:
             rag_citation = f"\n\n*Retrieved from: {', '.join(doc_names)}*"
+        # Add actual diagnostic knowledge content
+        if rag_content_snippets:
+            rag_citation += "\n\n### [2. RAG Retrieval]\n\n" + "\n".join(rag_content_snippets)
     
     # Build greeting for new threads
     greeting = ""
@@ -343,7 +354,7 @@ def hypotheses_node(state: ConversationalAgentState):
     symptom_description = ""
     for msg in state.messages:
         if isinstance(msg, HumanMessage):
-            content = msg.content if isinstance(msg.content, str) else str(msg.content)
+            content = extract_text_from_content(msg.content)
             symptom_description += content + " "
     
     # Format test points for LLM
@@ -1003,7 +1014,7 @@ def repair_node(state: ConversationalAgentState):
                             for r in recovery
                         ])
                         # Add source citation
-                        repair_instructions = f"### Repair Procedure for {fault_name}\n\n{repair_steps}\n\n_[Source: {equipment_model}-diagnostics.md]_"
+                        repair_instructions = f"### Repair Procedure for {fault_name}\n\n{repair_steps}\n\n_[Source: {state.equipment_model}-diagnostics.md]_"
                     break
         else:
             # Use LLM to match measurement to fault
@@ -1037,7 +1048,7 @@ Output ONLY the fault ID that best matches, nothing else."""
                             for r in recovery
                         ])
                         # Add source citation
-                        repair_instructions = f"### Repair Procedure for {fault_name}\n\n{repair_steps}\n\n_[Source: {equipment_model}-diagnostics.md]_"
+                        repair_instructions = f"### Repair Procedure for {fault_name}\n\n{repair_steps}\n\n_[Source: {state.equipment_model}-diagnostics.md]_"
                     break
     
     # Final message — expert quality repair guidance

@@ -506,7 +506,7 @@ def read_multimeter(
     
     while time.time() - start_time < max_duration:
         # Get reading from background reader
-        reading = reader.get_reading_with_stabilization(timeout=1.0, measurement_type=mtype_enum)
+        reading = reader.get_reading_with_stabilization(timeout=180, measurement_type=mtype_enum)
         
         if reading and reading.value is not None:
             # Add to stabilizer

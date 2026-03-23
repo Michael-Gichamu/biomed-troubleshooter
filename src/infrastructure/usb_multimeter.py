@@ -11,11 +11,11 @@ import time
 @dataclass
 class MultimeterReading:
     """A single reading from the multimeter."""
-    raw_value: str          # Raw string or hex from device
-    value: float            # Numeric value
-    unit: str               # Unit (V, A, OHM, Hz, etc.)
-    measurement_type: str   # DC, AC, OHM, CONT, DIODE, etc.
-    timestamp: str          # ISO timestamp
+    raw_value: str = ""     # Raw string or hex from device
+    value: float = 0.0      # Numeric value
+    unit: str = ""          # Unit (V, A, OHM, Hz, etc.)
+    measurement_type: str = "UNKNOWN"
+    timestamp: str = ""     # ISO timestamp
     test_point_id: str = "" # Optional test point identifier
     secondary_value: Optional[float] = None
     secondary_unit: Optional[str] = None
@@ -36,25 +36,83 @@ class MultimeterReading:
         return res
 
 
-class MastechMS8250DParser:
+class FS9721Parser:
     """
-    Parser for the Mastech MS8250D 18-byte binary protocol.
-    Protocol: 2400 baud, 8N1, unidirectional.
+    Parser for the Fortune Semiconductor FS9721 14-byte protocol.
+    Used by many 4000-count/6600-count multimeters.
+    Features "nibble-sync" (high nibble of byte i is i+1).
     """
     
-    # 7-segment digit mapping for main display (11-bit word)
-    # Bit 10:D, 9:G, 8:A, 5:E, 4:F, 1:C, 0:B
+    SEGMENT_MAP = {
+        0xAF: "0", 0x06: "1", 0x6D: "2", 0x4F: "3", 0xC6: "4",
+        0xCB: "5", 0xEB: "6", 0x0E: "7", 0xEF: "8", 0xCF: "9",
+        0x00: " ", 0xE1: "L" 
+    }
+
+    @classmethod
+    def decode_digit(cls, high_bits: int, low_bits: int) -> str:
+        """Decode a 7-segment digit from two nibbles."""
+        seg = (high_bits << 4) | low_bits
+        return cls.SEGMENT_MAP.get(seg & 0x7F, " ")
+
+    @classmethod
+    def parse_frame(cls, buf: bytes) -> Optional[MultimeterReading]:
+        if len(buf) < 14: return None
+        for i in range(14):
+            if (buf[i] >> 4) != (i + 1): return None
+        n = [b & 0x0F for b in buf]
+        try:
+            is_negative = bool(n[0] & 0x08)
+            d1 = cls.decode_digit(n[1], n[2])
+            d2 = cls.decode_digit(n[3], n[4])
+            d3 = cls.decode_digit(n[5], n[6])
+            d4 = cls.decode_digit(n[7], n[8])
+            val_str = (d1 + d2 + d3 + d4).strip()
+            if not val_str: return None
+            if n[3] & 0x08: val_str = d1 + "." + d2 + d3 + d4
+            elif n[5] & 0x08: val_str = d1 + d2 + "." + d3 + d4
+            elif n[7] & 0x08: val_str = d1 + d2 + d3 + "." + d4
+            unit, m_type = "", "UNKNOWN"
+            is_ac = bool(n[12] & 0x02)
+            if n[12] & 0x04:
+                unit, m_type = "V", "AC_VOLTAGE" if is_ac else "DC_VOLTAGE"
+            elif n[12] & 0x02:
+                unit, m_type = "A", "AC_CURRENT" if is_ac else "DC_CURRENT"
+            elif n[11] & 0x01:
+                unit, m_type = "Ω", "RESISTANCE"
+                if n[12] & 0x01: m_type = "CONTINUITY"
+            elif n[13] & 0x04: unit, m_type = "Hz", "FREQUENCY"
+            elif n[10] & 0x04: unit, m_type = "F", "CAPACITANCE"
+            elif n[12] & 0x01: unit, m_type = "V", "DIODE"
+            multiplier = 1.0
+            if n[10] & 0x08: multiplier = 1000.0
+            elif n[10] & 0x04: multiplier = 1000000.0
+            elif n[10] & 0x02: multiplier = 0.001
+            elif n[9] & 0x08: multiplier = 1e-6
+            elif n[9] & 0x04: multiplier = 1e-9
+            if val_str == "L": value = float('inf')
+            else:
+                value = float(val_str)
+                if is_negative: value *= -1
+                value *= multiplier
+            return MultimeterReading(
+                raw_value=buf.hex().upper(), value=value, unit=unit,
+                measurement_type=m_type, timestamp=datetime.utcnow().isoformat()
+            )
+        except: return None
+
+
+class MastechMS8250DParser:
+    """Strict parser for the MASTECH MS8250D (18-byte protocol)."""
+    PACKET_SIZE = 18
     DIGITS_MAIN = {
         0x533: "0", 0x003: "1", 0x721: "2", 0x703: "3", 0x213: "4",
         0x712: "5", 0x732: "6", 0x103: "7", 0x733: "8", 0x713: "9",
-        0x430: "L" # Part of "OL"
+        0x430: "L", 0x000: " "
     }
-    
-    # 7-segment digit mapping for secondary display (7-bit byte)
-    # Bit 4:A, 2:B, 0:C, 3:D, 6:E, 5:F, 1:G
     DIGITS_SEC = {
-        0x7D: "0", 0x05: "1", 0x5E: "2", 0x1F: "3", 0x27: "4",
-        0x3B: "5", 0x7B: "6", 0x15: "7", 0x7F: "8", 0x3F: "9"
+        0x00: "0", 0x7D: "0", 0x05: "1", 0x1B: "2", 0x1F: "3", 0x27: "4",
+        0x3E: "5", 0x7E: "6", 0x15: "7", 0x7F: "8", 0x3F: "9"
     }
 
     @classmethod
@@ -66,151 +124,75 @@ class MastechMS8250DParser:
         return cls.DIGITS_SEC.get(byte & 0x7F, " ")
 
     @classmethod
+    def _flags(cls, buf: bytes) -> dict:
+        return {
+            "is_volt": bool(buf[9] & (1 << 4)),
+            "is_ohm": bool(buf[9] & (1 << 6)),
+            "is_ampere": bool(buf[10] & (1 << 0)),
+            "is_hz": bool(buf[10] & (1 << 2)),
+            "is_farad": bool(buf[10] & (1 << 1)),
+            "is_micro": bool(buf[9] & (1 << 1)) if (buf[10] & (1 << 1)) else bool(buf[8] & (1 << 4)),
+            "is_nano": bool(buf[8] & (1 << 5)),
+            "is_milli": bool(buf[9] & (1 << 0)),
+            "is_kilo": bool(buf[9] & (1 << 2)),
+            "is_mega": bool(buf[8] & (1 << 6)),
+            "is_rs232": bool(buf[1] & (1 << 1)),
+            "is_ac": bool(buf[1] & (1 << 4)),
+            "is_dc": bool(buf[2] & (1 << 1)),
+            "is_diode": bool(buf[11] & (1 << 0)),
+            "is_beep": bool(buf[11] & (1 << 1)),
+        }
+
+    @classmethod
+    def _flags_valid(cls, flags: dict) -> bool:
+        if not flags["is_rs232"]: return False
+        measurement_count = sum(1 for k in ("is_hz", "is_ohm", "is_farad", "is_ampere", "is_volt") if flags[k])
+        if measurement_count != 1: return False
+        if flags["is_ac"] and flags["is_dc"]: return False
+        return True
+
+    @classmethod
     def parse_frame(cls, buf: bytes) -> Optional[MultimeterReading]:
-        if len(buf) < 18:
-            return None
-            
+        if len(buf) != 18 or buf[17] != 0x00: return None
+        flags = cls._flags(buf)
+        if not cls._flags_valid(flags): return None
         try:
-            # Main Display Extraction
-            # Digit positions based on libsigrok research
             d1_word = ((buf[3] & 0x07) << 8) | (buf[2] & 0x30) | ((buf[3] & 0x30) >> 4)
             d2_word = ((buf[4] & 0x73) << 4) | (buf[5] & 0x03)
             d3_word = ((buf[6] & 0x07) << 8) | (buf[5] & 0x30) | ((buf[6] & 0x30) >> 4)
             d4_word = ((buf[7] & 0x73) << 4) | (buf[8] & 0x03)
-            
-            val_str = cls.parse_main_digit(d1_word) + cls.parse_main_digit(d2_word) + \
-                      cls.parse_main_digit(d3_word) + cls.parse_main_digit(d4_word)
-            
-            # Handle Overflow (OL)
-            if " L" in val_str or val_str.strip() == "L":
-                value = float('inf')
+            s = [cls.parse_main_digit(w) for w in [d1_word, d2_word, d3_word, d4_word]]
+            if " " in s: return None
+            if "L" in s: value = float('inf')
             else:
-                try:
-                    # Decimal Points
-                    if buf[3] & 0x40: # X.XXX
-                        val_str = val_str[0] + "." + val_str[1:]
-                    elif buf[5] & 0x40: # XX.XX
-                        val_str = val_str[:2] + "." + val_str[2:]
-                    elif buf[7] & 0x04: # XXX.X
-                        val_str = val_str[:3] + "." + val_str[3:]
-                    
-                    value = float(val_str.strip() or "0")
-                    if buf[1] & 0x01: # Sign
-                        value = -value
-                except ValueError:
-                    value = 0.0
-
-            # Units & Measurement Type
-            unit = ""
-            m_type = "UNKNOWN"
-            
-            # Multipliers
-            multiplier = 1.0
-            if buf[8] & 0x20: multiplier = 1e-9  # n
-            elif buf[8] & 0x10: multiplier = 1e-6 # u
-            elif buf[9] & 0x01: multiplier = 1e-3 # m
-            elif buf[9] & 0x04: multiplier = 1e3  # k
-            elif buf[8] & 0x40: multiplier = 1e6  # M
-            
-            value *= multiplier
-
-            # Functions - MS8250D 18-byte frame mode detection
-            # Based on libsigrok and protocol reverse engineering
-            is_ac = bool(buf[1] & 0x10)
-            is_dc = bool(buf[2] & 0x02)
-            
-            # Check for specific modes first (most specific)
-            # Byte 10 bits for various functions
-            func_byte = buf[10] if len(buf) > 10 else 0
-            func2_byte = buf[11] if len(buf) > 11 else 0
-            
-            if func2_byte & 0x10:  # Continuity (beep) mode
-                unit = "Ω"
-                m_type = "CONTINUITY"
-            elif func2_byte & 0x20:  # Diode mode
-                unit = "V"
-                m_type = "DIODE"
-            elif func_byte & 0x04:  # Frequency (Hz)
-                unit = "Hz"
-                m_type = "FREQUENCY"
-            elif func_byte & 0x02:  # Capacitance
-                unit = "F"
-                m_type = "CAPACITANCE"
-            elif func_byte & 0x01:  # Current
-                unit = "A"
-                m_type = "AC_CURRENT" if is_ac else "DC_CURRENT"
-            elif buf[9] & 0x40:  # Resistance (ohms)
-                unit = "Ω"
-                m_type = "RESISTANCE"
-            elif buf[9] & 0x10:  # Voltage
-                unit = "V"
-                m_type = "AC_VOLTAGE" if is_ac else "DC_VOLTAGE"
-
-            # Secondary Display (Bytes 12-15)
-            s1 = cls.parse_sec_digit(buf[12])
-            s2 = cls.parse_sec_digit(buf[13])
-            s3 = cls.parse_sec_digit(buf[14])
-            s4 = cls.parse_sec_digit(buf[15])
-            sec_str = s1 + s2 + s3 + s4
-            
-            # Secondary DPs
-            if buf[12] & 0x80: sec_str = sec_str[0] + "." + sec_str[1:]
-            elif buf[13] & 0x80: sec_str = sec_str[:2] + "." + sec_str[2:]
-            elif buf[14] & 0x80: sec_str = sec_str[:3] + "." + sec_str[3:]
-            
-            sec_value = None
-            try:
-                sec_value = float(sec_str.strip())
-            except ValueError:
-                pass
-
+                val_str = "".join(s)
+                if buf[3] & 0x40: val_str = val_str[0] + "." + val_str[1:]
+                elif buf[5] & 0x40: val_str = val_str[:2] + "." + val_str[2:]
+                elif buf[7] & 0x04: val_str = val_str[:3] + "." + val_str[3:]
+                sign = -1 if (buf[0] & 0x04) else 1
+                value = float(val_str) * sign
+                if flags["is_nano"]: value *= 1e-9
+                elif flags["is_micro"]: value *= 1e-6
+                elif flags["is_milli"]: value *= 1e-3
+                elif flags["is_kilo"]: value *= 1e3
+                elif flags["is_mega"]: value *= 1e6
+            unit, m_type = "", "UNKNOWN"
+            if flags["is_beep"]: unit, m_type = "Ω", "CONTINUITY"
+            elif flags["is_diode"]: unit, m_type = "V", "DIODE"
+            elif flags["is_ohm"]: unit, m_type = "Ω", "RESISTANCE"
+            elif flags["is_hz"]: unit, m_type = "Hz", "FREQUENCY"
+            elif flags["is_farad"]: unit, m_type = "F", "CAPACITANCE"
+            elif flags["is_ampere"]: unit, m_type = "A", "AC_CURRENT" if flags["is_ac"] else "DC_CURRENT"
+            elif flags["is_volt"]: unit, m_type = "V", "AC_VOLTAGE" if flags["is_ac"] else "DC_VOLTAGE"
             return MultimeterReading(
-                raw_value=buf.hex().upper(),
-                value=value,
-                unit=unit,
-                measurement_type=m_type,
-                timestamp=datetime.utcnow().isoformat(),
-                secondary_value=sec_value,
-                secondary_unit="" # Logic for secondary units could be added if needed
+                raw_value=buf.hex().upper(), value=value, unit=unit,
+                measurement_type=m_type, timestamp=datetime.utcnow().isoformat()
             )
-        except Exception as e:
-            print(f"[MS8250D] Parse error: {e}")
-            return None
-
-
+        except: return None
 class USBMultimeterClient:
-    """
-    Client for Mastech MS8250D USB Multimeter.
-    
-    The MS8250D transmits data via USB-serial at:
-    - Baud rate: 2400 (default) or 9600 depending on version
-    - Data bits: 8
-    - Parity: None
-    - Stop bits: 1
-    
-    Can be used as a context manager:
-        with USBMultimeterClient() as client:
-            reading = client.read_measurement()
-    """
-    
-    # Common baud rates for multimeters
-    BAUD_RATES = [2400, 9600, 19200]
-    
-    # Regex patterns for parsing readings
-    PATTERNS = {
-        "dc_voltage": re.compile(r"DC\s*([\d.]+)\s*([mVkM]?V)?", re.IGNORECASE),
-        "ac_voltage": re.compile(r"AC\s*([\d.]+)\s*([mVkM]?V)?", re.IGNORECASE),
-        "dc_current": re.compile(r"DC\s*([\d.]+)\s*([mun]?A)?", re.IGNORECASE),
-        "ac_current": re.compile(r"AC\s*([\d.]+)\s*([mun]?A)?", re.IGNORECASE),
-        "resistance": re.compile(r"(OHM|Ω)\s*([\d.]+)\s*([kM])?", re.IGNORECASE),
-        "continuity": re.compile(r"CONT\s*([\d.]+)?", re.IGNORECASE),
-        "diode": re.compile(r"DIODE\s*([\d.]+)", re.IGNORECASE),
-        "frequency": re.compile(r"([\d.]+)\s*(Hz|kHz|MHz)", re.IGNORECASE),
-        "capacitance": re.compile(r"([\d.]+)\s*([nun]F)", re.IGNORECASE),
-        # Generic pattern for any reading
-        "generic": re.compile(r"([\d.]+)\s*([a-zA-ZΩ]+)?"),
-    }
-    
+    """MS8250D USB multimeter client (strict 18-byte binary protocol)."""
+    BAUD_RATES = [2400]
+
     def __init__(
         self,
         port: Optional[str] = None,
@@ -218,639 +200,132 @@ class USBMultimeterClient:
         timeout: float = 1.0,
         on_reading_callback: Optional[Callable[[MultimeterReading], None]] = None
     ):
-        """
-        Initialize USB multimeter client.
-        
-        Args:
-            port: COM port (e.g., "COM3" on Windows, "/dev/ttyUSB0" on Linux)
-                  If None, will auto-detect
-            baud_rate: Serial baud rate (default 2400 for MS8250D)
-            timeout: Read timeout in seconds
-            on_reading_callback: Callback function for each reading
-        """
         self.port = port
         self.baud_rate = baud_rate
         self.timeout = timeout
         self.on_reading_callback = on_reading_callback
-        
         self._serial: Optional[serial.Serial] = None
         self._connected = False
         self._reading_thread: Optional[threading.Thread] = None
         self._stop_event = threading.Event()
         self._last_reading: Optional[MultimeterReading] = None
-        
+        self._buffer = b""
+
     @staticmethod
     def list_available_ports() -> List[str]:
-        """
-        List all available COM ports.
-        
-        Returns:
-            List of port device names
-        """
-        ports = serial.tools.list_ports.comports()
-        return [port.device for port in ports]
-    
+        return [p.device for p in serial.tools.list_ports.comports()]
+
     @staticmethod
     def detect_multimeter() -> Optional[str]:
-        """
-        Auto-detect the multimeter port.
-        
-        Looks for common USB-serial chips used in multimeters:
-        - CH340 (common in Chinese multimeters)
-        - FTDI (higher quality)
-        - CP210x (Silicon Labs)
-        
-        Returns:
-            Port device name or None if not found
-        """
         ports = serial.tools.list_ports.comports()
-        
-        # Known USB-serial chip vendors
-        multimeter_vendors = [
-            "10C4",  # Silicon Labs (CP210x) - PRIORITIZED
-            "1A86",  # QinHeng Electronics (CH340)
-            "0403",  # FTDI
-            "067B",  # Prolific (PL2303)
-        ]
-        
-        for port in ports:
-            if hasattr(port, 'vid') and port.vid:
-                if f"{port.vid:04X}" in multimeter_vendors:
-                    return port.device
-            
-            # Fallback: check description for keywords
-            desc = port.description.lower()
-            if any(kw in desc for kw in ['usb-serial', 'ch340', 'ftdi', 'cp210', 'multimeter']):
-                return port.device
-        
-        # If no specific device found, return first available port
-        if ports:
-            return ports[0].device
-        
-        return None
-    
+        for p in ports:
+            v, pi = getattr(p, "vid", None), getattr(p, "pid", None)
+            if v == 0x10C4 and pi == 0xEA60: return p.device # CP2102
+            desc = (p.description or "").lower()
+            if any(x in desc for x in ["cp210", "silicon labs", "usb serial"]): return p.device
+        return ports[0].device if ports else None
+
     def connect(self) -> bool:
-        """
-        Connect to the multimeter.
-        
-        Returns:
-            True if connection successful
-        """
         try:
-            # Auto-detect port if not specified
-            if not self.port:
-                self.port = self.detect_multimeter()
-                if not self.port:
-                    print("[USB] No multimeter port detected")
-                    return False
-            
-            # Try different baud rates
-            for baud in [self.baud_rate] + [b for b in self.BAUD_RATES if b != self.baud_rate]:
-                try:
-                    self._serial = serial.Serial(
-                        port=self.port,
-                        baudrate=baud,
-                        bytesize=serial.EIGHTBITS,
-                        parity=serial.PARITY_NONE,
-                        stopbits=serial.STOPBITS_ONE,
-                        timeout=self.timeout
-                    )
-                    self.baud_rate = baud
-                    break
-                except serial.SerialException:
-                    continue
-            
-            if not self._serial or not self._serial.is_open:
-                print(f"[USB] Failed to open port {self.port}")
-                return False
-            
-            self._connected = True
-            print(f"[USB] Connected to multimeter on {self.port} at {self.baud_rate} baud")
-            return True
-            
-        except Exception as e:
-            print(f"[USB] Connection error: {e}")
-            self._connected = False
+            if not self.port: self.port = self.detect_multimeter()
+            if not self.port: return False
+            baud = self.baud_rate or 2400
+            self._serial = serial.Serial(
+                port=self.port, baudrate=baud, bytesize=8, parity='N', stopbits=1, timeout=self.timeout
+            )
+            if self._serial.is_open:
+                self._connected, self._buffer = True, b""
+                print(f"[USB] Connected to {self.port} at {baud} baud")
+                return True
             return False
-    
+        except Exception as e:
+            print(f"[USB] Connection error: {e}"); return False
+
     def disconnect(self) -> None:
-        """Disconnect from the multimeter."""
         self._stop_event.set()
-        
         if self._reading_thread and self._reading_thread.is_alive():
             self._reading_thread.join(timeout=2.0)
-        
-        if self._serial and self._serial.is_open:
-            self._serial.close()
-        
+        ser = self._serial
+        if ser and ser.is_open: ser.close()
         self._connected = False
-        print("[USB] Disconnected from multimeter")
-    
-    def __enter__(self) -> "USBMultimeterClient":
-        """Context manager entry - connects to multimeter."""
-        self.connect()
-        return self
-    
-    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
-        """Context manager exit - disconnects from multimeter."""
-        self.disconnect()
-    
-    def is_connected(self) -> bool:
-        """Check if connected to multimeter."""
-        return self._connected and self._serial and self._serial.is_open
-    
-    def _parse_reading(self, raw_data: str) -> Optional[MultimeterReading]:
-        """
-        Parse raw data string into a reading.
-        
-        Args:
-            raw_data: Raw string from multimeter
-            
-        Returns:
-            MultimeterReading or None if parsing failed
-        """
-        raw_data = raw_data.strip()
-        if not raw_data:
-            return None
-        
-        # Try each pattern
-        for reading_type, pattern in self.PATTERNS.items():
-            match = pattern.search(raw_data)
-            if match:
-                groups = match.groups()
-                
-                # Extract value and unit based on pattern type
-                if reading_type == "resistance":
-                    value = float(groups[1]) if len(groups) > 1 else 0.0
-                    unit = "Ω"
-                    if len(groups) > 2 and groups[2]:
-                        multiplier = groups[2].upper()
-                        if multiplier == 'K':
-                            value *= 1000
-                        elif multiplier == 'M':
-                            value *= 1000000
-                    measurement_type = "RESISTANCE"
-                    
-                elif reading_type in ["dc_voltage", "ac_voltage"]:
-                    value = float(groups[0])
-                    unit = groups[1] if len(groups) > 1 and groups[1] else "V"
-                    measurement_type = "DC_VOLTAGE" if "dc" in reading_type else "AC_VOLTAGE"
-                    
-                elif reading_type in ["dc_current", "ac_current"]:
-                    value = float(groups[0])
-                    unit = groups[1] if len(groups) > 1 and groups[1] else "A"
-                    measurement_type = "DC_CURRENT" if "dc" in reading_type else "AC_CURRENT"
-                    
-                elif reading_type == "frequency":
-                    value = float(groups[0])
-                    unit = groups[1] if len(groups) > 1 else "Hz"
-                    measurement_type = "FREQUENCY"
-                    
-                elif reading_type == "capacitance":
-                    value = float(groups[0])
-                    unit = groups[1] if len(groups) > 1 else "F"
-                    measurement_type = "CAPACITANCE"
-                    
-                else:
-                    # Generic parsing
-                    value = float(groups[0])
-                    unit = groups[1] if len(groups) > 1 and groups[1] else ""
-                    measurement_type = reading_type.upper()
-                
-                return MultimeterReading(
-                    raw_value=raw_data,
-                    value=value,
-                    unit=unit,
-                    measurement_type=measurement_type,
-                    timestamp=datetime.utcnow().isoformat()
-                )
-        
-        # If no pattern matched, try generic numeric extraction
-        numbers = re.findall(r"([\d.]+)", raw_data)
-        if numbers:
-            try:
-                return MultimeterReading(
-                    raw_value=raw_data,
-                    value=float(numbers[0]),
-                    unit="",
-                    measurement_type="UNKNOWN",
-                    timestamp=datetime.utcnow().isoformat()
-                )
-            except ValueError:
-                pass
-        
-        return None
-    
-    def _parse_binary_frame(self, raw_bytes: bytes) -> Optional[MultimeterReading]:
-        """
-        Parse binary frame from MS8250D multimeter.
-        
-        Args:
-            raw_bytes: Raw binary data from multimeter
-            
-        Returns:
-            MultimeterReading or None if parsing failed
-        """
-        if not raw_bytes:
-            return None
+        print("[USB] Disconnected")
 
-        # Look for 18-byte MS8250D frame
-        # These frames don't always have a fixed header, but we can look for patterns 
-        # or just try parsing if we have enough bytes. 
-        # Often they start with common status bits or sync by length.
+    def __enter__(self) -> "USBMultimeterClient":
+        self.connect(); return self
+
+    def __exit__(self, t, v, tb) -> None:
+        self.disconnect()
+
+    def is_connected(self) -> bool:
+        return bool(self._connected and self._serial and self._serial.is_open)
+
+    def _try_parse_buffer(self) -> Optional[MultimeterReading]:
+        """Scan buffer for tight 18-byte MS8250D frame, then 14-byte FS9721."""
+        if len(self._buffer) < 14: return None
         
-        if len(raw_bytes) >= 18:
-            # Shift buffer until we find what looks like a valid 18-byte frame
-            # For MS8250D, bytes are often 0x0X or have specific masks.
-            # Byte 17 often has 0x00 or fixed bits.
-            for i in range(len(raw_bytes) - 17):
-                candidate = raw_bytes[i:i+18]
-                reading = MastechMS8250DParser.parse_frame(candidate)
-                if reading and reading.measurement_type != "UNKNOWN":
-                    # print(f"[DEBUG MS8250D] Valid frame found at offset {i}")
+        # 1. Try 18-byte Mastech
+        if len(self._buffer) >= 18:
+            limit = len(self._buffer) - 18 + 1
+            for i in range(limit):
+                reading = MastechMS8250DParser.parse_frame(self._buffer[i:i+18])
+                if reading:
+                    self._buffer = self._buffer[i+18:]
                     return reading
 
-        # Fallback to older 10-byte formats if it doesn't look like MS8250D
-        if len(raw_bytes) >= 10:
-            i = 0
-            while i < len(raw_bytes) - 9:
-                # Format 1: Starts with 0xC8FEEC or 0xC8EECC
-                if (raw_bytes[i] == 0xC8 and i + 2 < len(raw_bytes) and 
-                    ((raw_bytes[i+1] == 0xFE and raw_bytes[i+2] == 0xEC) or 
-                     (raw_bytes[i+2] == 0xCC and raw_bytes[i+1] == 0xEE))):
-                    
-                    if i + 14 <= len(raw_bytes):
-                        reading = self._parse_new_frame_format(raw_bytes[i:i+14])
-                        if reading: return reading
-                
-                # Format 2: Old 10-byte format starting with 0x40 or 0x44
-                if raw_bytes[i] in [0x40, 0x44]:
-                    if i + 10 <= len(raw_bytes):
-                        reading = self._parse_um24c_frame(raw_bytes[i:i+10])
-                        if reading: return reading
-                i += 1
-        
-        return None
-    def _parse_new_frame_format(self, frame: bytes) -> Optional[MultimeterReading]:
-        """
-        Parse the new MS8250D frame format (C8FEEC or C8EECC).
-        
-        The Mastech MS8250D often uses a 14-byte frame where digits are 
-        encoded as segments or specific byte patterns.
-        """
-        try:
-            if len(frame) < 10 or frame[0] != 0xC8:
-                return None
-            
-            # Support both C8 FE EC and C8 EE CC headers
-            is_new_header = (frame[1] == 0xFE and frame[2] == 0xEC) or (frame[1] == 0xEE and frame[2] == 0xCC)
-            if not is_new_header:
-                return None
-            
-            # DEBUG: Log this parsing path
-            # print(f"[DEBUG _parse_new_frame_format] Parsing frame: {frame.hex().upper()}")
-                
-            # Improved Digit Extraction
-            # In many Mastech devices, digits are in fixed positions or marked by 0x3X
-            digits = []
-            for b in frame[3:]:
-                if 0x30 <= b <= 0x39:
-                    digits.append(b - 0x30)
-            
-            # If standard ASCII extraction fails, try segment-like mapping or just raw value extraction
-            # For now, we will lean on the observed ASCII pattern but add more robust type detection
-            
-            if not digits:
-                # Fallback: maybe the value is in bytes 4-8 directly?
-                # This is common in some binary protocols
-                pass
+        # 2. Try 14-byte FS9721 (with nibble-sync)
+        limit = len(self._buffer) - 14 + 1
+        for i in range(limit):
+            if (self._buffer[i] >> 4) == 1:
+                reading = FS9721Parser.parse_frame(self._buffer[i:i+14])
+                if reading:
+                    self._buffer = self._buffer[i+14:]
+                    return reading
 
-            if len(digits) >= 2:
-                # Basic value reconstruction
-                # If we have 4 digits, it's likely D1 D2 D3 D4 with a decimal point
-                if len(digits) == 4:
-                    value = digits[0] * 1000 + digits[1] * 100 + digits[2] * 10 + digits[3]
-                    # Scale based on decimal point (often byte 7 or 8)
-                    # For now, heuristic scaling
-                    if value > 1000: value /= 100.0 
-                else:
-                    value = float("".join(map(str, digits[:4]))) / 10.0
-                
-                # Mode/Function Detection
-                # MS8250D uses "Func" button. We need to look for AC vs DC bits.
-                # Usually byte 3 or byte 9 contains status flags.
-                unit = "V"
-                measurement_type = "DC_VOLTAGE"
-                
-                # Status Byte analysis (Byte 3 or 9 often contains AC/DC/Auto flags)
-                status_byte = frame[3] if len(frame) > 3 else 0x00
-                
-                # Heuristic for MS8250D:
-                # 0xAC or 0x21 often indicates AC
-                if 0xAC in frame or 0x21 in frame or (status_byte & 0x08):
-                    measurement_type = "AC_VOLTAGE"
-                
-                # Check for Current (A/mA/uA)
-                if 0x1F in frame or 0x3F in frame:
-                    unit = "A"
-                    measurement_type = "DC_CURRENT"
-                    if "AC" in measurement_type or 0xAC in frame:
-                        measurement_type = "AC_CURRENT"
-                
-                # Check for Resistance (Ω)
-                if 0x72 in frame or 0x52 in frame or 0xDF in frame:
-                    unit = "Ω"
-                    measurement_type = "RESISTANCE"
-
-                return MultimeterReading(
-                    raw_value=f"0x{frame.hex().upper()}",
-                    value=value,
-                    unit=unit,
-                    measurement_type=measurement_type,
-                    timestamp=datetime.utcnow().isoformat()
-                )
-        
-        except Exception as e:
-            print(f"[USB] New format parse error: {e}")
-        
+        if len(self._buffer) > 128: self._buffer = self._buffer[-64:]
         return None
 
-    def _parse_um24c_frame(self, frame: bytes) -> Optional[MultimeterReading]:
-        """
-        Parse MS8250D style binary frame (older format).
-        Format example: 0x44 0x22 0x03 0x00 0x00 0x30 0x35 0x04 0x03 0x10
-        
-        Frame structure analysis from captured data:
-        - Byte 0: 0x40 or 0x44 (start marker)
-        - Byte 1-2: Function code
-        - Byte 3-4: Measurement mode/unit
-        - Bytes 5-6: Value (ASCII digits, 0x30-0x39)
-        - Byte 7: Decimal point position
-        - Byte 8: Additional mode info
-        - Byte 9: 0x10 (end marker)
-        """
-        try:
-            # DEBUG: Log the raw frame
-            print(f"[DEBUG _parse_um24c_frame] frame={frame.hex().upper()}, len={len(frame)}")
-            
-            # Extract voltage/current from frame
-            if len(frame) >= 9 and frame[0] in [0x40, 0x44]:
-                # Relaxed checks for end marker as it varies by device
-                # Bytes 5-6 are ASCII digits
-                digit1 = frame[5] - 0x30
-                digit1 = frame[5] - 0x30
-                digit2 = frame[6] - 0x30
-                
-                # DEBUG: Log digits
-                print(f"[DEBUG] digit1={digit1} (0x{frame[5]:02x}), digit2={digit2} (0x{frame[6]:02x})")
-                
-                if 0 <= digit1 <= 9 and 0 <= digit2 <= 9:
-                    # Byte 7 indicates decimal point position
-                    decimal_pos = frame[7]
-                    
-                    # DEBUG: Log the values
-                    print(f"[DEBUG PARSE] frame={frame.hex().upper()}, digit1={digit1}, digit2={digit2}, decimal_pos=0x{decimal_pos:02x}")
-                    
-                    # Calculate value based on decimal position
-                    if decimal_pos == 0x01:
-                        value = digit1 + digit2 / 10.0
-                    elif decimal_pos == 0x02:
-                        value = digit1 / 10.0 + digit2 / 100.0
-                    elif decimal_pos == 0x03:
-                        value = digit1 * 10 + digit2
-                    elif decimal_pos == 0x04:
-                        value = digit1 * 100 + digit2 * 10
-                    elif decimal_pos == 0x57:
-                        # Special case from our data - this seems to represent 0.5V
-                        value = 0.5
-                    elif decimal_pos == 0x76:
-                        # Special case - seems to represent 5.0V
-                        value = 5.0
-                    else:
-                        value = digit1 + digit2
-                    
-                    # DEBUG: Log value before mode detection
-                    print(f"[DEBUG] Calculated value={value}, mode_byte=0x{frame[3]:02x}, unit_byte=0x{frame[4]:02x}")
-                    
-                    # Determine measurement type and unit from bytes 3-4
-                    mode_byte = frame[3]
-                    unit_byte = frame[4]
-                    
-                    # MS8250D mode detection from bytes 1-2 and 3-4
-                    # Based on protocol analysis of UM24C/MS8250D frames
-                    func_code = frame[1] if len(frame) > 1 else 0
-                    
-                    # Detection based on function code (byte 1)
-                    # 0x22 = Voltage, 0x20 = Current, 0x21 = Resistance
-                    # 0x23 = Continuity, 0x24 = Diode, 0x25 = Frequency
-                    if func_code == 0x23:
-                        # Continuity mode
-                        unit = "Ω"
-                        measurement_type = "CONTINUITY"
-                    elif func_code == 0x24:
-                        # Diode mode
-                        unit = "V"
-                        measurement_type = "DIODE"
-                    elif func_code == 0x25:
-                        # Frequency/Hz mode
-                        unit = "Hz"
-                        measurement_type = "FREQUENCY"
-                    elif func_code == 0x21 or (mode_byte == 0x01 and unit_byte == 0x00):
-                        # Resistance
-                        unit = "Ω"
-                        measurement_type = "RESISTANCE"
-                    elif func_code == 0x22:
-                        # Voltage (DC by default, check for AC)
-                        unit = "V"
-                        measurement_type = "DC_VOLTAGE"
-                        # Check if AC (may be in byte 2 or elsewhere)
-                        if len(frame) > 2 and frame[2] == 0x01:
-                            measurement_type = "AC_VOLTAGE"
-                    elif func_code == 0x20:
-                        # Current
-                        unit = "A"
-                        measurement_type = "DC_CURRENT"
-                        if len(frame) > 2 and frame[2] == 0x01:
-                            measurement_type = "AC_CURRENT"
-                    elif mode_byte == 0x03 and unit_byte == 0x00:
-                        # DC Voltage
-                        unit = "V"
-                        measurement_type = "DC_VOLTAGE"
-                    elif mode_byte == 0x02 and unit_byte == 0x00:
-                        # DC Current
-                        unit = "A"
-                        measurement_type = "DC_CURRENT"
-                    elif mode_byte == 0x02 and unit_byte == 0x21:
-                        # AC Voltage
-                        unit = "V"
-                        measurement_type = "AC_VOLTAGE"
-                    elif mode_byte == 0x01 and unit_byte == 0x00:
-                        # Resistance
-                        unit = "Ω"
-                        measurement_type = "RESISTANCE"
-                    else:
-                        # DEBUG: Log when we hit the default case
-                        print(f"[DEBUG] Unknown mode! mode_byte=0x{mode_byte:02x}, unit_byte=0x{unit_byte:02x} - defaulting to DC_VOLTAGE")
-                        # Default to DC Voltage if unknown
-                        unit = "V"
-                        measurement_type = "DC_VOLTAGE"
-                        
-                    return MultimeterReading(
-                        raw_value=f"0x{frame.hex().upper()}",
-                        value=value,
-                        unit=unit,
-                        measurement_type=measurement_type,
-                        timestamp=datetime.utcnow().isoformat()
-                    )
-        
-        except Exception as e:
-            print(f"[USB] Binary parse error: {e}")
-        
-        return None
-    
     def read_measurement(self, timeout: float = 2.0) -> Optional[MultimeterReading]:
-        """
-        Read a single measurement from the multimeter.
-        
-        Args:
-            timeout: Maximum time to wait for reading
-            
-        Returns:
-            MultimeterReading or None if timeout/error
-        """
-        if not self.is_connected():
-            print("[USB] Not connected to multimeter")
-            return None
-        
+        if not self.is_connected(): return None
         try:
-            # Read until we get a complete frame or timeout
-            start_time = time.time()
-            buffer = b""
-            
-            while time.time() - start_time < timeout:
-                if self._serial.in_waiting > 0:
-                    buffer += self._serial.read(self._serial.in_waiting)
-                    
-                    # Try to parse binary frames
-                    binary_reading = self._parse_binary_frame(buffer)
-                    if binary_reading:
-                        # Clear buffer after successful parse
-                        # Note: In a real stream we might only clear the parsed part,
-                        # but for 2400 baud unidirectional, clearing is safer.
-                        self._last_reading = binary_reading
-                        return binary_reading
-                        
-                    # Limit buffer size for MS8250D (18 bytes frame)
-                    if len(buffer) > 64:
-                        buffer = buffer[-36:] # Keep last 2 potential frames
-                        
-                else:
-                    time.sleep(0.01)
-            
-            # Timeout - no valid frame received
+            start = time.time()
+            while time.time() - start < timeout:
+                waiting = int(self._serial.in_waiting or 0)
+                if waiting > 0:
+                    self._buffer += self._serial.read(waiting)
+                    reading = self._try_parse_buffer()
+                    if reading:
+                        self._last_reading = reading
+                        return reading
+                time.sleep(0.01)
             return None
-            
-        except PermissionError as e:
-            # Handle "Access is denied" error - port may need reset
-            print(f"[USB] Read error (PermissionError): {e}")
-            print("[USB] Attempting to reconnect...")
-            self.disconnect()
-            time.sleep(0.5)
-            if self.connect():
-                print("[USB] Reconnected successfully")
-                return None  # Return None, caller can retry
-            else:
-                print("[USB] Failed to reconnect")
-                return None
+        except PermissionError:
+            print("[USB] PermissionError, reconnecting..."); self.disconnect(); time.sleep(0.5)
+            self.connect(); return None
         except Exception as e:
-            print(f"[USB] Read error: {e}")
-            return None
-    
+            print(f"[USB] Read error: {e}"); return None
+
     def start_continuous_reading(self) -> None:
-        """Start continuous reading in background thread."""
-        if self._reading_thread and self._reading_thread.is_alive():
-            return
-        
+        if self._reading_thread and self._reading_thread.is_alive(): return
         self._stop_event.clear()
         self._reading_thread = threading.Thread(target=self._continuous_read_loop, daemon=True)
         self._reading_thread.start()
-    
-    def stop_continuous_reading(self) -> None:
-        """Stop continuous reading."""
-        self._stop_event.set()
-        if self._reading_thread:
-            self._reading_thread.join(timeout=2.0)
-    
+
     def _continuous_read_loop(self) -> None:
-        """Background thread for continuous reading."""
         while not self._stop_event.is_set() and self.is_connected():
             reading = self.read_measurement(timeout=0.5)
-            if reading and self.on_reading_callback:
-                self.on_reading_callback(reading)
-    
+            if reading and self.on_reading_callback: self.on_reading_callback(reading)
+
     def get_last_reading(self) -> Optional[MultimeterReading]:
-        """Get the most recent reading."""
         return self._last_reading
 
 
-# =============================================================================
-# Convenience Functions
-# =============================================================================
-
 def create_multimeter_client(
-    port: Optional[str] = None,
+    port: Optional[str] = None, 
     on_reading_callback: Optional[Callable[[MultimeterReading], None]] = None
 ) -> USBMultimeterClient:
-    """
-    Create a multimeter client with auto-detection.
-    
-    Args:
-        port: Optional port override
-        on_reading_callback: Callback for readings
-        
-    Returns:
-        Configured USBMultimeterClient
-    """
-    return USBMultimeterClient(
-        port=port,
-        on_reading_callback=on_reading_callback
-    )
+    return USBMultimeterClient(port=port, on_reading_callback=on_reading_callback)
 
 
 def quick_read(port: Optional[str] = None) -> Optional[MultimeterReading]:
-    """
-    Quick one-time read from multimeter.
-    
-    Args:
-        port: Optional port override
-        
-    Returns:
-        Single reading or None
-    """
-    client = USBMultimeterClient(port=port)
-    if client.connect():
-        reading = client.read_measurement()
-        client.disconnect()
-        return reading
-    return None
-
-
-if __name__ == "__main__":
-    # Test the multimeter client
-    print("Available ports:", USBMultimeterClient.list_available_ports())
-    
-    detected = USBMultimeterClient.detect_multimeter()
-    print(f"Detected multimeter: {detected}")
-    
-    if detected:
-        client = USBMultimeterClient(port=detected)
-        if client.connect():
-            print("Reading measurements (press Ctrl+C to stop)...")
-            try:
-                while True:
-                    reading = client.read_measurement()
-                    if reading:
-                        print(f"  {reading.measurement_type}: {reading.value} {reading.unit}")
-            except KeyboardInterrupt:
-                pass
-            client.disconnect()
+    with USBMultimeterClient(port=port) as client:
+        return client.read_measurement()
