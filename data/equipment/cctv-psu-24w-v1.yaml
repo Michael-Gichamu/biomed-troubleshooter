@@ -34,7 +34,7 @@ signals:
       Probe between Live and Neutral at input connector.
       Alternatively confirm at wall outlet before opening unit.
     safety_warning: "LETHAL — 230V AC. CAT II 600V probes minimum."
-    image_url: "https://raw.githubusercontent.com/Michael-Gichamu/biomed-troubleshooter/main/data/equipment/cctv-psu-24w-v1-test-points/ac_input_test_point.png"
+    image_url: "https://raw.githubusercontent.com/Michael-Gichamu/biomed-troubleshooter/main/data/equipment/cctv-psu-24w-v1-test-points/ac_input_capacitor.png"
     diagnostic_meaning: >
       Confirms mains supply is reaching the board.
       Zero reading indicates upstream fault: power cord, outlet, or circuit breaker.
@@ -96,7 +96,7 @@ signals:
       LETHAL — C1 stores approximately 310V DC. This charge is retained after AC is
       disconnected. Discharge procedure: connect 10kΩ 2W resistor across C1 terminals
       for 30 seconds, then verify less than 10V with meter. CAT III 600V probes required.
-    image_url: "https://raw.githubusercontent.com/Michael-Gichamu/biomed-troubleshooter/main/data/equipment/cctv-psu-24w-v1-test-points/bridge_output_test_point.png"
+    image_url: "https://raw.githubusercontent.com/Michael-Gichamu/biomed-troubleshooter/main/data/equipment/cctv-psu-24w-v1-test-points/main_capacitor_test_point.png"
     diagnostic_meaning: >
       Single highest-value diagnostic test. Splits fault space in half.
       280–340V = primary input stage confirmed working. Fault is in Q1, U3, D3, or secondary.
@@ -195,7 +195,7 @@ signals:
       Shorted: approximately 0V in both orientations.
       Open: OL in both orientations.
     safety_warning: "Power off only for diode testing."
-    image_url: "https://raw.githubusercontent.com/Michael-Gichamu/biomed-troubleshooter/main/data/equipment/cctv-psu-24w-v1-test-points/schottky_diode_test_point.png"
+    image_url: "https://raw.githubusercontent.com/Michael-Gichamu/biomed-troubleshooter/main/data/equipment/cctv-psu-24w-v1-test-points/high_speed_rectifier.png"
     diagnostic_meaning: >
       D3 shorted causes a cascade: secondary short → primary current spike → Q1 overstress
       → Q1 D-S shorted → F1 (T5A/250V) blows. D3 failure is the most common root cause
