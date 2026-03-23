@@ -539,6 +539,13 @@ def step_node(state: ConversationalAgentState):
     # Get expected values for this test point
     expected = state.expected_values.get(test_point_id, {"min": 0, "max": 999, "unit": "V"})
     
+    # Get signal definition for measurement type (DC/AC, resistance, etc.)
+    signal_def = {}
+    for sig in state.equipment_config.get("signals", []):
+        if sig.get("signal_id") == test_point_id:
+            signal_def = sig
+            break
+    
     # Get current hypothesis info
     current_hyp_desc = ""
     for h in state.hypotheses:
@@ -556,11 +563,13 @@ def step_node(state: ConversationalAgentState):
         guidance = {"error": str(e), "name": test_point_id, "test_point": test_point_id}
     
     # Step 5: Take measurement
+    # Get measurement type from signal definition
+    measurement_type = signal_def.get("parameter", "voltage_dc")
     try:
         measurement_result = read_multimeter.invoke({
             "equipment_model": state.equipment_model,
             "test_point": test_point_id,
-            "measurement_type": "voltage_dc"
+            "measurement_type": measurement_type
         })
     except Exception as e:
         measurement_result = {"status": "error", "error": str(e), "test_point": test_point_id}
@@ -582,14 +591,15 @@ def step_node(state: ConversationalAgentState):
             evaluation = "fault"
     
     # Step 7-8: Build expert-quality measurement report
-    # Get signal definition for context
-    signal_def = {}
-    for sig in state.equipment_config.get("signals", []):
-        if sig.get("signal_id") == test_point_id:
-            signal_def = sig
-            break
-
     signal_name = signal_def.get("name", test_point_id)
+    
+    # Get parameter type for display (e.g., "voltage_dc" -> "DC Voltage")
+    param = signal_def.get("parameter", "")
+    param_display = ""
+    if param:
+        # Format parameter for display
+        param_formatted = param.replace("_", " ").title()
+        param_display = f" ({param_formatted})"
 
     explanation = f"## Measurement Result — {signal_name}\n\n"
 
@@ -605,7 +615,7 @@ def step_node(state: ConversationalAgentState):
     # Clear measurement with fault/normal call-out
     if evaluation == "fault":
         explanation += f"### ⚠️ FAULT READING\n"
-        explanation += f"**{signal_name}:** {measurement_value} {measurement_unit}\n"
+        explanation += f"**{signal_name}:** {measurement_value} {measurement_unit}{param_display}\n"
         explanation += f"**Expected:** {expected.get('min', 0)} – {expected.get('max', 999999)} {measurement_unit}\n\n"
         # Add diagnostic interpretation from signal definition
         diag_meaning = signal_def.get("diagnostic_meaning", "")
@@ -613,7 +623,7 @@ def step_node(state: ConversationalAgentState):
             explanation += f"**What this tells us:** {diag_meaning}\n"
     else:
         explanation += f"### ✓ READING NORMAL\n"
-        explanation += f"**{signal_name}:** {measurement_value} {measurement_unit}\n"
+        explanation += f"**{signal_name}:** {measurement_value} {measurement_unit}{param_display}\n"
         explanation += f"**Expected:** {expected.get('min', 0)} – {expected.get('max', 999999)} {measurement_unit}\n\n"
         diag_meaning = signal_def.get("diagnostic_meaning", "")
         if diag_meaning:
