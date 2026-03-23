@@ -181,6 +181,10 @@ class USBMultimeterClient:
     - Data bits: 8
     - Parity: None
     - Stop bits: 1
+    
+    Can be used as a context manager:
+        with USBMultimeterClient() as client:
+            reading = client.read_measurement()
     """
     
     # Common baud rates for multimeters
@@ -335,6 +339,15 @@ class USBMultimeterClient:
         
         self._connected = False
         print("[USB] Disconnected from multimeter")
+    
+    def __enter__(self) -> "USBMultimeterClient":
+        """Context manager entry - connects to multimeter."""
+        self.connect()
+        return self
+    
+    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
+        """Context manager exit - disconnects from multimeter."""
+        self.disconnect()
     
     def is_connected(self) -> bool:
         """Check if connected to multimeter."""
@@ -695,6 +708,18 @@ class USBMultimeterClient:
             # Timeout - no valid frame received
             return None
             
+        except PermissionError as e:
+            # Handle "Access is denied" error - port may need reset
+            print(f"[USB] Read error (PermissionError): {e}")
+            print("[USB] Attempting to reconnect...")
+            self.disconnect()
+            time.sleep(0.5)
+            if self.connect():
+                print("[USB] Reconnected successfully")
+                return None  # Return None, caller can retry
+            else:
+                print("[USB] Failed to reconnect")
+                return None
         except Exception as e:
             print(f"[USB] Read error: {e}")
             return None
