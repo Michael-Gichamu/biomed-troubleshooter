@@ -7,7 +7,40 @@
 
 ## Current Milestone
 
-**Phase: USB Multimeter Mode Detection Fix (COMPLETE)**
+**Phase: Step-by-Step Diagnostic Engine Refactoring (COMPLETE)**
+
+Refactored [`src/studio/conversational_agent.py`](src/studio/conversational_agent.py) to align with "Step-by-Step Diagnostic Engine" specification:
+
+### Refactoring Changes (2026-03-23)
+
+1. **Identity & Greeting (New Thread Detection)** (lines ~217-304):
+   - Added new thread detection via `is_new_thread` check on HumanMessage count
+   - For new threads: "Hello Engineer, I am DIAG. I'll guide you through a systematic diagnostic process."
+   - Node label: `[1. Initialization]`
+
+2. **Mandatory Node Labeling** (all nodes):
+   - RAG_NODE: `[1. Initialization]` - Entry point
+   - HYPOTHESES_NODE: `[3. Preliminary Assessment]` - Fault hypotheses
+   - STEP_NODE: `[4. Measurement & Guidance]` - Active probing
+   - REASON_NODE: `[5. Results Analysis]` - Data interpretation
+   - REPAIR_NODE: `[6. Repair Procedure]` - Final fix steps
+   - INTERRUPT_NODE: `[4. Measurement & Guidance]` - Next test point
+
+3. **Physical Probing & Source Citation** (lines ~517, ~1112):
+   - HYPOTHESES_NODE (line ~517): "_As specified in {equipment_model}.yaml._"
+   - INTERRUPT_NODE (line ~1112): "_As specified in {state.equipment_model}.yaml._"
+   - STEP_NODE: Added location citation with physical description
+
+4. **Multimeter Polling Logic** (lines ~646-653):
+   - Added explicit polling message: "🔌 **Multimeter is active and polling.** Please place your probes on **{test_point_id}** ({physical_description})."
+
+5. **Repair Formatting & Truth-Groundedness** (lines ~1000-1006, ~1034-1040):
+   - Fixed duplicate numbering: changed from `f"{i+1}. {r.get('step', '')}: {r.get('instruction', '')}"` to `f"- **{r.get('step', '')}:** {r.get('instruction', '')}"`
+   - Added source citation: "_[Source: {equipment_model}-diagnostics.md]_"
+
+6. **RAG Document Citation** (lines ~283-297):
+   - Added document name extraction from RAG results
+   - Message: "*Retrieved from: {doc_names}*"
 
 Fixed multimeter mode detection in [`src/infrastructure/usb_multimeter.py`](src/infrastructure/usb_multimeter.py):
 

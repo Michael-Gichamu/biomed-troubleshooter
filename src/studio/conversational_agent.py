@@ -206,13 +206,19 @@ def rag_node(state: ConversationalAgentState):
     
     CRITICAL: Equipment config is fetched here ONCE and stored in state.
     It should NEVER be fetched again in later nodes.
+    
+    Identity & Greeting: For new threads (no prior messages), prepend a SystemMessage greeting.
     """
     from src.studio.tools import query_diagnostic_knowledge, get_equipment_configuration
     
     # First check if equipment_model is already in state
     equipment_model = state.equipment_model
     
-    # If not in state, try to extract from message history
+    # Detect new thread: check if there are any user messages in history
+    # A new thread has only the initial user message (or no messages at all)
+    is_new_thread = len([m for m in state.messages if isinstance(m, HumanMessage)]) == 0
+    
+    # If still not in state, try to extract from message history
     if not equipment_model:
         pattern = r"cctv-psu-[a-z0-9-]+"
         
@@ -229,7 +235,7 @@ def rag_node(state: ConversationalAgentState):
     # If still not found, return error
     if not equipment_model:
         return {
-            "messages": [AIMessage(content="Error: No equipment model provided. Please specify the equipment model to begin diagnosis.")]
+            "messages": [AIMessage(content="[1. Initialization]\n\nError: No equipment model provided. Please specify the equipment model to begin diagnosis.")]
         }
     
     # Step 1: Query RAG for diagnostic knowledge
@@ -273,6 +279,30 @@ def rag_node(state: ConversationalAgentState):
     faults = config_result.get("faults", []) if isinstance(config_result, dict) else []
     
     # Store everything in state — equipment_model MUST be returned so downstream nodes have it
+    
+    # Build RAG citation message
+    rag_citation = ""
+    if rag_knowledge and len(rag_knowledge) > 0:
+        doc_names = []
+        for r in rag_knowledge[:3]:
+            # Try to extract document name from metadata or title
+            if isinstance(r, dict):
+                title = r.get('title', '')
+                if title:
+                    doc_names.append(title)
+                elif r.get('content'):
+                    # Use first 30 chars of content as identifier if no title
+                    doc_names.append(r.get('content', '')[:30] + "...")
+        if doc_names:
+            rag_citation = f"\n\n*Retrieved from: {', '.join(doc_names)}*"
+    
+    # Build greeting for new threads
+    greeting = ""
+    if is_new_thread:
+        greeting = "[1. Initialization]\n\nHello Engineer, I am DIAG. I'll guide you through a systematic diagnostic process. "
+    else:
+        greeting = "[1. Initialization]\n\n"
+    
     return {
         "equipment_model": equipment_model,
         "rag_knowledge": rag_knowledge,
@@ -281,7 +311,7 @@ def rag_node(state: ConversationalAgentState):
         "expected_values": expected_values,
         "suspected_faults": faults,
         "config_cached": True,
-        "messages": [AIMessage(content=f"Diagnostic knowledge loaded for **{equipment_model}**. Found {len(test_points)} test points and {len(faults)} potential faults.")]
+        "messages": [AIMessage(content=f"{greeting}Diagnostic knowledge loaded for **{equipment_model}**. Found {len(test_points)} test points and {len(faults)} potential faults.{rag_citation}")]
     }
 
 
@@ -463,7 +493,7 @@ Only output the JSON array, nothing else."""
     # Build expert-quality hypothesis message
     sorted_hypotheses = sorted(hypotheses, key=lambda h: hypothesis_probabilities.get(h['id'], 0), reverse=True)
 
-    hypothesis_message = "## Diagnostic Assessment\n\n"
+    hypothesis_message = "[3. Preliminary Assessment]\n\n"
     hypothesis_message += f"Based on the symptom — **{symptom_description.strip()}** — here are the most likely fault candidates:\n\n"
 
     for h in sorted_hypotheses:
@@ -482,7 +512,9 @@ Only output the JSON array, nothing else."""
         hypothesis_message += f"⚠️ **SAFETY:** {first_signal['safety_warning']}\n\n"
 
     if first_signal.get('physical_description'):
-        hypothesis_message += f"**Where to find it:** {first_signal['physical_description']}\n\n"
+        hypothesis_message += f"**Where to find it:** {first_signal['physical_description']}\n"
+        # Add source citation
+        hypothesis_message += f"_As specified in {equipment_model}.yaml._\n\n"
 
     if first_signal.get('probe_placement'):
         hypothesis_message += f"**How to measure:**\n{first_signal['probe_placement']}\n\n"
@@ -601,11 +633,21 @@ def step_node(state: ConversationalAgentState):
         param_formatted = param.replace("_", " ").title()
         param_display = f" ({param_formatted})"
 
-    explanation = f"## Measurement Result — {signal_name}\n\n"
+    # Get physical description with source citation
+    physical_desc = signal_def.get("physical_description", "")
+    physical_citation = f"\n\n_Location specified in {state.equipment_model}.yaml._" if physical_desc else ""
+
+    explanation = f"[4. Measurement & Guidance]\n\n"
 
     # Add hypothesis context
     if state.current_hypothesis and current_hyp_desc:
         explanation += f"*Testing whether: {current_hyp_desc}*\n\n"
+
+    # Multimeter polling message
+    explanation += f"🔌 **Multimeter is active and polling.** Please place your probes on **{test_point_id}**"
+    if physical_desc:
+        explanation += f" ({physical_desc})"
+    explanation += ".\n\n"
 
     # Add image if available
     guidance_image = guidance.get("image_url", "")
@@ -616,7 +658,10 @@ def step_node(state: ConversationalAgentState):
     if evaluation == "fault":
         explanation += f"### ⚠️ FAULT READING\n"
         explanation += f"**{signal_name}:** {measurement_value} {measurement_unit}{param_display}\n"
-        explanation += f"**Expected:** {expected.get('min', 0)} – {expected.get('max', 999999)} {measurement_unit}\n\n"
+        explanation += f"**Expected:** {expected.get('min', 0)} – {expected.get('max', 999999)} {measurement_unit}"
+        if physical_citation:
+            explanation += physical_citation
+        explanation += "\n\n"
         # Add diagnostic interpretation from signal definition
         diag_meaning = signal_def.get("diagnostic_meaning", "")
         if diag_meaning:
@@ -624,7 +669,10 @@ def step_node(state: ConversationalAgentState):
     else:
         explanation += f"### ✓ READING NORMAL\n"
         explanation += f"**{signal_name}:** {measurement_value} {measurement_unit}{param_display}\n"
-        explanation += f"**Expected:** {expected.get('min', 0)} – {expected.get('max', 999999)} {measurement_unit}\n\n"
+        explanation += f"**Expected:** {expected.get('min', 0)} – {expected.get('max', 999999)} {measurement_unit}"
+        if physical_citation:
+            explanation += physical_citation
+        explanation += "\n\n"
         diag_meaning = signal_def.get("diagnostic_meaning", "")
         if diag_meaning:
             explanation += f"**What this tells us:** {diag_meaning}\n"
@@ -804,7 +852,7 @@ Only output JSON, nothing else."""
         decision = "all_eliminated"
     
     # Build expert-quality analysis output
-    explanation = "## Analysis\n\n"
+    explanation = "[5. Results Analysis]\n\n"
 
     if reasoning:
         explanation += f"{reasoning}\n\n"
@@ -949,11 +997,13 @@ def repair_node(state: ConversationalAgentState):
                     fault_name = fault.get('name', 'Unknown')
                     recovery = fault.get('recovery', [])
                     if recovery:
+                        # Fix duplicate numbering: use clean markdown list without duplicate numbering
                         repair_steps = "\n".join([
-                            f"{i+1}. {r.get('step', '')}: {r.get('instruction', '')}"
-                            for i, r in enumerate(recovery)
+                            f"- **{r.get('step', '')}:** {r.get('instruction', '')}"
+                            for r in recovery
                         ])
-                        repair_instructions = f"### Repair Procedure for {fault_name}\n\n{repair_steps}"
+                        # Add source citation
+                        repair_instructions = f"### Repair Procedure for {fault_name}\n\n{repair_steps}\n\n_[Source: {equipment_model}-diagnostics.md]_"
                     break
         else:
             # Use LLM to match measurement to fault
@@ -981,15 +1031,18 @@ Output ONLY the fault ID that best matches, nothing else."""
                     fault_name = fault.get("name", "Unknown")
                     recovery = fault.get("recovery", [])
                     if recovery:
+                        # Fix duplicate numbering: use clean markdown list without duplicate numbering
                         repair_steps = "\n".join([
-                            f"{i+1}. {r.get('step', '')}: {r.get('instruction', '')}"
-                            for i, r in enumerate(recovery)
+                            f"- **{r.get('step', '')}:** {r.get('instruction', '')}"
+                            for r in recovery
                         ])
-                        repair_instructions = f"### Repair Procedure for {fault_name}\n\n{repair_steps}"
+                        # Add source citation
+                        repair_instructions = f"### Repair Procedure for {fault_name}\n\n{repair_steps}\n\n_[Source: {equipment_model}-diagnostics.md]_"
                     break
     
     # Final message — expert quality repair guidance
-    final_message = "## Diagnosis Complete — Fault Confirmed\n\n"
+    final_message = "[6. Repair Procedure]\n\n"
+    final_message += f"## Diagnosis Complete — Fault Confirmed\n\n"
     final_message += f"**Confirmed fault:** {fault_name}\n"
     if current_hypothesis:
         # Find the hypothesis description
@@ -1040,6 +1093,7 @@ def interrupt_node(state: ConversationalAgentState):
 
     # Build the instruction message
     instruction_parts = []
+    instruction_parts.append("[4. Measurement & Guidance]\n")
 
     if next_signal:
         instruction_parts.append(f"## Next Measurement — {next_signal.get('name', next_signal_id)}")
@@ -1054,6 +1108,8 @@ def interrupt_node(state: ConversationalAgentState):
 
         if next_signal.get('physical_description'):
             instruction_parts.append(f"**Where to find it:**\n{next_signal['physical_description']}")
+            # Add source citation
+            instruction_parts.append(f"_As specified in {state.equipment_model}.yaml._")
 
         if next_signal.get('probe_placement'):
             instruction_parts.append(f"**How to measure:**\n{next_signal['probe_placement']}")
