@@ -254,9 +254,60 @@ def get_equipment_configuration(
     
     elif request_type == "all":
         # Return complete config
+        
+        # Build thresholds
+        thresholds = {}
+        for signal_id, threshold in config.thresholds.items():
+            states = {}
+            for state_name, state in threshold.states.items():
+                states[state_name] = {
+                    "min": state.min_value,
+                    "max": state.max_value,
+                    "description": state.description
+                }
+            thresholds[signal_id] = {
+                "signal_id": threshold.signal_id,
+                "states": states
+            }
+        
+        # Build faults list
+        faults_list = []
+        for fault_id, fault in config.faults.items():
+            faults_list.append({
+                "fault_id": fault.fault_id,
+                "name": fault.name,
+                "description": fault.description,
+                "priority": fault.priority,
+                "signatures": fault.signatures,
+                "hypotheses": [
+                    {
+                        "rank": h.rank,
+                        "component": h.component,
+                        "failure_mode": h.failure_mode,
+                        "cause": h.cause,
+                        "confidence": h.confidence
+                    }
+                    for h in fault.hypotheses
+                ],
+                "recovery": [
+                    {
+                        "step": r.step,
+                        "action": r.action,
+                        "target": r.target,
+                        "instruction": r.instruction,
+                        "verification": r.verification,
+                        "safety": r.safety,
+                        "difficulty": r.difficulty,
+                        "estimated_time": r.estimated_time
+                    }
+                    for r in fault.recovery
+                ]
+            })
+        faults_list.sort(key=lambda x: x.get("priority", 999))
+        
+        # Build images
         images = []
         for img in config.images.values():
-            # Use GitHub RAW URL format
             image_url = f"https://raw.githubusercontent.com/Michael-Gichamu/biomed-troubleshooter/main/data/equipment/{equipment_model}-test-points/{img.filename}"
             images.append({
                 "image_id": img.image_id,
@@ -293,6 +344,8 @@ def get_equipment_configuration(
                 }
                 for s in config.signals.values()
             ],
+            "thresholds": thresholds,
+            "faults": faults_list,
             "images": images
         }
     
