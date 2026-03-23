@@ -10,6 +10,7 @@ metadata:
   category: "power_supply"
   topology: "flyback_smps"
   version: "3.0.0"
+  created: "2026-01-01"
 
 # =============================================================================
 # SIGNALS — All measurable signals with physical locations and probe placement
