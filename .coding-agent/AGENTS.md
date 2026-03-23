@@ -10,10 +10,10 @@
 |------|--------|
 | **Project Type** | LangGraph-powered AI troubleshooting agent |
 | **Core Functionality** | Automated equipment diagnostics for CCTV Power Supply Units |
-| **Working Modes** | Mock (simulation) and USB (real hardware via Mastech MS8250D) |
+| **Working Mode** | USB (real hardware via Mastech MS8250D multimeter) |
 | **Primary LLM** | Groq (Llama 3.3 70B) |
 | **Vector DB** | ChromaDB (embedded mode - no Docker required) |
-| **Current State** | Core diagnostic workflow functional; some conversational agent routing incomplete |
+| **Current State** | Working - hypothesis-driven diagnostic workflow functional |
 
 ---
 
@@ -54,15 +54,11 @@ cp .env.example .env
 # Install dependencies
 pip install -r requirements.txt
 
-# Run in mock mode (no hardware needed)
-python -m src.interfaces.cli --mock
+# Test multimeter connection
+python test_mm.py
 
-# Or run in USB mode (requires Mastech MS8250D multimeter)
-python -m src.interfaces.cli --usb CCTV-PSU-24W-V1
-
-# Or use LangGraph Studio
-langgraph dev --port 2024
-# Note: Images are served via GitHub RAW URLs - no local server needed
+# Or use LangGraph Studio (requires venv or PATH fix)
+start.bat
 ```
 
 ### Key Files Reference
@@ -70,11 +66,11 @@ langgraph dev --port 2024
 | Purpose | File |
 |---------|------|
 | Main diagnostic workflow | [`src/studio/conversational_agent.py`](src/studio/conversational_agent.py) |
+| LangGraph tools | [`src/studio/tools.py`](src/studio/tools.py) |
 | Domain models & services | [`src/domain/models.py`](src/domain/models.py) |
 | Equipment configuration | [`data/equipment/cctv-psu-24w-v1.yaml`](data/equipment/cctv-psu-24w-v1.yaml) |
 | CLI interface | [`src/interfaces/cli.py`](src/interfaces/cli.py) |
-| Infrastructure config | [`src/infrastructure/config.py`](src/infrastructure/config.py) |
-| ChromaDB client | [`src/infrastructure/chromadb_client.py`](src/infrastructure/chromadb_client.py) |
+| USB Multimeter | [`src/infrastructure/usb_multimeter.py`](src/infrastructure/usb_multimeter.py) |
 
 ---
 
@@ -83,17 +79,17 @@ langgraph dev --port 2024
 ### For Debugging Issues
 1. Check [STATUS.md](.coding-agent/STATUS.md) for known issues
 2. Enable LangSmith tracing in `.env` for full observability
-3. Use mock mode to reproduce issues without hardware
+3. Use `test_mm.py` to test multimeter directly
 
 ### For Adding New Features
 1. Review [SPEC.md](.coding-agent/SPEC.md) to ensure alignment with project goals
 2. Study [ARCHITECTURE.md](.coding-agent/ARCHITECTURE.md) to understand where the feature fits
 3. Add equipment-specific logic in YAML config (not hardcoded)
 
-### For Fixing Bugs
-1. Run tests: `pytest tests/`
-2. Use mock scenarios: `python -m src.interfaces.cli --mock --scenario cctv-psu-overvoltage`
-3. Check LangSmith traces for decision debugging
+### For Multimeter Issues
+1. Run `python test_mm.py` to test direct multimeter reading
+2. Check COM port in device manager
+3. Verify multimeter is in correct mode (DCV, ACV, Ω, etc.)
 
 ---
 
@@ -114,4 +110,3 @@ This project follows **data-driven architecture**:
 - **Project overview**: See [SPEC.md](.coding-agent/SPEC.md)
 - **Current state**: See [STATUS.md](.coding-agent/STATUS.md)
 - **Technical details**: See [ARCHITECTURE.md](.coding-agent/ARCHITECTURE.md)
-- **Existing docs**: See [`docs/`](docs/) directory

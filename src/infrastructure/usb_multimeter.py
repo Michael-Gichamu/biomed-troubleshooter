@@ -114,31 +114,37 @@ class MastechMS8250DParser:
             
             value *= multiplier
 
-            # Functions (Ordered by specificity to prevent misclassification)
+            # Functions - MS8250D 18-byte frame mode detection
+            # Based on libsigrok and protocol reverse engineering
             is_ac = bool(buf[1] & 0x10)
             is_dc = bool(buf[2] & 0x02)
             
-            if buf[11] & 0x40: # Continuity (Specific bit)
+            # Check for specific modes first (most specific)
+            # Byte 10 bits for various functions
+            func_byte = buf[10] if len(buf) > 10 else 0
+            func2_byte = buf[11] if len(buf) > 11 else 0
+            
+            if func2_byte & 0x10:  # Continuity (beep) mode
                 unit = "Ω"
                 m_type = "CONTINUITY"
-            elif buf[12] & 0x01: # Diode (Specific bit)
+            elif func2_byte & 0x20:  # Diode mode
                 unit = "V"
                 m_type = "DIODE"
-            elif buf[9] & 0x40: # Resistance
-                unit = "Ω"
-                m_type = "RESISTANCE"
-            elif buf[9] & 0x10: # Voltage
-                unit = "V"
-                m_type = "AC_VOLTAGE" if is_ac else "DC_VOLTAGE"
-            elif buf[10] & 0x01: # Current
-                unit = "A"
-                m_type = "AC_CURRENT" if is_ac else "DC_CURRENT"
-            elif buf[10] & 0x04: # Frequency
+            elif func_byte & 0x04:  # Frequency (Hz)
                 unit = "Hz"
                 m_type = "FREQUENCY"
-            elif buf[10] & 0x02: # Capacitance
+            elif func_byte & 0x02:  # Capacitance
                 unit = "F"
                 m_type = "CAPACITANCE"
+            elif func_byte & 0x01:  # Current
+                unit = "A"
+                m_type = "AC_CURRENT" if is_ac else "DC_CURRENT"
+            elif buf[9] & 0x40:  # Resistance (ohms)
+                unit = "Ω"
+                m_type = "RESISTANCE"
+            elif buf[9] & 0x10:  # Voltage
+                unit = "V"
+                m_type = "AC_VOLTAGE" if is_ac else "DC_VOLTAGE"
 
             # Secondary Display (Bytes 12-15)
             s1 = cls.parse_sec_digit(buf[12])
@@ -630,7 +636,43 @@ class USBMultimeterClient:
                     mode_byte = frame[3]
                     unit_byte = frame[4]
                     
-                    if mode_byte == 0x03 and unit_byte == 0x00:
+                    # MS8250D mode detection from bytes 1-2 and 3-4
+                    # Based on protocol analysis of UM24C/MS8250D frames
+                    func_code = frame[1] if len(frame) > 1 else 0
+                    
+                    # Detection based on function code (byte 1)
+                    # 0x22 = Voltage, 0x20 = Current, 0x21 = Resistance
+                    # 0x23 = Continuity, 0x24 = Diode, 0x25 = Frequency
+                    if func_code == 0x23:
+                        # Continuity mode
+                        unit = "Ω"
+                        measurement_type = "CONTINUITY"
+                    elif func_code == 0x24:
+                        # Diode mode
+                        unit = "V"
+                        measurement_type = "DIODE"
+                    elif func_code == 0x25:
+                        # Frequency/Hz mode
+                        unit = "Hz"
+                        measurement_type = "FREQUENCY"
+                    elif func_code == 0x21 or (mode_byte == 0x01 and unit_byte == 0x00):
+                        # Resistance
+                        unit = "Ω"
+                        measurement_type = "RESISTANCE"
+                    elif func_code == 0x22:
+                        # Voltage (DC by default, check for AC)
+                        unit = "V"
+                        measurement_type = "DC_VOLTAGE"
+                        # Check if AC (may be in byte 2 or elsewhere)
+                        if len(frame) > 2 and frame[2] == 0x01:
+                            measurement_type = "AC_VOLTAGE"
+                    elif func_code == 0x20:
+                        # Current
+                        unit = "A"
+                        measurement_type = "DC_CURRENT"
+                        if len(frame) > 2 and frame[2] == 0x01:
+                            measurement_type = "AC_CURRENT"
+                    elif mode_byte == 0x03 and unit_byte == 0x00:
                         # DC Voltage
                         unit = "V"
                         measurement_type = "DC_VOLTAGE"

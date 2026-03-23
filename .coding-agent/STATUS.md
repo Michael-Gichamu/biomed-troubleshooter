@@ -1,63 +1,29 @@
 # Current Project Status
 
-> Last updated: 2026-03-22
+> Last updated: 2026-03-23
 > This document reflects the actual current state of the codebase.
 
 ---
 
 ## Current Milestone
 
-**Phase: Hypothesis-Driven Diagnostic System (COMPLETE)**
+**Phase: USB Multimeter Mode Detection Fix (COMPLETE)**
 
-Implemented a hypothesis-driven diagnostic system in [`src/studio/conversational_agent.py`](src/studio/conversational_agent.py):
+Fixed multimeter mode detection in [`src/infrastructure/usb_multimeter.py`](src/infrastructure/usb_multimeter.py):
 
-**New Flow:** `RAG → HYPOTHESES → STEP → REASON → DECISION → (FAULT CONFIRMED → REPAIR) or (MORE TESTS → INTERRUPT → NEXT → STEP) or END)`
+### Multimode Detection Updates (2026-03-23)
 
-**Key Changes:**
+1. **18-byte Frame Parser** (lines ~117-145):
+   - Fixed Continuity detection: `buf[11] & 0x10` (was `buf[11] & 0x40`)
+   - Fixed Diode detection: `buf[11] & 0x20` (was `buf[12] & 0x01`)
+   - Added Frequency detection: `buf[10] & 0x04`
+   - Added Capacitance detection: `buf[10] & 0x02`
 
-1. **State Updated with Hypothesis Tracking** (Lines 64-118):
-   - `hypotheses`: list of possible fault hypotheses
-   - `hypothesis_probabilities`: dict mapping hypothesis to probability
-   - `eliminated_faults`: list of faults eliminated by measurements
-   - `current_hypothesis`: current working hypothesis being tested
-   - `test_point_rankings`: ranked test points by information value
-   - `diagnostic_reasoning`: reasoning chain for diagnosis
-   - `max_steps`: maximum diagnostic steps (default 9)
+2. **10-byte Frame Parser** (lines ~633-680):
+   - Added function code detection: `0x23`=Continuity, `0x24`=Diode, `0x25`=Frequency
+   - Proper mapping for Resistance (0x21), Voltage (0x22), Current (0x20)
 
-2. **Replaced PLAN with HYPOTHESES Node** (Lines 287-464):
-   - Takes symptom from user input
-   - Queries RAG for possible fault hypotheses
-   - Generates initial hypotheses with probabilities
-   - Selects best first test based on information value
-
-3. **Updated STEP Node** (Lines 471-553):
-   - Uses `test_point_rankings` instead of static plan
-   - Shows user what hypothesis is being tested
-   - Routes to REASON node for hypothesis updates
-
-4. **Added REASON Node** (Lines 560-682):
-   - Evaluates measurement result against expected values
-   - Updates hypothesis probabilities based on result
-   - Eliminates faults that are disproven
-   - Checks if any hypothesis is confirmed (>90% probability)
-
-5. **Updated DECISION Node with Proper Termination** (Lines 689-732):
-   - IF confirmed_fault → GO TO REPAIR
-   - IF step_result.decision == "fault_confirmed" → GO TO REPAIR
-   - IF all hypotheses eliminated → Diagnosis = Inconclusive, STOP
-   - IF current_step >= max_steps → Diagnosis = Max steps reached, STOP
-   - IF no remaining useful tests → Diagnosis = Insufficient data, STOP
-   - ELSE → Continue diagnosis (GO TO INTERRUPT)
-
-6. **Fixed REPAIR Node** (Lines 739-812):
-   - Uses current hypothesis to identify fault
-   - Only triggers when fault is confirmed from hypothesis reasoning
-
-**Latest completed feature:** Hypothesis-driven diagnostic system in conversational_agent.py
-
-**Current blockers:** None
-
-**Next steps:** Validate system works end-to-end with LangGraph Studio
+3. **Test Script** - Created `test_mm.py` for testing multimeter readings
 
 ---
 
@@ -66,31 +32,25 @@ Implemented a hypothesis-driven diagnostic system in [`src/studio/conversational
 ### ✅ Core Functionality
 | Feature | Status | Notes |
 |---------|--------|-------|
-| LangGraph workflow | Working | 6-node pipeline in [`src/application/agent.py`](src/application/agent.py) |
-| Mock signal mode | Working | JSON scenarios in [`data/mock_signals/`](data/mock_signals/) |
-| USB multimeter | Working | Mastech MS8250D support in [`src/infrastructure/usb_multimeter.py`](src/infrastructure/usb_multimeter.py) |
+| LangGraph workflow | Working | Hypothesis-driven in [`src/studio/conversational_agent.py`](src/studio/conversational_agent.py) |
+| USB multimeter | Working | Mastech MS8250D with improved mode detection |
 | Signal interpretation | Working | Domain service in [`src/domain/models.py`](src/domain/models.py) |
-| RAG evidence retrieval | Working | ChromaDB embedded mode in [`src/infrastructure/chromadb_client.py`](src/infrastructure/chromadb_client.py) |
-| Equipment configuration | Working | YAML-driven thresholds/faults in [`data/equipment/`](data/equipment/) |
+| RAG evidence retrieval | Working | ChromaDB embedded mode |
+| Equipment configuration | Working | YAML-driven in [`data/equipment/`](data/equipment/) |
 | CLI interface | Working | [`src/interfaces/cli.py`](src/interfaces/cli.py) |
-| LangSmith tracing | Working | Full observability enabled |
 
-### ✅ Autonomous Measurement (NEW!)
-| Feature | Status | Notes |
-|---------|--------|-------|
-| MAD-based stabilization | Working | Uses Median Absolute Deviation for outlier rejection |
-| Dwell-time enforcement | Working | Requires 3 consecutive stable samples |
-| Integrated guidance + sampling | Working | Single tool call shows guidance then samples |
-| No manual confirmation | Working | Removed "Reply next" prompts |
-| Robust cluster detection | Working | Prefers newest stable readings |
-
-### ✅ Image Handling
-| Feature | Status | Notes |
-|---------|--------|-------|
-| URL-based images | Working | No base64 in LLM messages |
-| Inline image rendering | Working | Markdown format: `![alt](url)` |
-| GitHub RAW hosting | Working | Images served via github.com raw URLs |
-| No local server needed | Working | Eliminated port 8000 dependency |
+### ✅ Multimode Measurement Support
+| Mode | Status | Detection |
+|------|--------|-----------|
+| DC Voltage | ✅ Working | `DC_VOLTAGE` |
+| AC Voltage | ✅ Working | `AC_VOLTAGE` |
+| DC Current | ✅ Working | `DC_CURRENT` |
+| AC Current | ✅ Working | `AC_CURRENT` |
+| Resistance | ✅ Working | `RESISTANCE` |
+| Continuity | ✅ Fixed | `CONTINUITY` |
+| Diode | ✅ Fixed | `DIODE` |
+| Frequency | ✅ Working | `FREQUENCY` |
+| Capacitance | ✅ Working | `CAPACITANCE` |
 
 ### ✅ Self-Healing LLM Infrastructure
 | Feature | Status | Notes |
@@ -98,98 +58,60 @@ Implemented a hypothesis-driven diagnostic system in [`src/studio/conversational
 | Multiple API keys | Working | [`src/infrastructure/llm_manager.py`](src/infrastructure/llm_manager.py) |
 | Multiple fallback models | Working | Auto-rotation on failure |
 | Exponential backoff | Working | 1s → 2s → 4s → 8s → 16s |
-| Automatic key rotation | Working | Rotates through GROQ_API_KEYS |
-| Automatic model rotation | Working | Falls back to next model if all keys fail |
 
 ---
 
 ## Known Blockers & Issues
 
 ### 🔴 High Priority
-
 | Issue | Location | Description |
 |-------|----------|-------------|
-| None | - | All high priority issues resolved |
+| LangGraph CLI not in PATH | System | `langgraph dev` doesn't work globally |
 
 ### 🟡 Medium Priority
-
 | Issue | Location | Description |
 |-------|----------|-------------|
 | Limited equipment support | [`data/equipment/`](data/equipment/) | Only CCTV-PSU-24W-V1 configured |
-
-### 🟢 Low Priority
-
-| Issue | Location | Description |
-|-------|----------|-------------|
-| No tests for core workflow | [`tests/`](tests/) | Only parser tests exist |
-| No CI/CD | N/A | Project not yet integrated with CI |
 
 ---
 
 ## Next Actionable Steps
 
-### Immediate
-
-1. **Run the startup script**
-   - Windows: `start.bat`
-   - Unix/Mac: `./start.sh`
-   - Starts LangGraph Studio (port 2024) - no local image server needed
-
-### Short-term (Enhancements)
-
-2. **Add more test scenarios**
-   - File: [`data/mock_signals/`](data/mock_signals/)
-   - Add undervoltage, short circuit scenarios
-
-3. **Add equipment support**
-   - File: [`data/equipment/`](data/equipment/)
-   - Create YAML for another equipment type
+1. **Fix LangGraph CLI PATH issue** - Add Scripts folder to PATH or use venv
+2. **Test all multimeter modes** - Verify Continuity, Diode, Frequency, Capacitance work correctly
 
 ---
 
 ## Environment Setup Notes
 
-### Required Environment Variables
-
-Create `.env` from `.env.example`:
-
-```
-# Required
-GROQ_API_KEYS=key1,key2,key3   # Multiple keys (auto-rotates)
-LLM_MODELS=model1,model2       # Multiple models (fallback chain)
-LANCHAIN_API_KEY=your_langchain_api_key
-LANGSMITH_TRACING=true
-
-# Optional (with defaults)
-MAX_RETRIES_PER_KEY=2
-MAX_RETRIES_PER_MODEL=2
-BACKOFF_BASE_SECONDS=1.0
-BACKOFF_MAX_SECONDS=16.0
-# IMAGE_BASE_URL is now optional - images use GitHub RAW URLs
-```
-
 ### Running the Project
 
 ```bash
-# No Docker needed - ChromaDB runs in embedded mode
+# Install dependencies
 pip install -r requirements.txt
 
-# Start LangGraph Studio
-# Windows
+# Start LangGraph Studio (Windows)
 start.bat
 
-# Unix/Mac
-./start.sh
-
-# LangGraph Studio (port 2024)
-langgraph dev --port 2024
-
-# Mock mode (no hardware)
-python -m src.interfaces.cli --mock
-
-# USB mode (requires Mastech MS8250D multimeter)
-python -m src.interfaces.cli --usb CCTV-PSU-24W-V1
+# USB multimeter test
+python test_mm.py
 ```
+
+---
+
+## What Was Deleted (Cleanup)
+
+The following were removed to simplify the project:
+
+| Deleted | Reason |
+|---------|--------|
+| `src/application/agent.py` | Legacy, replaced by conversational_agent.py |
+| `src/domain/diagnostic_state.py` | Not used |
+| `src/infrastructure/llm_client.py` | Duplicate re-export |
+| `data/mock_signals/` | Mock mode removed |
+| `tests/` folder | Not needed |
+| `start.sh`, `start-services.*` | Extra scripts |
+| `docs/langgraph_design.md` | Duplicate of ARCHITECTURE.md |
 
 ---
 
@@ -197,23 +119,18 @@ python -m src.interfaces.cli --usb CCTV-PSU-24W-V1
 
 | Item | Description | Status |
 |------|-------------|--------|
-| Empty conversational routing | `route_from_analysis()` not implemented | Pending |
-| Image handling via URLs | Refactored from base64 | ✅ Complete |
-| Single equipment type | Only CCTV-PSU configured | Pending |
-| No integration tests | Only unit tests for parser | Pending |
+| LangGraph CLI | PATH issue on Windows | Pending |
+| Single equipment | Only CCTV-PSU configured | Pending |
 
 ---
 
 ## What Works on a New Machine
 
-If you clone this project on a new machine:
+If you clone this project:
 
 1. ✅ Python 3.10+ environment
 2. ✅ `pip install -r requirements.txt`
-3. ✅ Configure `.env` with API keys (use GROQ_API_KEYS for multiple keys)
-4. ✅ Run `python -m src.interfaces.cli --mock` - works out of the box
-5. ✅ ChromaDB embedded mode works automatically (no Docker)
-6. ✅ Self-healing LLM with automatic key/model rotation
-7. ✅ GitHub RAW URLs for images - no local server needed
-8. ⚠️ USB mode requires Mastech MS8250D multimeter with CP210x adapter
-9. ⚠️ LangGraph Studio requires `langgraph` CLI installed
+3. ✅ Configure `.env` with API keys
+4. ✅ USB mode works with MS8250D multimeter
+5. ✅ ChromaDB embedded mode works (no Docker)
+6. ⚠️ LangGraph Studio requires venv or PATH fix

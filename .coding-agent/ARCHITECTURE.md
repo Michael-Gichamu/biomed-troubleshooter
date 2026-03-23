@@ -37,7 +37,7 @@
 
 ---
 
-## Folder Structure
+## Folder Structure (Current)
 
 ```
 ai-agent/
@@ -45,37 +45,28 @@ ai-agent/
 │   ├── AGENTS.md               # Entry point (READ THIS FIRST)
 │   ├── STATUS.md               # Current state
 │   ├── SPEC.md                 # Product spec
-│   ├── ARCHITECTURE.md         # Technical details (YOU ARE HERE)
-│   └── sessions/               # Session history
+│   └── ARCHITECTURE.md         # Technical details (YOU ARE HERE)
 │
 ├── src/
-│   ├── application/            # LangGraph workflow definition
-│   │   ├── agent.py            # Main diagnostic workflow (legacy)
-│   │   ├── diagnostic_agent.py # NEW: Step-by-step LangGraph workflow
-│   │   └── conversational_agent.py  # Conversational variant
-│   │
 │   ├── domain/                 # Business logic (no framework dependencies)
-│   │   ├── models.py           # Domain models & services
-│   │   └── diagnostic_state.py # NEW: Diagnostic state management
+│   │   └── models.py           # Domain models & services
 │   │
 │   ├── infrastructure/         # External integrations
 │   │   ├── config.py           # Centralized configuration
 │   │   ├── chromadb_client.py  # ChromaDB (embedded mode)
-│   │   ├── llm_client.py       # Groq/Ollama LLM wrapper
 │   │   ├── llm_manager.py      # LLM provider management
-│   │   ├── usb_multimeter.py   # Serial communication
+│   │   ├── usb_multimeter.py   # Serial communication (MS8250D)
 │   │   ├── equipment_config.py # YAML loader
 │   │   ├── rag_repository.py   # RAG operations
-│   │   └── multimeter_stabilizer.py # NEW: Stabilization engine
+│   │   └── multimeter_stabilizer.py # Stabilization engine
 │   │
 │   ├── interfaces/             # User-facing interfaces
-│   │   ├── cli.py              # Command-line interface
-│   │   └── mode_router.py      # Mock/USB mode selection
+│   │   ├── cli.py             # Command-line interface
+│   │   └── mode_router.py     # Mock/USB mode selection
 │   │
 │   └── studio/                 # LangGraph Studio integration
-│       ├── langgraph_studio.py # Studio entry point
 │       ├── tools.py            # LangGraph tools (RAG + measurement)
-│       ├── conversational_agent.py # Studio agent
+│       ├── conversational_agent.py # Main diagnostic agent
 │       └── background_usb_reader.py # Async USB reading
 │
 ├── data/
@@ -83,12 +74,10 @@ ai-agent/
 │   │   └── cctv-psu-24w-v1.yaml
 │   ├── knowledge/              # RAG documentation
 │   │   └── cctv-psu-24w-v1-diagnostics.md
-│   └── mock_signals/           # Test scenarios (JSON)
-│       └── scenarios.json
+│   └── chromadb/               # Vector database (auto-generated)
 │
-├── docs/                       # Project documentation
-├── tests/                      # Unit tests
-├── pyproject.toml              # Python dependencies
+├── test_mm.py                  # Multimeter test script
+├── start.bat                   # Windows startup script
 └── langgraph.json             # LangGraph Studio config
 ```
 
@@ -98,57 +87,50 @@ ai-agent/
 
 ```mermaid
 graph TB
-    subgraph "Input Sources"
-        MOCK[Mock Mode<br/>JSON Scenarios]
+    subgraph "Input"
         USB[USB Mode<br/>Mastech MS8250D<br/>via CP210x]
     end
 
     subgraph "CLI Interface"
         CLI[src/interfaces/cli.py]
-        ROUTE[Mode Router]
     end
 
-    subgraph "LangGraph Workflow<br/>src/application/diagnostic_agent.py"
+    subgraph "LangGraph Workflow<br/>src/studio/conversational_agent.py"
         RAG[RAG_NODE<br/>Retrieve diagnostic knowledge]
-        PLAN[PLAN_NODE<br/>Select hypothesis]
-        STEP[STEP_NODE<br/>Atomic diagnostic step<br/>Show → Measure → Evaluate → Reason → Explain]
-        DECISION[DECISION_NODE<br/>Determine next action]<n    INTERRUPT[INTERRUPT_NODE<br/>Wait for user "Next"]
+        HYP[HYPOTHESES_NODE<br/>Generate fault hypotheses]
+        STEP[STEP_NODE<br/>Atomic diagnostic step]
+        REASON[REASON_NODE<br/>Evaluate measurement]
+        DECISION[DECISION_NODE<br/>Determine next action]
         REPAIR[REPAIR_NODE<br/>Output repair steps]
     end
 
-    subgraph "Domain Layer<br/>src/domain/"
-        DIAG_STATE[DiagnosticState<br/>diagnostic_state.py]
-        DIAG_ENGINE[DiagnosticEngine<br/>diagnostic_state.py]
-        MODELS[Models & Services]
+    subgraph "Domain Layer"
+        MODELS[Models & Services<br/>src/domain/models.py]
     end
 
-    subgraph "Infrastructure<br/>src/infrastructure/"
-        CONFIG[Configuration]
+    subgraph "Infrastructure"
         CHROMA[ChromaDB<br/>(embedded)]
         LLM[LLM Client (Groq)]
         EQUIP[Equipment Config]
-        STABILIZER[MultimeterStabilizer<br/>multimeter_stabilizer.py]
+        MULTI[USB Multimeter<br/>usb_multimeter.py]
+        STABILIZER[MultimeterStabilizer]
     end
 
-    MOCK --> ROUTE
-    USB --> ROUTE
-    ROUTE --> CLI
+    USB --> CLI
     CLI --> RAG
 
-    RAG --> PLAN
-    PLAN --> STEP
-    STEP --> DECISION
+    RAG --> HYP
+    HYP --> STEP
+    STEP --> REASON
+    REASON --> DECISION
     DECISION -->|Fault confirmed| REPAIR
-    DECISION -->|More tests needed| INTERRUPT
-    INTERRUPT -->|NEXT pressed| STEP
-
+    DECISION -->|More tests| INTERRUPT
+    
     RAG -.-> CHROMA
-    PLAN -.-> EQUIP
+    STEP -.-> MULTI
     STEP -.-> STABILIZER
     STEP -.-> EQUIP
-    DECISION -.-> CHROMA
-    DIAG_STATE -.-> MODELS
-    DIAG_ENGINE -.-> EQUIP
+    MODELS -.-> EQUIP
 ```
 
 ---
@@ -157,196 +139,67 @@ graph TB
 
 ### LangGraph Workflow Nodes
 
-The diagnostic agent uses an 8-node LangGraph workflow with interrupt-based step control:
+The diagnostic agent uses a 7-node LangGraph workflow:
 
 | Node | File | Responsibility |
 |------|------|----------------|
-| [`rag_node`](src/application/diagnostic_agent.py:85) | diagnostic_agent.py | Query ChromaDB for diagnostic guidance |
-| [`plan_node`](src/application/diagnostic_agent.py:141) | diagnostic_agent.py | Generate hypothesis list from RAG + config |
-| [`instruction_node`](src/application/diagnostic_agent.py:273) | diagnostic_agent.py | Display test point, image, probe instructions |
-| [`interrupt_node`](src/application/diagnostic_agent.py:314) | diagnostic_agent.py | **CRITICAL**: Pause workflow, wait for user |
-| [`measure_node`](src/application/diagnostic_agent.py:356) | diagnostic_agent.py | Take stabilized measurement |
-| [`evaluate_node`](src/application/diagnostic_agent.py:439) | diagnostic_agent.py | Compare against expected values |
-| [`reason_node`](src/application/diagnostic_agent.py:529) | diagnostic_agent.py | Decide: continue or repair |
-| [`repair_node`](src/application/diagnostic_agent.py:620) | diagnostic_agent.py | Output repair guidance |
+| RAG_NODE | conversational_agent.py | Query ChromaDB for diagnostic guidance |
+| HYPOTHESES_NODE | conversational_agent.py | Generate hypothesis list from RAG + config |
+| STEP_NODE | conversational_agent.py | Perform atomic diagnostic step |
+| REASON_NODE | conversational_agent.py | Evaluate measurement against hypothesis |
+| DECISION_NODE | conversational_agent.py | Route based on hypothesis state |
+| REPAIR_NODE | conversational_agent.py | Output repair guidance |
+| INTERRUPT_NODE | conversational_agent.py | Pause for user "Next" |
 
-### Workflow Diagram (CORRECTED)
+### Workflow Flow
 
 ```mermaid
 graph TD
-    RAG[RAG_NODE<br/>Retrieve diagnostic knowledge] --> PLAN[PLAN_NODE<br/>Select hypothesis]
-    PLAN --> STEP[STEP_NODE<br/>Atomic diagnostic step<br/>Show test point → Show image → Measure → Stabilize → Evaluate → Reason → Explain]
-    STEP --> DECISION[DECISION_NODE<br/>Determine next action]
-    DECISION -->|Fault confirmed| REPAIR[REPAIR_NODE<br/>Output repair steps]
-    DECISION -->|More tests needed| INTERRUPT[INTERRUPT_NODE<br/>Wait for user "Next"]
-    INTERRUPT -->|NEXT pressed| STEP
+    RAG[RAG_NODE] --> HYP[HYPOTHESES_NODE]
+    HYP --> STEP[STEP_NODE]
+    STEP --> REASON[REASON_NODE]
+    REASON --> DECISION[DECISION_NODE]
+    DECISION -->|Fault confirmed| REPAIR[REPAIR_NODE]
+    DECISION -->|More tests| INTERRUPT[INTERRUPT_NODE]
+    INTERRUPT -->|NEXT| STEP
     REPAIR --> END
 
     style RAG fill:#e3f2fd
-    style PLAN fill:#e3f2fd
+    style HYP fill:#e3f2fd
     style STEP fill:#fff3e0
+    style REASON fill:#fff3e0
     style DECISION fill:#f3e5f5
     style INTERRUPT fill:#ffcdd2
     style REPAIR fill:#c8e6c9
 ```
 
-**Node Responsibilities:**
-
-| Node | Purpose | Key Behavior |
-|------|---------|--------------|
-| RAG_NODE | Query ChromaDB for fault hypotheses | Retrieves top-3 relevant docs |
-| PLAN_NODE | Select next hypothesis from RAG results | Builds ordered hypothesis list |
-| STEP_NODE | **ATOMIC**: Complete diagnostic step | 1)Show test point 2)Show probe placement 3)Show ONE image 4)Call read_multimeter 5)Stabilize 6)Evaluate 7)Reason 8)Explain to user 9)Decide next action |
-| DECISION_NODE | **CRITICAL**: Determine next action | FAULT CONFIRMED → REPAIR, or MORE TESTS → INTERRUPT |
-| INTERRUPT_NODE | **CRITICAL**: Pause AFTER step completes | Uses `langgraph.types.interrupt()` - user presses "Next" to continue |
-| REPAIR_NODE | Terminal node | Outputs confirmed fault + repair steps |
-
-**Key Correction:** INTERRUPT happens AFTER the full STEP completes, NOT before measurement. This ensures the user sees the test instructions and image before the system pauses for confirmation.
-
 ---
 
-## New Components
+## USB Multimeter Integration
 
-### MultimeterStabilizer
+### Supported Modes
 
-File: [`src/infrastructure/multimeter_stabilizer.py`](src/infrastructure/multimeter_stabilizer.py:21)
+The MS8250D multimeter parser supports all measurement modes:
 
-Provides stable reading extraction using statistical algorithms:
+| Mode | Unit | Type Code |
+|------|------|-----------|
+| DC Voltage | V | `DC_VOLTAGE` |
+| AC Voltage | V | `AC_VOLTAGE` |
+| DC Current | A | `DC_CURRENT` |
+| AC Current | A | `AC_CURRENT` |
+| Resistance | Ω | `RESISTANCE` |
+| Continuity | Ω | `CONTINUITY` |
+| Diode | V | `DIODE` |
+| Frequency | Hz | `FREQUENCY` |
+| Capacitance | F | `CAPACITANCE` |
 
-```python
-class MultimeterStabilizer:
-    def __init__(
-        self,
-        max_samples: int = 50,
-        min_samples: int = 5,
-        max_duration: float = 180.0,
-        window_size: int = 10,
-        stability_threshold: float = 0.01,
-        cluster_tolerance: float = 0.05,
-        zero_threshold: float = 0.01
-    ):
-        """Initialize stabilizer with statistical parameters."""
-```
+### Parser Details
 
-**Stabilization Algorithm:**
-1. Maintain rolling window of 10 samples
-2. Check stability: std_dev < 1% of mean
-3. If stable → return mean of window
-4. If unstable → apply trimmed mean (10% top/bottom)
-5. Apply cluster detection → select largest cluster within ±5%
-6. Validate zero readings with majority rule
+File: [`src/infrastructure/usb_multimeter.py`](src/infrastructure/usb_multimeter.py)
 
-### DiagnosticState
-
-File: [`src/domain/diagnostic_state.py`](src/domain/diagnostic_state.py:23)
-
-Tracks complete state of diagnostic session:
-
-```python
-class DiagnosticState(BaseModel):
-    equipment_model: str
-    current_step: int
-    completed_steps: List[int]
-    measurements: Dict[str, Any]
-    current_hypothesis: str
-    hypothesis_list: List[str]
-    waiting_for_next: bool  # Key: indicates paused state
-    diagnosis_progress: Literal["in_progress", "completed", "fault_confirmed"]
-    tested_points: List[str]
-    eliminated_faults: List[str]
-    retrieved_context: Dict[str, Any]
-```
-
-### DiagnosticEngine
-
-File: [`src/domain/diagnostic_state.py`](src/domain/diagnostic_state.py:238)
-
-Manages diagnostic workflow orchestration:
-
-```python
-class DiagnosticEngine:
-    def load_equipment_config(self, equipment_model: str) -> Dict:
-        """Load ONCE at start, cache in state."""
-
-    def initialize_diagnosis(self, symptoms: str) -> DiagnosticState:
-        """Start new diagnosis, retrieve RAG context."""
-
-    def _build_diagnostic_steps(self) -> None:
-        """Build steps from current hypothesis."""
-```
-
----
-
-## Data Flow
-
-### Phase 1: Initialization
-
-```
-User Input (symptoms) → RAG Query → Hypothesis List → First Test Point
-```
-
-### Phase 2: Step-by-Step Execution (Repeats)
-
-```
-PLAN → STEP → DECISION
-              │
-    ┌─────────┴─────────┐
-    │                   │
-    ▼                   ▼
-FAULT CONFIRMED    MORE TESTS NEEDED
-    │                   │
-    ▼                   ▼
-REPAIR (end)      INTERRUPT (wait for NEXT)
-                       │
-                       ▼
-                   STEP (next)
-```
-
-**STEP is atomic - performs all 9 operations in sequence:**
-1. Show test point name
-2. Show probe placement instructions
-3. Show exactly ONE image
-4. Call read_multimeter
-5. Stabilize measurement
-6. Evaluate against expected values
-7. Reason about the result
-8. Explain to user: measured value, expected value, interpretation, conclusion
-9. Decide next action (passes to DECISION node)
-
-```
-INSTRUCTION → INTERRUPT (wait) → MEASURE → EVALUATE → REASON
-                                              │
-                    ┌─────────────────────────┼─────────────────────────┐
-                    │                         │                         │
-                    ▼                         ▼                         ▼
-             More tests needed          Fault confirmed           Uncertain
-                    │                         │                         │
-                    ▼                         ▼                         ▼
-               RAG (next)              REPAIR (end)             RAG (retry)
-```
-
-### Phase 3: Repair (Terminal)
-
-```
-REPAIR → Recovery Steps → END
-```
-
----
-
-## Infrastructure Components
-
-| Component | File | Purpose |
-|-----------|------|---------|
-| [`AppConfig`](src/infrastructure/config.py:18) | config.py | Centralized configuration dataclass |
-| [`ChromaDBClient`](src/infrastructure/chromadb_client.py:15) | chromadb_client.py | ChromaDB embedded client |
-| [`LLMClient`](src/infrastructure/llm_client.py:20) | llm_client.py | Groq/Ollama LLM abstraction |
-| [`LLMManager`](src/infrastructure/llm_manager.py:30) | llm_manager.py | Multi-provider LLM management |
-| [`USBMultimeter`](src/infrastructure/usb_multimeter.py:40) | usb_multimeter.py | Serial communication with MS8250D |
-| [`EquipmentConfigLoader`](src/infrastructure/equipment_config.py:20) | equipment_config.py | YAML parsing for equipment |
-| [`MultimeterStabilizer`](src/infrastructure/multimeter_stabilizer.py:21) | multimeter_stabilizer.py | **NEW**: Stabilization engine |
-| [`RAGRepository`](src/infrastructure/rag_repository.py:25) | rag_repository.py | RAG operations |
-| [`DiagnosticState`](src/domain/diagnostic_state.py:23) | diagnostic_state.py | **NEW**: State management |
-| [`DiagnosticEngine`](src/domain/diagnostic_state.py:238) | diagnostic_state.py | **NEW**: Workflow orchestration |
+- **18-byte Frame Parser**: For newer protocol format
+- **10-byte Frame Parser**: For older UM24C-compatible format
+- **Auto-detection**: Automatically detects COM port via USB VID
 
 ---
 
@@ -356,21 +209,10 @@ REPAIR → Recovery Steps → END
 
 ```python
 # src/infrastructure/config.py
-@dataclass
-class AppConfig:
-    mode: str = "mock"          # "mock" or "usb"
-
-    llm: LLMConfig              # Provider: "groq" or "ollama"
-                                # Model: "llama-3.3-70b-versatile"
-                                # Temperature: 0.0-1.0
-
-    embedding: EmbeddingConfig  # Provider: "sentence-transformers"
-                                # Model: "all-MiniLM-L6-v2"
-
-    usb: USBConfig              # Port: "COM3" (auto-detect)
-                                # Baud: 2400
-
-    mock: MockConfig            # Default scenario name
+GROQ_API_KEYS=key1,key2      # Multiple keys (auto-rotates)
+LLM_MODELS=model1,model2      # Multiple models (fallback chain)
+LANCHAIN_API_KEY=your_key
+LANGSMITH_TRACING=true
 ```
 
 ### Equipment YAML Schema
@@ -378,43 +220,39 @@ class AppConfig:
 ```yaml
 # data/equipment/cctv-psu-24w-v1.yaml
 equipment_model: CCTV-PSU-24W-V1
-manufacturer: Generic CCTV
-power_output: 24W
 
-test_points:
+signals:
   output_rail:
-    nominal_voltage: 24.0
-    tolerance: 0.10
+    signal_id: output_rail
+    test_point: TP1
+    parameter: voltage
     unit: V
 
+thresholds:
+  output_rail:
+    normal:
+      min: 22.0
+      max: 26.0
+
 faults:
-  overvoltage_output:
-    signature:
+  overvoltage:
+    priority: 1
+    signatures:
       - test_point: output_rail
         state: over_voltage
-    hypothesis: "Zener diode failure"
-    confidence_weight: 0.9
     hypotheses:
-      - rank: 1
-        component: zener_diode
-        cause: Zener voltage regulator failure
-        confidence: high
-
-recovery:
-  overvoltage_output:
-    - priority: 1
-      action: "Replace Zener diode"
-      instruction: |
-        1. Disconnect power
-        2. Locate Zener on PCB
-        ...
+      - component: zener_diode
+        cause: Zener failure
+    recovery:
+      - action: replace
+        instruction: Replace Zener diode
 ```
 
 ---
 
 ## Design Principles
 
-### 1. Step-by-Step Control (NOT Conversational)
+### 1. Step-by-Step Control
 - Each diagnostic step is atomic: show → measure → evaluate → decide
 - Interrupt between steps using `langgraph.types.interrupt()`
 - User must confirm "Next" before measurement proceeds
@@ -425,47 +263,28 @@ recovery:
 - Prevents hallucinations in fault diagnosis
 
 ### 3. Stabilized Measurements
-- Multimter readings stabilized before interpretation
+- Multimeter readings stabilized before interpretation
 - Rolling window + cluster detection algorithm
 - Confidence levels: HIGH / MEDIUM / LOW
 
-### 4. Deterministic + Probabilistic
-- **Deterministic**: Rule-based matching for known fault patterns
-- **Probabilistic**: LLM reasoning for ambiguous cases
-- **Fallback chain**: Rules first → LLM for edge cases
-
-### 5. Embedded Dependencies
-ChromaDB runs in embedded mode - no Docker or server required
+### 4. Embedded Dependencies
+- ChromaDB runs in embedded mode - no Docker or server required
 
 ---
 
 ## Running the System
 
-### LangGraph Studio Mode
+### Test Multimeter
 ```bash
-pip install -r requirements.txt
-langgraph dev --port 2024
-# Open browser to interact with agent
+python test_mm.py
 ```
 
-### Mock Mode (No Hardware)
+### LangGraph Studio (requires venv or PATH fix)
 ```bash
-python -m src.interfaces.cli --mock
-# Uses scenarios from data/mock_signals/
+start.bat
+# OR
+venv\Scripts\langgraph dev --port 2024
 ```
-
----
-
-## Key Differences from Old System
-
-| Old System | New System |
-|------------|------------|
-| Conversational flow | Step-by-step workflow |
-| Continuous measurement | Interrupt between steps |
-| Raw multimeter readings | Stabilized readings |
-| Ad-hoc hypothesis testing | RAG-driven ordered hypotheses |
-| No state persistence | DiagnosticState with serialization |
-| Single-pass workflow | Loop until fault confirmed |
 
 ---
 
@@ -473,5 +292,8 @@ python -m src.interfaces.cli --mock
 
 This file is part of the `.coding-agent/` memory system. Any architectural changes must be reflected here.
 
-**Last Updated**: 2026-03-22
-**Key Changes**: Added hypothesis-driven diagnostic system with REASON node and proper termination conditions
+**Last Updated**: 2026-03-23
+**Key Changes**: 
+- Updated folder structure (removed mock_signals, tests, legacy files)
+- Added multimeter mode detection details
+- Reflected current working state

@@ -23,6 +23,5 @@ from src.infrastructure.config import (
     get_app_config,
 )
 
-# LLM exports for global installation support
-from src.infrastructure.llm_client import get_llm, LLMClient
+# LLM exports
 from src.infrastructure.llm_manager import get_llm_manager, invoke_with_retry
