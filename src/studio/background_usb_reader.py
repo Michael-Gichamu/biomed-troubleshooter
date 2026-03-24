@@ -472,75 +472,96 @@ class BackgroundReader:
     
     def _read_loop(self):
         """Background reading loop with noise filtering and stabilization."""
-        # Track consecutive None-returns so we can force a reconnect when the
-        # COM port gets stuck (e.g. after a Windows PermissionError cascade).
+        # ── Reconnect policy ──────────────────────────────────────────────────
+        # Only reconnect when read_measurement() returns None repeatedly.
+        # A parsed-but-noise-filtered reading is still a healthy port — do NOT
+        # treat it as a failure.  The old threshold of 30 (~15 s) was far too
+        # aggressive and caused constant COM-port thrashing on Windows because
+        # LangGraph's file-watcher restarts the process frequently; each restart
+        # races to open the same COM port before Windows releases the old handle.
+        #
+        # New policy:
+        #   • Threshold raised to 200 (~100 s) so transient dropouts don't trigger
+        #   • Exponential backoff: each reconnect attempt waits 2× longer than the
+        #     last (capped at 60 s) so we don't hammer a port that Windows has
+        #     locked after a PermissionError cascade.
         _consecutive_failures: int = 0
-        _FAILURE_RECONNECT_THRESHOLD: int = 30   # ~15 s at 0.5 s timeout each
+        _FAILURE_RECONNECT_THRESHOLD: int = 200   # ~100 s at 0.5 s timeout each
+        _reconnect_delay: float = 2.0             # starts at 2 s, doubles each time
+        _MAX_RECONNECT_DELAY: float = 60.0
 
         while not self._stop_event.is_set():
             try:
                 if self.client:
                     reading = self.client.read_measurement(timeout=0.5)
                     if reading and reading.value is not None:
-                        _consecutive_failures = 0   # reset on any good reading
-                        value = abs(reading.value)  # Use absolute value
-                        
+                        # A valid frame arrived → port is healthy, reset counters
+                        _consecutive_failures = 0
+                        _reconnect_delay = 2.0          # reset backoff on success
+
+                        value = abs(reading.value)
+
                         # Filter noise based on measurement type
-                        # For Voltage: Ignore < 0.5V (air interference)
-                        # For Resistance/Continuity: Do NOT filter low values
+                        # For Voltage: Ignore < 0.5 V (floating-probe interference)
+                        # For Resistance/Continuity: Do NOT filter low values (0 Ω is valid)
                         is_voltage = "VOLTAGE" in reading.measurement_type
                         threshold = self.NOISE_THRESHOLD if is_voltage else 0.01
 
                         if value < threshold:
-                            # Too low - likely noise
-                            with self._lock:
-                                self._stabilizer.reset()
+                            # Reading arrived but is below noise floor — port is fine,
+                            # just don't feed it to the stabilizer.  Do NOT reset the
+                            # stabilizer here: that wiped accumulated samples every time
+                            # a single low reading slipped through, preventing stabilisation.
                             continue
-                        
+
                         # Set measurement type for threshold calculation
                         self._stabilizer.set_measurement_type(reading.measurement_type)
-                        
-                        # Add to stabilizer - check if it passes noise filter
+
+                        # Add to stabilizer and check for a stable cluster
                         with self._lock:
                             was_added = self._stabilizer.add(value)
                             self._latest_reading = reading
-                            
+
                             if was_added:
-                                # Check if readings are now stable
                                 if self._stabilizer.is_stable():
                                     stable_val = self._stabilizer.get_stable_reading()
                                     if stable_val is not None:
-                                        # Stable reading found! Create a stable reading
                                         self._stable_reading = MultimeterReading(
                                             value=stable_val,
                                             unit=reading.unit,
                                             measurement_type=reading.measurement_type,
                                             timestamp=reading.timestamp,
-                                            test_point_id=reading.test_point_id
+                                            test_point_id=reading.test_point_id,
                                         )
-                                        # Note: Don't clear stabilizer - allow continuous monitoring
-                                        print(f"[BACKGROUND_READER] Stable reading: {stable_val} {reading.unit}")
+                                        print(
+                                            f"[BACKGROUND_READER] Stable reading: "
+                                            f"{stable_val} {reading.unit}"
+                                        )
 
                     else:
-                        # read_measurement returned None — count the failure
+                        # read_measurement returned None — genuine parse / port failure
                         _consecutive_failures += 1
                         if _consecutive_failures >= _FAILURE_RECONNECT_THRESHOLD:
                             print(
-                                f"[BACKGROUND_READER] {_consecutive_failures} consecutive read "
-                                "failures — forcing port reconnect..."
+                                f"[BACKGROUND_READER] {_consecutive_failures} consecutive "
+                                f"read failures — reconnecting (backoff {_reconnect_delay:.0f}s)…"
                             )
                             try:
                                 self.client.disconnect()
-                                time.sleep(2.0)
+                                time.sleep(_reconnect_delay)
                                 self.client.connect()
                             except Exception as reconnect_err:
                                 print(f"[BACKGROUND_READER] Reconnect error: {reconnect_err}")
+
+                            # Exponential backoff, capped at _MAX_RECONNECT_DELAY
+                            _reconnect_delay = min(
+                                _reconnect_delay * 2.0, _MAX_RECONNECT_DELAY
+                            )
                             _consecutive_failures = 0
-                                
-            except Exception as e:
-                # Continue on error
+
+            except Exception:
                 pass
-            
+
             time.sleep(0.1)  # Small delay between reads
     
     def get_latest_reading(self) -> Optional[MultimeterReading]:

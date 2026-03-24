@@ -5,21 +5,22 @@ Hypothesis-driven diagnostic workflow for LangGraph Studio.
 Guides engineers through structured fault diagnosis with real multimeter readings.
 
 Workflow:
-  START → rag → hypotheses → interrupt → resume → step → reason → decision
-                                    ↑_____________________________|
-                                    (loops until fault confirmed or exhausted)
+  START → rag → hypotheses → instruction → step → reason → decision
+                                  ↑                              |
+                                  ←──── resume ← interrupt ──────┘  (if no fault)
   decision → repair → END
   decision → END  (inconclusive / max steps)
 
 Node roles:
-  rag         — Fetch equipment config and RAG knowledge ONCE at start
-  hypotheses  — Generate ranked fault hypotheses from symptom + RAG
-  interrupt   — Show probe placement instructions; pause for engineer confirmation
-  resume      — Clear waiting flag; pass control to step
-  step        — Take stabilised multimeter reading; report result
-  reason      — Update hypothesis probabilities from measurement; advance step counter
-  decision    — Route: repair | interrupt (next step) | END
-  repair      — Emit step-by-step repair procedure; END
+  rag          — Fetch equipment config and RAG knowledge ONCE at start (parallel calls)
+  hypotheses   — Generate ranked fault hypotheses from symptom + RAG
+  instruction  — Show probe placement for current test point (NO pause)
+  step         — Take stabilised multimeter reading; report result
+  reason       — Update hypothesis probabilities from measurement; advance step counter
+  decision     — Route: repair | interrupt (next step) | END
+  interrupt    — Pause for engineer "Next" confirmation ONLY (no probe info)
+  resume       — Clear waiting flag; pass control back to instruction
+  repair       — Identify root cause + secondary damage; emit combined repair plan; END
 """
 
 from dataclasses import dataclass, field
@@ -160,42 +161,59 @@ def rag_node(state: ConversationalAgentState):
             ))]
         }
 
-    # ── Step 1: RAG retrieval ────────────────────────────────────────────────
-    try:
-        rag_result = query_diagnostic_knowledge.invoke({
-            "query": "diagnostic procedures troubleshooting fault",
-            "equipment_model": equipment_model,
-            "top_k": 5
-        })
-        rag_knowledge = rag_result.get("results", []) if isinstance(rag_result, dict) else []
-    except Exception as e:
-        rag_knowledge = [{"error": str(e)}]
+    # ── Steps 1-3: Parallelise all three API calls ───────────────────────────
+    from concurrent.futures import ThreadPoolExecutor, as_completed
 
-    # ── Step 2: Complete config (thresholds, faults, images) ─────────────────
-    try:
-        config_result = get_equipment_configuration.invoke({
-            "equipment_model": equipment_model,
-            "request_type": "all"
-        })
-    except Exception as e:
-        config_result = {"error": str(e), "test_points": [], "thresholds": {}, "faults": []}
+    def _fetch_rag():
+        try:
+            r = query_diagnostic_knowledge.invoke({
+                "query": "diagnostic procedures troubleshooting fault",
+                "equipment_model": equipment_model,
+                "top_k": 5
+            })
+            return ("rag", r.get("results", []) if isinstance(r, dict) else [])
+        except Exception as e:
+            return ("rag", [{"error": str(e)}])
+
+    def _fetch_config():
+        try:
+            r = get_equipment_configuration.invoke({
+                "equipment_model": equipment_model,
+                "request_type": "all"
+            })
+            return ("config", r if isinstance(r, dict) else {"test_points": [], "thresholds": {}, "faults": []})
+        except Exception as e:
+            return ("config", {"error": str(e), "test_points": [], "thresholds": {}, "faults": []})
+
+    def _fetch_signals():
+        try:
+            r = get_equipment_configuration.invoke({
+                "equipment_model": equipment_model,
+                "request_type": "test_points"
+            })
+            return ("signals", r.get("test_points", []) if isinstance(r, dict) else [])
+        except Exception:
+            return ("signals", [])
+
+    rag_knowledge: list  = []
+    config_result: dict  = {"test_points": [], "thresholds": {}, "faults": []}
+    full_signals:  list  = []
+
+    with ThreadPoolExecutor(max_workers=3) as pool:
+        futures = [pool.submit(fn) for fn in (_fetch_rag, _fetch_config, _fetch_signals)]
+        for fut in as_completed(futures):
+            key, val = fut.result()
+            if key == "rag":
+                rag_knowledge = val
+            elif key == "config":
+                config_result = val
+            else:
+                full_signals = val
 
     if not isinstance(config_result, dict):
         config_result = {"test_points": [], "thresholds": {}, "faults": []}
 
-    # ── Step 3: Full signal data (includes physical_description, image_url, pro_tips) ──
-    # The "all" config returns test_points with basic fields only.
-    # We need the richer "test_points" response to drive interrupt_node.
-    try:
-        tp_result = get_equipment_configuration.invoke({
-            "equipment_model": equipment_model,
-            "request_type": "test_points"
-        })
-        full_signals = tp_result.get("test_points", []) if isinstance(tp_result, dict) else []
-    except Exception:
-        full_signals = []
-
-    # Store full signals under "signals" key so interrupt_node and step_node can find them
+    # Store full signals so instruction_node and step_node can find them
     config_result["signals"] = full_signals
 
     # ── Step 4: Build expected_values with correct per-signal units ───────────
@@ -406,7 +424,7 @@ Output ONLY a valid JSON object, nothing else:
         "\n---\n"
         "_Test sequence calculated. "
         f"Starting with {len(test_point_rankings)} measurements — "
-        "preparing first probe placement..._"
+        "showing first probe placement now..._"
     )
 
     return {
@@ -838,14 +856,20 @@ def _top_hypothesis_desc(state: ConversationalAgentState) -> str:
 
 def repair_node(state: ConversationalAgentState):
     """
-    Identify the confirmed fault, emit repair steps from config, and terminate.
+    Identify the confirmed (root-cause) fault, scan measurements for secondary
+    damage caused by the root fault, then emit a single combined repair plan.
+
+    Secondary damage rule: any measurement marked 'fault' that is NOT the
+    confirming measurement may indicate collateral damage (e.g. a blown fuse
+    caused by a shorted MOSFET).  We include those fault records in the repair
+    plan after the root-cause steps.
     """
     from src.infrastructure.llm_manager import invoke_with_retry
 
     faults             = state.suspected_faults
     current_hypothesis = state.current_hypothesis
 
-    # ── Find fault_id for current hypothesis ─────────────────────────────────
+    # ── Find fault_id for root-cause hypothesis ───────────────────────────────
     fault_id = ""
     for h in state.hypotheses:
         if h.get("id") == current_hypothesis:
@@ -857,7 +881,7 @@ def repair_node(state: ConversationalAgentState):
     last_val  = last_meas.get("value", "?")
     last_unit = last_meas.get("unit", "")
 
-    # ── Find fault record ─────────────────────────────────────────────────────
+    # ── Find root-cause fault record ──────────────────────────────────────────
     fault_record: dict = {}
     if fault_id:
         fault_record = next(
@@ -887,29 +911,82 @@ def repair_node(state: ConversationalAgentState):
 
     fault_name = fault_record.get("name", "Unspecified Fault")
 
-    # ── Build repair steps ────────────────────────────────────────────────────
-    recovery = fault_record.get("recovery", [])
-    if recovery:
-        repair_lines = []
-        for r in recovery:
-            step_label = r.get("action", f"Step {r.get('step', '')}") or f"Step {r.get('step', '')}"
-            instruction = r.get("instruction", "")
-            verification = r.get("verification", "")
-            safety = r.get("safety", "")
-            est_time = r.get("estimated_time", "")
+    # ── Detect secondary damage ───────────────────────────────────────────────
+    # Any prior measurement that evaluated as 'fault' (but is not the confirming
+    # measurement) is a candidate for collateral damage.
+    secondary_fault_records: list[dict] = []
+    seen_fault_ids: set[str] = {fault_id}
 
-            repair_lines.append(f"**{step_label}**")
-            repair_lines.append(f"> {instruction}")
+    for m in state.measurements[:-1]:   # exclude last (confirming) measurement
+        if m.get("evaluation") != "fault":
+            continue
+        m_tp = m.get("test_point", "")
+        # Ask LLM to map this abnormal measurement to a fault_id
+        if faults:
+            faults_summary = "\n".join(
+                f"- {f.get('fault_id','')}: {f.get('name','')}"
+                for f in faults[:8]
+            )
+            try:
+                response = invoke_with_retry([{"role": "user", "content": (
+                    f"Measurement: {m_tp} = {m.get('value','?')} {m.get('unit','')}\n"
+                    f"Faults:\n{faults_summary}\n"
+                    "Reply with ONLY the fault_id that best matches, or NONE if none fits."
+                )}])
+                sec_id = (response.content or "").strip()
+                if sec_id and sec_id != "NONE" and sec_id not in seen_fault_ids:
+                    sec_record = next(
+                        (f for f in faults if f.get("fault_id") == sec_id), {}
+                    )
+                    if sec_record:
+                        secondary_fault_records.append(sec_record)
+                        seen_fault_ids.add(sec_id)
+            except Exception:
+                pass
+
+    # ── Build repair steps ────────────────────────────────────────────────────
+    def _format_recovery(record: dict, label_prefix: str = "") -> list[str]:
+        lines: list[str] = []
+        for r in record.get("recovery", []):
+            step_label   = r.get("action", f"Step {r.get('step', '')}") or f"Step {r.get('step', '')}"
+            instruction  = r.get("instruction", "")
+            verification = r.get("verification", "")
+            safety       = r.get("safety", "")
+            est_time     = r.get("estimated_time", "")
+            lines.append(f"**{label_prefix}{step_label}**")
+            lines.append(f"> {instruction}")
             if safety:
-                repair_lines.append(f"  ⚠️ *Safety: {safety}*")
+                lines.append(f"  ⚠️ *Safety: {safety}*")
             if verification:
-                repair_lines.append(f"  ✓ *Verify: {verification}*")
+                lines.append(f"  ✓ *Verify: {verification}*")
             if est_time:
-                repair_lines.append(f"  ⏱ *Estimated: {est_time}*")
-            repair_lines.append("")
-        repair_block = "\n".join(repair_lines)
+                lines.append(f"  ⏱ *Estimated: {est_time}*")
+            lines.append("")
+        return lines
+
+    repair_lines: list[str] = []
+
+    if fault_record.get("recovery"):
+        repair_lines += _format_recovery(fault_record)
     else:
-        repair_block = "_No repair procedure found in config. Consult service manual._"
+        repair_lines.append("_No repair procedure found in config for root cause. Consult service manual._")
+
+    if secondary_fault_records:
+        repair_lines.append("---")
+        repair_lines.append("### 🔗 Secondary / Collateral Damage\n")
+        repair_lines.append(
+            "_The root cause likely caused the following additional failures. "
+            "Repair these AFTER fixing the root cause:_\n"
+        )
+        for sec in secondary_fault_records:
+            repair_lines.append(f"**{sec.get('name', 'Unknown')}**")
+            if sec.get("recovery"):
+                repair_lines += _format_recovery(sec, label_prefix="  ")
+            else:
+                repair_lines.append("  _Consult service manual for this component._")
+                repair_lines.append("")
+
+    repair_block = "\n".join(repair_lines) if repair_lines else "_No repair procedure available._"
 
     # ── Evidence summary ──────────────────────────────────────────────────────
     evidence_rows = []
@@ -932,56 +1009,55 @@ def repair_node(state: ConversationalAgentState):
         if evidence_rows else "_No measurements recorded._"
     )
 
-    # ── Dynamic verification from expected values ─────────────────────────────
-    # Find the primary output signal to suggest a post-repair check
+    # ── Dynamic post-repair verification ─────────────────────────────────────
     output_signal = None
     for sig in state.equipment_config.get("signals", []):
-        sid = sig.get("signal_id", "").lower()
-        name = sig.get("name", "").lower()
+        sid   = sig.get("signal_id", "").lower()
+        name  = sig.get("name", "").lower()
         param = sig.get("parameter", "").lower()
         if ("output" in sid or "output" in name) and "voltage" in param:
             output_signal = sig
             break
 
     if output_signal:
-        osid     = output_signal.get("signal_id", "")
-        oname    = output_signal.get("name", "output")
-        oexpect  = state.expected_values.get(osid, {})
-        if oexpect:
-            verify_msg = (
-                f"**Post-repair verification:** Measure **{oname}**. "
-                f"Expected: {oexpect['min']}–{oexpect['max']} {oexpect.get('unit','V')} DC."
-            )
-        else:
-            verify_msg = (
-                f"**Post-repair verification:** Confirm **{oname}** is within normal operating range."
-            )
+        osid    = output_signal.get("signal_id", "")
+        oname   = output_signal.get("name", "output")
+        oexpect = state.expected_values.get(osid, {})
+        verify_msg = (
+            f"**Post-repair verification:** Measure **{oname}**. "
+            f"Expected: {oexpect['min']}–{oexpect['max']} {oexpect.get('unit','V')} DC."
+            if oexpect else
+            f"**Post-repair verification:** Confirm **{oname}** is within normal operating range."
+        )
     else:
         verify_msg = (
             "**Post-repair verification:** Confirm all output voltages are within specified range."
         )
 
-    # ── Confirmed-by hypothesis description ──────────────────────────────────
-    hyp_mechanism = ""
-    for h in state.hypotheses:
-        if h.get("id") == current_hypothesis:
-            hyp_mechanism = h.get("description", "")
-            break
+    # ── Hypothesis mechanism ──────────────────────────────────────────────────
+    hyp_mechanism = next(
+        (h.get("description", "") for h in state.hypotheses if h.get("id") == current_hypothesis),
+        ""
+    )
 
     # ── Final message ─────────────────────────────────────────────────────────
+    sec_names = ", ".join(s.get("name", "?") for s in secondary_fault_records)
+    sec_line  = f"\n**Secondary damage detected:** {sec_names}" if secondary_fault_records else ""
+
     msg_parts = [
         "**[6. Repair Procedure]**\n",
         "## ✅ Diagnosis Complete — Fault Confirmed\n",
-        f"**Fault:** {fault_name}",
+        f"**Root Cause:** {fault_name}",
     ]
     if hyp_mechanism:
         msg_parts.append(f"**Mechanism:** {hyp_mechanism}")
-    msg_parts.append(
-        f"**Confirmed by:** {last_tp} = {last_val} {last_unit}\n"
-    )
+    msg_parts.append(f"**Confirmed by:** {last_tp} = {last_val} {last_unit}{sec_line}\n")
     msg_parts.append("### Evidence Summary\n")
     msg_parts.append(evidence_table)
-    msg_parts.append(f"\n### Repair Steps — *{fault_name}*\n")
+    msg_parts.append(f"\n### Repair Steps — *{fault_name}*")
+    if secondary_fault_records:
+        sec_list = ", ".join(s.get("name","?") for s in secondary_fault_records)
+        msg_parts.append(f"_Includes secondary damage: {sec_list}_")
     msg_parts.append(f"_Source: {state.equipment_model}-diagnostics_\n")
     msg_parts.append(repair_block)
     msg_parts.append("---")
@@ -995,27 +1071,18 @@ def repair_node(state: ConversationalAgentState):
 
 
 # =============================================================================
-# NODE: INTERRUPT — show probe placement; pause for engineer
+# NODE: INSTRUCTION — show probe placement for current test point (NO pause)
 # =============================================================================
 
-def interrupt_node(state: ConversationalAgentState):
+def instruction_node(state: ConversationalAgentState):
     """
-    Show the engineer exactly where to place probes for the CURRENT test point,
-    then pause execution with interrupt().
+    Emit the probe-placement instructions for the CURRENT test point as a
+    plain AIMessage.  Does NOT call interrupt() — execution continues
+    immediately into step_node.
 
-    state.current_step was incremented by reason_node (or set to 0 by
-    hypotheses_node), so it already points at the next test to perform.
-
-    The engineer sees:
-      - Step counter
-      - Image (if available)
-      - Where to find the test point
-      - Pro tips
-      - Expected reading
-      - Prompt to proceed
-
-    The interrupt() value is passed as a plain markdown string so LangGraph
-    Studio renders it properly (not as raw YAML).
+    state.current_step already points at the test to perform (set to 0 by
+    hypotheses_node on the first pass; incremented by reason_node on every
+    subsequent pass).
     """
     total_steps = len(state.test_point_rankings)
 
@@ -1038,11 +1105,9 @@ def interrupt_node(state: ConversationalAgentState):
         step_num    = state.current_step + 1
         signal_name = current_signal.get("name", current_signal_id)
 
-        parts.append(
-            f"## 🔬 Measurement {step_num} of {total_steps} — {signal_name}"
-        )
+        parts.append(f"## 🔬 Measurement {step_num} of {total_steps} — {signal_name}")
 
-        # Image first — engineer sees where to probe before reading text
+        # Image first
         image_url = current_signal.get("image_url", "")
         if image_url:
             parts.append(f"![{signal_name}]({image_url})")
@@ -1075,23 +1140,31 @@ def interrupt_node(state: ConversationalAgentState):
         if hyp_desc:
             parts.append(f"*Testing hypothesis: {hyp_desc}*")
 
-        parts.append(
-            "\n---\n"
-            "**Probes in position and stable?** "
-            "Type anything and press Enter to take the measurement."
-        )
+        parts.append("\n_Place probes and hold steady — taking measurement now..._")
 
     else:
-        # No more test points — shouldn't normally reach here
-        # (decision_node would have routed to END), but guard anyway
-        parts.append("## All measurements complete.")
-        parts.append("Type anything to proceed to the diagnosis summary.")
+        parts.append("## All measurements complete — proceeding to analysis.")
 
-    instruction_text = "\n\n".join(parts)
+    return {"messages": [AIMessage(content="\n\n".join(parts))]}
 
-    # ── Pause execution — interrupt value is shown in LangGraph Studio ────────
-    interrupt(instruction_text)
 
+# =============================================================================
+# NODE: INTERRUPT — pause ONLY; no probe info (fires after full step cycle)
+# =============================================================================
+
+def interrupt_node(state: ConversationalAgentState):
+    """
+    Pause execution after a complete measurement cycle so the engineer can
+    review the result before continuing.
+
+    The probe instructions for the NEXT test point will be shown by
+    instruction_node after the engineer presses resume — not here.
+    """
+    interrupt(
+        "**Measurement cycle complete.**\n\n"
+        "Review the result above, then type anything and press **Enter** "
+        "to continue to the next test point."
+    )
     return {"waiting_for_next": True}
 
 
@@ -1121,13 +1194,13 @@ def route_from_decision(state: ConversationalAgentState) -> str:
     return "interrupt"
 
 
-def route_from_interrupt(state: ConversationalAgentState) -> str:
-    """Route after resume: continue to step or end if all tests done / max reached."""
+def route_from_resume(state: ConversationalAgentState) -> str:
+    """Route after resume: go to instruction (which leads to step) or end."""
     if state.current_step >= state.max_steps:
         return "end"
     if state.current_step >= len(state.test_point_rankings):
         return "end"
-    return "step"
+    return "instruction"
 
 
 # =============================================================================
@@ -1139,31 +1212,32 @@ def create_conversational_graph():
     Build and compile the hypothesis-driven diagnostic workflow.
 
     Flow:
-      START → rag → hypotheses → interrupt → resume → step
-                                    ↑                     ↓
-                                    ←── reason ← decision ←
+      START → rag → hypotheses → instruction → step → reason → decision
+                                      ↑                              |
+                                      ←────── resume ← interrupt ────┘  (if no fault)
       decision → repair → END
-      decision → END
+      decision → END  (inconclusive / max steps / exhausted)
     """
     builder = StateGraph(ConversationalAgentState)
 
-    builder.add_node("rag",        rag_node)
-    builder.add_node("hypotheses", hypotheses_node)
-    builder.add_node("step",       step_node)
-    builder.add_node("reason",     reason_node)
-    builder.add_node("decision",   decision_node)
-    builder.add_node("repair",     repair_node)
-    builder.add_node("interrupt",  interrupt_node)
-    builder.add_node("resume",     resume_node)
+    builder.add_node("rag",         rag_node)
+    builder.add_node("hypotheses",  hypotheses_node)
+    builder.add_node("instruction", instruction_node)
+    builder.add_node("step",        step_node)
+    builder.add_node("reason",      reason_node)
+    builder.add_node("decision",    decision_node)
+    builder.add_node("repair",      repair_node)
+    builder.add_node("interrupt",   interrupt_node)
+    builder.add_node("resume",      resume_node)
 
-    builder.add_edge(START, "rag")
-    builder.add_edge("rag", "hypotheses")
+    builder.add_edge(START,        "rag")
+    builder.add_edge("rag",        "hypotheses")
 
-    # First interrupt fires BEFORE first measurement
-    builder.add_edge("hypotheses", "interrupt")
-
-    builder.add_edge("step",   "reason")
-    builder.add_edge("reason", "decision")
+    # After hypotheses: go straight to instruction (no pre-measurement interrupt)
+    builder.add_edge("hypotheses", "instruction")
+    builder.add_edge("instruction", "step")
+    builder.add_edge("step",       "reason")
+    builder.add_edge("reason",     "decision")
 
     builder.add_conditional_edges(
         "decision",
@@ -1171,12 +1245,13 @@ def create_conversational_graph():
         {"repair": "repair", "interrupt": "interrupt", "end": END}
     )
 
+    # interrupt pauses; resume routes to instruction (shows next probe placement)
     builder.add_edge("interrupt", "resume")
 
     builder.add_conditional_edges(
         "resume",
-        route_from_interrupt,
-        {"step": "step", "end": END}
+        route_from_resume,
+        {"instruction": "instruction", "end": END}
     )
 
     builder.add_edge("repair", END)
@@ -1202,6 +1277,6 @@ if __name__ == "__main__":
     g = create_conversational_graph()
     print("Graph compiled successfully.")
     print(
-        "\nFlow: START → rag → hypotheses → interrupt → resume → step "
-        "→ reason → decision → (repair|interrupt|END)"
+        "\nFlow: START → rag → hypotheses → instruction → step "
+        "→ reason → decision → (repair|interrupt→resume→instruction|END)"
     )
