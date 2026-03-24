@@ -108,8 +108,13 @@ class RobustStabilizer:
         return list(self._valid_readings)
     
     def set_measurement_type(self, m_type: str):
-        """Set the measurement type for threshold calculation."""
-        self.measurement_type = m_type.upper() if m_type else "DEFAULT"
+        """Set the measurement type for threshold calculation.
+        Only resets when the type actually changes to preserve accumulated samples.
+        """
+        new_type = m_type.upper() if m_type else "DEFAULT"
+        if new_type == self.measurement_type:
+            return  # Same type — preserve accumulated samples
+        self.measurement_type = new_type
         self.reset()
     
     def reset(self):
@@ -490,9 +495,9 @@ class BackgroundReader:
                         threshold = self.NOISE_THRESHOLD if is_voltage else 0.01
 
                         if value < threshold:
-                            # Too low - likely noise
-                            with self._lock:
-                                self._stabilizer.reset()
+                            # Too low - likely noise; skip but don't destroy
+                            # accumulated samples (RobustStabilizer.add() already
+                            # filters noise via its own _valid_readings gate)
                             continue
                         
                         # Set measurement type for threshold calculation
@@ -545,8 +550,8 @@ class BackgroundReader:
         Wait for stable reading with robust MAD-based stabilization.
         
         Algorithm:
-        1. Clear previous readings and reset stabilizer
-        2. Set measurement type for appropriate thresholds
+        1. Set measurement type (only resets if type changed)
+        2. Clear stable-reading flag to re-evaluate freshly
         3. Wait for minimum valid samples (10+)
         4. Check for stable cluster using MAD-based outlier rejection
         5. Require dwell time: 3 consecutive stable samples
@@ -560,11 +565,12 @@ class BackgroundReader:
             Stable reading, or None if timeout
         """
         print(f"[DEBUG] get_reading_with_stabilization called: type={measurement_type}, timeout={timeout}")
-        
+
         with self._lock:
-            # Reset stabilizer for new measurement
-            self._stabilizer.reset()
+            # Set measurement type (guarded — only resets if type actually changed)
             self._stabilizer.set_measurement_type(measurement_type)
+            # Clear the result flag so we re-evaluate stability freshly,
+            # but keep accumulated samples from the background _read_loop
             self._stable_reading = None
         
         start_time = time.time()

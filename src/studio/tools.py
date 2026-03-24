@@ -356,7 +356,7 @@ def read_multimeter(
     """
     Read stabilized measurement from multimeter at the specified test point.
     
-    Uses MultimeterStabilizer for noise filtering and stable reading extraction.
+    Uses the background reader's RobustStabilizer for noise filtering and stable reading extraction.
     
     Args:
         test_point: The test point identifier (e.g., "TP2", "output_rail")
@@ -387,14 +387,12 @@ def read_multimeter(
             "guidance": {...}
         }
     """
-    from src.infrastructure.multimeter_stabilizer import MultimeterStabilizer
     from src.studio.background_usb_reader import ensure_reader_running, get_background_reader
-    
+
     # =========================================================================
     # PHASE 1: Get test point guidance (automatically, no user confirmation)
     # =========================================================================
-    
-    # Get guidance first - this shows the engineer where to probe
+
     try:
         guidance_result = get_test_point_guidance.invoke({
             "equipment_model": equipment_model,
@@ -405,23 +403,19 @@ def read_multimeter(
             "error": f"Failed to get guidance: {str(e)}",
             "test_point": test_point
         }
-    
+
     # =========================================================================
-    # PHASE 2: Autonomous stabilization - start sampling immediately
+    # PHASE 2: Autonomous stabilization via background reader
     # =========================================================================
-    
-    # Create MultimeterStabilizer with max_duration
-    stabilizer = MultimeterStabilizer(max_duration=max_duration)
-    
+
     # Ensure background reader is running
     if not ensure_reader_running():
-        # Try to get port list for error message
         try:
             from src.infrastructure.usb_multimeter import USBMultimeterClient
             available_ports = USBMultimeterClient.list_available_ports()
-        except:
+        except Exception:
             available_ports = []
-        
+
         return {
             "status": "error",
             "error": "Could not connect to multimeter",
@@ -431,10 +425,10 @@ def read_multimeter(
             "guidance": guidance_result,
             "message": "Multimeter not connected. Please connect and try again."
         }
-    
+
     reader = get_background_reader()
-    
-    # Map measurement type string to enum
+
+    # Map measurement type string to the RobustStabilizer enum
     measurement_type_map = {
         "voltage_dc": "DC_VOLTAGE",
         "voltage_ac": "AC_VOLTAGE",
@@ -444,63 +438,53 @@ def read_multimeter(
         "continuity": "CONTINUITY",
     }
     mtype_enum = measurement_type_map.get(measurement_type.lower(), "DC_VOLTAGE")
-    
-    # Wait for stable reading using the stabilizer
-    start_time = time.time()
-    last_value = None
-    
-    while time.time() - start_time < max_duration:
-        # Get reading from background reader
-        reading = reader.get_reading_with_stabilization(timeout=180, measurement_type=mtype_enum)
-        
-        if reading and reading.value is not None:
-            # Add to stabilizer
-            stabilizer.add_sample(reading.value)
-            last_value = reading.value
-            
-            # Check if we have a stable reading
-            stable_result = stabilizer.get_stable_reading()
-            
-            if stable_result.get("stability_status") == "stable" and stable_result.get("confidence") == "HIGH":
-                # We have a good stable reading!
-                result = {
-                    "value": round(stable_result["value"], 2),
-                    "unit": reading.unit,
-                    "status": "success",
-                    "test_point": test_point,
-                    "measurement_type": mtype_enum,
-                    "measurement_type_requested": measurement_type,
-                    "confidence": stable_result.get("confidence", "LOW"),
-                    "stability_status": stable_result.get("stability_status", "unknown"),
-                    "samples_used": stable_result.get("samples_used", 0),
-                    "guidance": guidance_result,
-                    "message": f"Stable reading obtained using {stable_result.get('samples_used', 0)} samples"
-                }
-                return result
-        
-        # Small delay to avoid busy waiting
-        time.sleep(0.1)
-    
-    # Timeout - check if we have any reading at all
-    if last_value is not None:
-        # We have some readings but couldn't stabilize
-        stable_result = stabilizer.get_stable_reading()
+
+    # Single call — the RobustStabilizer in the background reader handles all
+    # MAD-based stabilization, cluster detection, and dwell-time enforcement.
+    # Returns early as soon as a stable cluster is detected (typically 10-15s),
+    # or at max_duration timeout if readings never stabilize.
+    reading = reader.get_reading_with_stabilization(
+        timeout=max_duration,
+        measurement_type=mtype_enum
+    )
+
+    if reading and reading.value is not None:
+        # Check if we got a genuinely stable result from the stabilizer
+        stable_result = reader.get_stable_result()
+
+        if stable_result:
+            return {
+                "value": round(stable_result["value"], 2),
+                "unit": reading.unit,
+                "status": "success",
+                "test_point": test_point,
+                "measurement_type": mtype_enum,
+                "measurement_type_requested": measurement_type,
+                "confidence": "HIGH",
+                "stability_status": "stable",
+                "samples_used": stable_result.get("samples", 0),
+                "guidance": guidance_result,
+                "message": f"Stable reading obtained using {stable_result.get('samples', 0)} samples"
+            }
+
+        # Reading returned but stabilizer didn't formally declare stable
+        # (timeout with partial data — return best-effort)
         return {
             "status": "timeout_unstable",
             "test_point": test_point,
             "measurement_type": mtype_enum,
             "measurement_type_requested": measurement_type,
             "guidance": guidance_result,
-            "value": round(last_value, 2),
-            "unit": reading.unit if reading else "V",
-            "confidence": stable_result.get("confidence", "LOW"),
-            "stability_status": stable_result.get("stability_status", "unstable"),
-            "samples_used": stabilizer.get_sample_count(),
+            "value": round(reading.value, 2),
+            "unit": reading.unit,
+            "confidence": "LOW",
+            "stability_status": "unstable",
+            "samples_used": reader.get_sample_count(),
             "note": "Readings were unstable - probes may need repositioning",
             "message": "The readings kept fluctuating. Please ensure probes have good contact "
                       "and hold them steady."
         }
-    
+
     # Complete timeout - no readings obtained
     return {
         "status": "timeout",
@@ -509,7 +493,7 @@ def read_multimeter(
         "measurement_type_requested": measurement_type,
         "max_duration_seconds": max_duration,
         "guidance": guidance_result,
-        "samples_collected": stabilizer.get_sample_count(),
+        "samples_collected": reader.get_sample_count(),
         "message": "No reading available",
         "error": "No reading available - please check probe connections"
     }
@@ -1065,6 +1049,17 @@ def _prewarm_usb_reader() -> None:
         print(f"[PREWARM] USB reader pre-warm failed (non-fatal): {exc}")
 
 
-# Fire both pre-warms concurrently; daemon=True so they don't block process exit
+def _prewarm_llm() -> None:
+    """Pre-initialise the LLMManager singleton (loads API keys, creates Groq client)."""
+    try:
+        from src.infrastructure.llm_manager import LLMManager
+        LLMManager()  # Trigger singleton __init__
+        print("[PREWARM] LLMManager ready.")
+    except Exception as exc:
+        print(f"[PREWARM] LLM pre-warm failed (non-fatal): {exc}")
+
+
+# Fire all pre-warms concurrently; daemon=True so they don't block process exit
 _threading.Thread(target=_prewarm_rag,        daemon=True, name="prewarm-rag").start()
 _threading.Thread(target=_prewarm_usb_reader, daemon=True, name="prewarm-usb").start()
+_threading.Thread(target=_prewarm_llm,        daemon=True, name="prewarm-llm").start()
