@@ -1,0 +1,202 @@
+ 
+AUTOMATIC CONVEYOR BELT
+SORTING SYSTEM
+MEMBERS
+1
+2
+3
+.MERCY MARGARET MUTANU-EE107/G/13973/21
+.WAMBUA MUMBUA-EE107/G/13975/21
+.OMONDI CHRISTABEL PASCALIA-
+EE107/G/14012/21
+SUPERVISOR:ENG RODGERS BOSIRE
+
+
+ 
+BACKGROUND OF STUDY
+
+
+Industries require efficient sorting of objects on
+conveyor belts for manufacturing, logistics,
+recycling, and food processing.
+Manual sorting and traditional conveyor systems
+are time-consuming, prone to errors, and
+inefficient.
+
+
+
+
+Increasing production volumes demand more
+precise and automated sorting mechanisms.
+Accuracy Issues: Difficulty in correctly classifying
+and sorting items.
+Efficiency Concerns: Manual sorting slows down
+operations and reduces productivity.
+Cost Implications: High operational costs due to
+errors and inefficiencies in existing sorting
+processes.
+
+
+ 
+OBJECTIVES
+MAIN OBJECTIVE
+
+
+The objective was to develop a system that was
+cost-effective, efficient, more accurate, and
+reduced human labor.
+SPECIFIC OBJECTIVES
+To create a system that was capable of
+classifying objects of numerous types with precise
+accuracy.
+
+
+To create a system that optimized performance
+and reliability.
+To apply improved sorting processes by utilizing
+more accurate sensors and imaging techniques
+
+
+ 
+METHODOLOGY
+SOFTWARE DEVELOPMENT AND SIMULATIONS
+The software component was developed using Arduino
+programming to control the system's sensors, motors, and
+actuators
+
+Fig.1Simulation diagram
+Fig. 2 CAD design
+
+
+ 
+IMPLEMENTATION AND TESTING
+HARDWARE IMPLEMENTATION
+
+The hardware was designed and implemented with the following key components:
+
+
+Arduino Uno
+TCS3200Color Sensor
+Servo motor SG90
+Ultrasonic sensor
+Dc Motor
+
+Motor driver L298N
+Breadboard
+
+
+ 
+IMPLEMENTATION DIAGRAM
+
+
+ 
+RESULTS AND DISCUSSION
+
+The system was tested for accuracy, speed, reliability, and efficiency.
+
+
+
+
+It aimed to detect, classify, and sort objects based on color.
+Components used: ultrasonic sensors, TCS3200 color sensor, servo motors, and DC motors.
+Performance was compared against expected outcomes.
+Limitations and discrepancies observed during testing were analyzed.
+RESULTS
+COLOR DETECTION ACCURACY
+
+The color sensor was tested by placing multiple objects of
+different colors under varying lighting conditions. The
+detection accuracy was recorded as follows:
+Red objects: 92% accuracy
+Blue objects: 94% accuracy
+Other colors: Misclassification rate of 8%
+
+
+
+
+
+The slight variations in accuracy were mainly attributed to
+good lighting conditions affecting sensor readings.
+Calibration adjustments helped in improving detection
+reliability.
+
+
+ 
+SORTING EFFICIENCY
+The sorting mechanism, controlled by servo motors, was
+assessed based on response time and correct placement of
+objects.
+
+
+The system successfully sorted 93% of the tested objects into
+their correct bins, with occasional misplacements due to
+conveyor speed variations.
+SPEED ANALYSIS
+The conveyor belt's speed was optimized to balance
+efficiency and accuracy.
+
+
+The average sorting time per object was recorded as 2.5
+seconds, ensuring a steady flow of items without
+congestion.
+
+
+ 
+DISCUSSION OF RESULTS
+
+
+The results indicate that the automatic conveyor belt sorting
+system performed well in color detection and object sorting.
+The accuracy levels met expectations, though minor
+calibration and environmental adjustments could improve
+overall efficiency.
+
+
+
+The color sensor was effective but slightly affected by
+lighting conditions. Enclosing the sensor in a controlled
+environment could reduce misclassification.
+The successfully directed objects into their designated bins,
+though occasional misplacements were observed due to
+conveyor speed inconsistencies.
+The system’s overall efficiency was high, demonstrating its
+potential for industrial applications, with further refinements
+enhancing its robustness.
+
+
+ 
+CONCLUSION
+
+
+The system successfully detected, classified, and sorted objects based on color.
+Achieved 93% sorting efficiency using ultrasonic sensors, TCS3200 color sensor, servo motors,
+and DC motors.
+
+Minor issues arose due to environmental factors like poor lighting.
+
+
+Automation in sorting improves efficiency, reduces human error, and boosts productivity.
+Further improvements can enhance performance and scalability for larger applications.
+
+
+ 
+RECOMMENDATION
+
+
+Based on the findings of this study, the following
+recommendations are suggested for improving the system:
+Enhanced Calibration: Regular calibration of the color sensor
+should be implemented to reduce errors caused by
+environmental variations.
+
+
+
+Enclosure for Sensors: Placing the color sensor in a controlled
+lighting environment will minimize misclassification due to
+ambient light interference.
+Speed Optimization: Using real-time feedback control for
+conveyor speed will improve sorting precision and minimize
+misplacements.
+AI-based Sorting: Machine learning algorithms can be
+introduced to enhance classification accuracy and
+adaptability to different object types.

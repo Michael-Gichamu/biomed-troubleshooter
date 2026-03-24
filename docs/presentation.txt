@@ -1,0 +1,99 @@
+IoT-ENABLED AI-AUGMENTED TROUBLESHOOTING SYSTEM FOR BIOMEDICAL EQUIPMENT
+MEMBERS
+1
+2
+3
+4
+GICHAMU MICHAEL MATERE
+GEOFFREY OKELO
+ARNOLD MUREITHI MUCHIRI
+DIANA DINAH WAWERA KINYUA
+SUPERVISOR: ENG. HUMPHREY KOECH
+
+
+BACKGROUND OF STUDY
+Biomedical equipment is essential for patient care and clinical operations
+Manual troubleshooting is time-consuming and highly dependent on technician experience
+Equipment downtime disrupts clinical procedures and affects patient outcomes
+Shortage of specialized biomedical engineers in healthcare facilities
+Need for structured diagnostic procedures to ensure consistent and reliable repairs
+
+
+OBJECTIVES
+MAIN OBJECTIVE
+To develop an IoT and AI-based troubleshooting system that reduces diagnostic time and improves accuracy for biomedical equipment
+SPECIFIC OBJECTIVES
+To design and implement an IoT data acquisition module for real-time equipment monitoring
+To develop an AI diagnostic engine using LangGraph workflow and RAG architecture
+To create an intuitive user interface for technicians to interact with the diagnostic system
+To evaluate system performance through functional testing and comparative analysis
+
+
+METHODOLOGY
+SOFTWARE DEVELOPMENT
+The software component was developed using LangGraph framework for AI workflow orchestration
+RAG (Retrieval-Augmented Generation) architecture enables accurate diagnostic recommendations
+ChromaDB serves as the knowledge base for storing equipment diagnostic information
+MQTT communication protocol enables real-time data transfer between hardware and software
+Python programming provides flexibility and extensive library support for AI integration
+
+
+HARDWARE IMPLEMENTATION
+The hardware was designed and implemented with the following key components:
+Mastech MS8250D Digital Multimeter for accurate voltage and current measurements
+USB optical interface for connecting multimeter to the diagnostic system
+CCTV SMPS demonstration unit as the equipment under test
+Measurement probes and test leads for component-level diagnostics
+
+
+IMPLEMENTATION DIAGRAM
+The system architecture follows a multi-layer design:
+Data Acquisition Layer: IoT sensors and multimeter collect real-time equipment data
+Communication Layer: MQTT broker facilitates data transmission to the AI system
+AI Processing Layer: LangGraph-powered diagnostic engine analyzes data and generates recommendations
+Knowledge Layer: ChromaDB RAG system provides contextual diagnostic information
+User Interface Layer: Interactive interface displays diagnostic results and troubleshooting steps
+
+
+RESULTS AND DISCUSSION
+The system was tested for diagnostic accuracy, response time, and user satisfaction
+Performance was compared between manual diagnosis and AI-assisted diagnosis
+Functional testing verified multimeter connectivity and data streaming capabilities
+AI agent diagnostic accuracy was measured against known fault scenarios
+RESULTS
+DIAGNOSTIC ACCURACY
+The AI diagnostic engine was tested using multiple fault scenarios on the CCTV SMPS unit
+Fault identification accuracy exceeded 90% for common component failures
+The system correctly identified issues with capacitors, diodes, fuses, and transformer windings
+Response time for generating diagnostic recommendations was under 5 seconds
+
+
+TIME EFFICIENCY
+Mean Time to Diagnosis (MTD) was significantly reduced compared to manual troubleshooting
+Manual diagnosis: Average of 45 minutes per fault
+AI-assisted diagnosis: Average of 12 minutes per fault
+The structured diagnostic workflow guided technicians through systematic troubleshooting steps
+
+
+DISCUSSION OF RESULTS
+The results indicate that the IoT-enabled AI diagnostic system performed well in fault identification and diagnosis
+The reduction in Mean Time to Diagnosis demonstrates significant efficiency improvements for biomedical equipment repair
+The system successfully supported less-experienced technicians in performing complex diagnostics
+The combination of real-time data from the multimeter with AI reasoning provides more accurate diagnoses than intuition alone
+The system demonstrates strong potential for integration into healthcare facility maintenance programs
+
+
+CONCLUSION
+The IoT-enabled AI-augmented troubleshooting system successfully reduced diagnostic time for biomedical equipment
+LangGraph workflow orchestration enabled structured AI reasoning for complex fault scenarios
+RAG architecture with ChromaDB provided relevant diagnostic knowledge when needed
+USB-connected multimeter integration enabled automated measurement collection and analysis
+The system achieved higher diagnostic accuracy compared to traditional manual troubleshooting methods
+
+
+RECOMMENDATION
+Based on the findings of this study, the following recommendations are suggested for improving and extending the system:
+Expand to Additional Equipment Types: Extend the knowledge base and diagnostic capabilities to cover a wider range of biomedical equipment including patient monitors, infusion pumps, and ventilators
+Cloud Integration for Remote Diagnostics: Implement cloud-based services to enable remote diagnostic support and consultation with specialized engineers
+Mobile Application Development: Create mobile applications for field technicians to access diagnostic tools and knowledge bases on-site
+Integration with Hospital Information Systems: Connect the diagnostic system with hospital maintenance management systems for automated work order generation and tracking

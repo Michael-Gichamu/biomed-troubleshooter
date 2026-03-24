@@ -217,7 +217,7 @@ Discharge the capacitor first. Desolder one lead to isolate from circuit — in-
 **R2A:** Approximately 62kΩ (calculated). Lower divider resistor. Labeled R2A on PCB.
 **Location:** Secondary side near TL431 shunt regulator.
 
-**Regulation formula:** Vout = 2.495 × (1 + R2/R2A) = 12V → ratio R2/R2A ≈ 3.81
+**Regulation formula:** Vout = 2.495 × (1 + R2/R2A) = 12V → ratio R2/R2A ≈ 4.99
 Verification: 2.495 × (1 + 240/62) = 2.495 × 4.87 ≈ 12.15V
 
 **Probe placement (power off, one lead desoldered for accuracy):**
