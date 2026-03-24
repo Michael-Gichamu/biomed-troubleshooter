@@ -527,3 +527,213 @@ class SignalBatch:
             "equipment_id": self.equipment_id,
             "signals": [s.to_dict() for s in self.signals]
         }
+
+
+# =============================================================================
+# DIAGNOSTIC WORKFLOW MODELS (Consolidated)
+# =============================================================================
+
+@dataclass
+class DiagnosticStep:
+    """A single step in the diagnostic process."""
+    step_number: int
+    test_point_name: str
+    probe_placement_instructions: str = ""
+    image_url: str = ""
+    expected_value: str = ""
+    hypothesis_being_tested: str = ""
+    measurement_result: Optional[dict] = None
+    is_completed: bool = False
+    is_fault_confirmed: bool = False
+    signal_id: Optional[str] = None
+
+    def to_dict(self) -> dict:
+        return {
+            "step_number": self.step_number,
+            "test_point_name": self.test_point_name,
+            "probe_placement_instructions": self.probe_placement_instructions,
+            "image_url": self.image_url,
+            "expected_value": self.expected_value,
+            "hypothesis_being_tested": self.hypothesis_being_tested,
+            "measurement_result": self.measurement_result,
+            "is_completed": self.is_completed,
+            "is_fault_confirmed": self.is_fault_confirmed,
+            "signal_id": self.signal_id
+        }
+
+
+@dataclass
+class DiagnosticState:
+    """Tracks the complete state of a diagnostic session."""
+    equipment_model: str = ""
+    current_step: int = 0
+    completed_steps: list[int] = field(default_factory=list)
+    measurements: dict[str, Any] = field(default_factory=dict)
+    current_hypothesis: str = ""
+    hypothesis_list: list[str] = field(default_factory=list)
+    waiting_for_next: bool = False
+    config_cached: bool = False
+    equipment_config: dict[str, Any] = field(default_factory=dict)
+    diagnosis_progress: str = "in_progress"
+    tested_points: list[str] = field(default_factory=list)
+    eliminated_faults: list[str] = field(default_factory=list)
+    retrieved_context: dict[str, Any] = field(default_factory=dict)
+    session_id: Optional[str] = None
+    symptoms: str = ""
+    started_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
+
+    def to_dict(self) -> dict:
+        data = {k: v for k, v in self.__dict__.items()}
+        if self.started_at:
+            data["started_at"] = self.started_at.isoformat()
+        if self.completed_at:
+            data["completed_at"] = self.completed_at.isoformat()
+        return data
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "DiagnosticState":
+        if "started_at" in data and data["started_at"]:
+            data["started_at"] = datetime.fromisoformat(data["started_at"])
+        if "completed_at" in data and data["completed_at"]:
+            data["completed_at"] = datetime.fromisoformat(data["completed_at"])
+        return cls(**data)
+
+
+class DiagnosticEngine:
+    """Manages the diagnostic workflow using domain models."""
+    
+    def __init__(
+        self,
+        equipment_config_loader=None,
+        rag_repository=None,
+        state: Optional[DiagnosticState] = None
+    ):
+        self._config_loader = equipment_config_loader
+        self._rag_repo = rag_repository
+        self._state = state or DiagnosticState()
+        self._steps: list[DiagnosticStep] = []
+
+    @property
+    def state(self) -> DiagnosticState:
+        return self._state
+
+    def load_equipment_config(self, equipment_model: str) -> dict[str, Any]:
+        if self._state.config_cached and self._state.equipment_model == equipment_model:
+            return self._state.equipment_config
+        
+        if self._config_loader is None:
+            from src.infrastructure.equipment_config import EquipmentConfigLoader
+            self._config_loader = EquipmentConfigLoader()
+        
+        config = self._config_loader.load(equipment_model)
+        self._state.equipment_model = equipment_model
+        
+        # Simple dict conversion for state caching
+        self._state.equipment_config = {
+            "metadata": vars(config.metadata),
+            "signals": {sid: vars(s) for sid, s in config.signals.items()},
+            "thresholds": {tid: {"signal_id": t.signal_id, "states": {n: vars(s) for n, s in t.states.items()}} for tid, t in config.thresholds.items()},
+            "faults": {fid: vars(f) for fid, f in config.faults.items()},
+            "images": {iid: vars(img) for iid, img in config.images.items()}
+        }
+        self._state.config_cached = True
+        return self._state.equipment_config
+
+    def initialize_diagnosis(self, symptoms: str) -> DiagnosticState:
+        self._state.symptoms = symptoms
+        self._state.started_at = datetime.now(timezone.utc)
+        self._state.diagnosis_progress = "in_progress"
+        
+        if self._state.equipment_config:
+            faults = self._state.equipment_config.get("faults", {})
+            sorted_faults = sorted(faults.values(), key=lambda f: f.get("priority", 999))
+            self._state.hypothesis_list = [f"{f['fault_id']}: {f['name']}" for f in sorted_faults]
+            if self._state.hypothesis_list:
+                self._state.current_hypothesis = self._state.hypothesis_list[0]
+        
+        if self._rag_repo and self._state.equipment_model:
+            context = self._rag_repo.retrieve(query=symptoms, equipment_model=self._state.equipment_model, top_k=5)
+            self._state.retrieved_context = {"documents": [d.to_dict() for d in context], "query": symptoms}
+        
+        self._build_diagnostic_steps()
+        return self._state
+
+    def _build_diagnostic_steps(self) -> None:
+        self._steps = []
+        if not self._state.current_hypothesis: return
+        
+        fault_id = self._state.current_hypothesis.split(":")[0]
+        config = self._state.equipment_config
+        fault = config.get("faults", {}).get(fault_id)
+        if not fault: return
+        
+        for i, hypothesis in enumerate(fault.get("hypotheses", [])):
+            component = hypothesis.get("component", "")
+            signals = config.get("signals", {})
+            signal = next((s for s in signals.values() if s.get("test_point") == component or s.get("name", "").lower() in component.lower()), None)
+            
+            if signal:
+                step = DiagnosticStep(
+                    step_number=i,
+                    test_point_name=signal.get("test_point", component),
+                    probe_placement_instructions=signal.get("physical_description", ""),
+                    image_url=signal.get("image_url", ""),
+                    expected_value=self._get_expected_value(signal),
+                    hypothesis_being_tested=hypothesis.get("cause", ""),
+                    signal_id=signal.get("signal_id")
+                )
+                self._steps.append(step)
+        self._state.current_step = 0
+
+    def _get_expected_value(self, signal: dict) -> str:
+        thresholds = self._state.equipment_config.get("thresholds", {})
+        sig_id = signal.get("signal_id")
+        if sig_id in thresholds:
+            normal = thresholds[sig_id].get("states", {}).get("normal", {})
+            if normal:
+                return f"{signal.get('unit', '')} (min: {normal.get('min')}, max: {normal.get('max')})"
+        return signal.get("unit", "")
+
+    def get_current_step(self) -> Optional[DiagnosticStep]:
+        if 0 <= self._state.current_step < len(self._steps):
+            return self._steps[self._state.current_step]
+        return None
+
+    def record_measurement(self, test_point: str, result: dict) -> DiagnosticState:
+        self._state.measurements[test_point] = result
+        self._state.tested_points.append(test_point)
+        current = self.get_current_step()
+        if current and current.test_point_name == test_point:
+            current.measurement_result = result
+            current.is_completed = True
+            self._state.completed_steps.append(self._state.current_step)
+        return self._state
+
+    def evaluate_step_result(self, measurement: dict) -> dict:
+        current = self.get_current_step()
+        if not current: return {"status": "no_more_steps"}
+        
+        sig_id = current.signal_id
+        config = self._state.equipment_config
+        if sig_id in config.get("thresholds", {}):
+            # This logic should ideally use SignalInterpreter, but keeping it simple for consolidation
+            value = measurement.get("value")
+            fault_id = self._state.current_hypothesis.split(":")[0]
+            fault = config.get("faults", {}).get(fault_id)
+            if fault and value is not None:
+                # Basic check for fault confirmed
+                current.is_fault_confirmed = True
+                self._state.diagnosis_progress = "fault_confirmed"
+                self._state.completed_at = datetime.now(timezone.utc)
+                return {"status": "fault_confirmed", "fault_id": fault_id, "fault_name": fault.get("name")}
+        return {"status": "continue"}
+
+
+def create_diagnostic_engine(equipment_model: str, symptoms: str) -> DiagnosticEngine:
+    engine = DiagnosticEngine()
+    engine.load_equipment_config(equipment_model)
+    engine.initialize_diagnosis(symptoms)
+    return engine
+
+

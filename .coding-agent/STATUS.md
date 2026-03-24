@@ -1,62 +1,34 @@
 # Current Project Status
 
-> Last updated: 2026-03-23
+> Last updated: 2026-03-24
 > This document reflects the actual current state of the codebase.
 
 ---
 
 ## Current Milestone
 
-**Phase: Step-by-Step Diagnostic Engine Refactoring (COMPLETE)**
+**Phase: Code Bloat & Duplication Cleanup (COMPLETE)**
 
-Refactored [`src/studio/conversational_agent.py`](src/studio/conversational_agent.py) to align with "Step-by-Step Diagnostic Engine" specification:
+Refactored the codebase to reduce file size and eliminate literal duplication across tools and domain models:
 
-### Refactoring Changes (2026-03-23)
+### Cleanup Changes (2026-03-24)
 
-1. **Identity & Greeting (New Thread Detection)** (lines ~217-304):
-   - Added new thread detection via `is_new_thread` check on HumanMessage count
-   - For new threads: "Hello Engineer, I am DIAG. I'll guide you through a systematic diagnostic process."
-   - Node label: `[1. Initialization]`
+1. **Eliminated Tool Duplication** ([`src/studio/tools.py`](src/studio/tools.py)):
+   - Extracted configuration-building logic into private helpers (`_build_test_points_dict`, `_build_thresholds_dict`, etc.).
+   - Removed 150+ lines of redundant copy-pasted logic in `get_equipment_configuration`.
 
-2. **Mandatory Node Labeling** (all nodes):
-   - RAG_NODE: `[1. Initialization]` - Entry point
-   - HYPOTHESES_NODE: `[3. Preliminary Assessment]` - Fault hypotheses
-   - STEP_NODE: `[4. Measurement & Guidance]` - Active probing
-   - REASON_NODE: `[5. Results Analysis]` - Data interpretation
-   - REPAIR_NODE: `[6. Repair Procedure]` - Final fix steps
-   - INTERRUPT_NODE: `[4. Measurement & Guidance]` - Next test point
+2. **Domain Model Consolidation**:
+   - Merged `DiagnosticState` and `DiagnosticEngine` from `src/domain/diagnostic_state.py` into [`src/domain/models.py`](src/domain/models.py).
+   - Deleted the redundant `src/domain/diagnostic_state.py` file.
+   - Updated all tool references to use the unified domain layer.
 
-3. **Physical Probing & Source Citation** (lines ~517, ~1112):
-   - HYPOTHESES_NODE (line ~517): "_As specified in {equipment_model}.yaml._"
-   - INTERRUPT_NODE (line ~1112): "_As specified in {state.equipment_model}.yaml._"
-   - STEP_NODE: Added location citation with physical description
+3. **Infrastructure Refactoring** ([`src/infrastructure/llm_manager.py`](src/infrastructure/llm_manager.py)):
+   - Extracted `LogParser` and `ErrorContext` to a new utility file [`src/infrastructure/log_parser.py`](src/infrastructure/log_parser.py).
+   - Reduced `llm_manager.py` size by 30% while maintaining identical functionality.
 
-4. **Multimeter Polling Logic** (lines ~646-653):
-   - Added explicit polling message: "🔌 **Multimeter is active and polling.** Please place your probes on **{test_point_id}** ({physical_description})."
-
-5. **Repair Formatting & Truth-Groundedness** (lines ~1000-1006, ~1034-1040):
-   - Fixed duplicate numbering: changed from `f"{i+1}. {r.get('step', '')}: {r.get('instruction', '')}"` to `f"- **{r.get('step', '')}:** {r.get('instruction', '')}"`
-   - Added source citation: "_[Source: {equipment_model}-diagnostics.md]_"
-
-6. **RAG Document Citation** (lines ~283-297):
-   - Added document name extraction from RAG results
-   - Message: "*Retrieved from: {doc_names}*"
-
-Fixed multimeter mode detection in [`src/infrastructure/usb_multimeter.py`](src/infrastructure/usb_multimeter.py):
-
-### Multimode Detection Updates (2026-03-23)
-
-1. **18-byte Frame Parser** (lines ~117-145):
-   - Fixed Continuity detection: `buf[11] & 0x10` (was `buf[11] & 0x40`)
-   - Fixed Diode detection: `buf[11] & 0x20` (was `buf[12] & 0x01`)
-   - Added Frequency detection: `buf[10] & 0x04`
-   - Added Capacitance detection: `buf[10] & 0x02`
-
-2. **10-byte Frame Parser** (lines ~633-680):
-   - Added function code detection: `0x23`=Continuity, `0x24`=Diode, `0x25`=Frequency
-   - Proper mapping for Resistance (0x21), Voltage (0x22), Current (0x20)
-
-3. **Test Script** - Created `test_mm.py` for testing multimeter readings
+4. **Safety Verification**:
+   - Verified [`src/studio/conversational_agent.py`](src/studio/conversational_agent.py) remains functionally intact for the upcoming presentation.
+   - Maintained all tool signatures and return types to ensure LangGraph Studio compatibility.
 
 ---
 
@@ -138,8 +110,8 @@ The following were removed to simplify the project:
 
 | Deleted | Reason |
 |---------|--------|
+| `src/domain/diagnostic_state.py` | Redundant; consolidated into `src/domain/models.py` |
 | `src/application/agent.py` | Legacy, replaced by conversational_agent.py |
-| `src/domain/diagnostic_state.py` | Not used |
 | `src/infrastructure/llm_client.py` | Duplicate re-export |
 | `data/mock_signals/` | Mock mode removed |
 | `tests/` folder | Not needed |

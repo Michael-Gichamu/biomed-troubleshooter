@@ -299,10 +299,25 @@ class USBMultimeterClient:
                 time.sleep(0.01)
             return None
         except PermissionError:
-            print("[USB] PermissionError, reconnecting..."); self.disconnect(); time.sleep(0.5)
-            self.connect(); return None
+            # Bare PermissionError (non-Windows or older pyserial)
+            print("[USB] PermissionError, reconnecting...")
+            self.disconnect()
+            time.sleep(1.0)
+            self.connect()
+            return None
         except Exception as e:
-            print(f"[USB] Read error: {e}"); return None
+            # On Windows, pyserial wraps ClearCommError / WriteFile / ReadFile
+            # OS errors inside SerialException — the bare PermissionError handler
+            # above will NOT match.  Detect by inspecting the message string.
+            err_str = str(e)
+            if "PermissionError" in err_str or "Access is denied" in err_str:
+                print(f"[USB] Windows COM-port access denied (SerialException) — reconnecting...")
+                self.disconnect()
+                time.sleep(1.5)   # give the OS a moment to release the handle
+                self.connect()
+            else:
+                print(f"[USB] Read error: {e}")
+            return None
 
     def start_continuous_reading(self) -> None:
         if self._reading_thread and self._reading_thread.is_alive(): return

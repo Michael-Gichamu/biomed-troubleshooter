@@ -28,6 +28,115 @@ def _get_equipment_config():
         _equipment_config = get_equipment_config
     return _equipment_config
 
+
+def _build_test_points_dict(config):
+    """Internal helper to build test points dictionary from config."""
+    test_points = []
+    for signal in config.signals.values():
+        annotations = []
+        for img in config.images.values():
+            for ann in (img.annotations or []):
+                if ann.get("target") == signal.test_point:
+                    annotations.append({
+                        "position": ann.get("position", ""),
+                        "label": ann.get("label", ""),
+                        "image_id": img.image_id,
+                        "filename": img.filename
+                    })
+        test_points.append({
+            "signal_id": signal.signal_id,
+            "name": signal.name,
+            "test_point": signal.test_point,
+            "parameter": signal.parameter,
+            "unit": signal.unit,
+            "measurability": signal.measurability,
+            "physical_description": signal.physical_description,
+            "image_url": signal.image_url,
+            "pro_tips": signal.pro_tips,
+            "visual_guide": annotations if annotations else None
+        })
+    return test_points
+
+
+def _build_thresholds_dict(config):
+    """Internal helper to build thresholds dictionary from config."""
+    thresholds = {}
+    for signal_id, threshold in config.thresholds.items():
+        states = {}
+        for state_name, state in threshold.states.items():
+            states[state_name] = {
+                "min": state.min_value,
+                "max": state.max_value,
+                "description": state.description
+            }
+        thresholds[signal_id] = {
+            "signal_id": threshold.signal_id,
+            "states": states
+        }
+    return thresholds
+
+
+def _build_faults_list(config):
+    """Internal helper to build faults list from config."""
+    faults_list = []
+    for fault_id, fault in config.faults.items():
+        faults_list.append({
+            "fault_id": fault.fault_id,
+            "name": fault.name,
+            "description": fault.description,
+            "priority": fault.priority,
+            "signatures": fault.signatures,
+            "hypotheses": [
+                {
+                    "rank": h.rank,
+                    "component": h.component,
+                    "failure_mode": h.failure_mode,
+                    "cause": h.cause,
+                    "confidence": h.confidence
+                }
+                for h in fault.hypotheses
+            ],
+            "recovery": [
+                {
+                    "step": r.step,
+                    "action": r.action,
+                    "target": r.target,
+                    "instruction": r.instruction,
+                    "verification": r.verification,
+                    "safety": r.safety,
+                    "difficulty": r.difficulty,
+                    "estimated_time": r.estimated_time
+                }
+                for r in fault.recovery
+            ]
+        })
+    faults_list.sort(key=lambda x: x.get("priority", 999))
+    return faults_list
+
+
+def _build_images_list(config, equipment_model):
+    """Internal helper to build images list from config."""
+    images = []
+    for img in config.images.values():
+        image_url = f"https://raw.githubusercontent.com/Michael-Gichamu/biomed-troubleshooter/main/data/equipment/{equipment_model}-test-points/{img.filename}"
+        images.append({
+            "image_id": img.image_id,
+            "filename": img.filename,
+            "description": img.description,
+            "test_points": img.test_points,
+            "image_url": image_url,
+            "annotations": [
+                {
+                    "target": a.get("target", ""),
+                    "position": a.get("position", ""),
+                    "label": a.get("label", "")
+                }
+                for a in (img.annotations or [])
+            ]
+        })
+    return images
+
+
 def _get_rag_repository():
     """Lazy initialization of RAG repository to avoid DLL loading issues."""
     global _rag_repo
@@ -40,7 +149,7 @@ def _get_diagnostic_engine():
     """Lazy initialization of diagnostic engine."""
     global _diagnostic_engine
     if _diagnostic_engine is None:
-        from src.domain.diagnostic_state import DiagnosticEngine
+        from src.domain.models import DiagnosticEngine
         _diagnostic_engine = DiagnosticEngine
     return _diagnostic_engine
 
@@ -148,183 +257,18 @@ def get_equipment_configuration(
         }
     
     if request_type == "test_points":
-        test_points = []
-        for signal in config.signals.values():
-            # Find any image annotations for this test point
-            annotations = []
-            for img in config.images.values():
-                for ann in (img.annotations or []):
-                    if ann.get("target") == signal.test_point:
-                        annotations.append({
-                            "position": ann.get("position", ""),
-                            "label": ann.get("label", ""),
-                            "image_id": img.image_id,
-                            "filename": img.filename
-                        })
-            test_points.append({
-                "signal_id": signal.signal_id,
-                "name": signal.name,
-                "test_point": signal.test_point,
-                "parameter": signal.parameter,
-                "unit": signal.unit,
-                "measurability": signal.measurability,
-                "physical_description": signal.physical_description,
-                "image_url": signal.image_url,
-                "pro_tips": signal.pro_tips,
-                "visual_guide": annotations if annotations else None
-            })
-        return {"test_points": test_points, "equipment_model": equipment_model}
+        return {"test_points": _build_test_points_dict(config), "equipment_model": equipment_model}
     
     elif request_type == "thresholds":
-        thresholds = {}
-        for signal_id, threshold in config.thresholds.items():
-            states = {}
-            for state_name, state in threshold.states.items():
-                states[state_name] = {
-                    "min": state.min_value,
-                    "max": state.max_value,
-                    "description": state.description
-                }
-            thresholds[signal_id] = {
-                "signal_id": threshold.signal_id,
-                "states": states
-            }
-        return {"thresholds": thresholds, "equipment_model": equipment_model}
+        return {"thresholds": _build_thresholds_dict(config), "equipment_model": equipment_model}
     
     elif request_type == "faults":
-        faults_list = []
-        for fault_id, fault in config.faults.items():
-            faults_list.append({
-                "fault_id": fault.fault_id,
-                "name": fault.name,
-                "description": fault.description,
-                "priority": fault.priority,
-                "signatures": fault.signatures,
-                "hypotheses": [
-                    {
-                        "rank": h.rank,
-                        "component": h.component,
-                        "failure_mode": h.failure_mode,
-                        "cause": h.cause,
-                        "confidence": h.confidence
-                    }
-                    for h in fault.hypotheses
-                ],
-                "recovery": [
-                    {
-                        "step": r.step,
-                        "action": r.action,
-                        "target": r.target,
-                        "instruction": r.instruction,
-                        "verification": r.verification,
-                        "safety": r.safety,
-                        "difficulty": r.difficulty,
-                        "estimated_time": r.estimated_time
-                    }
-                    for r in fault.recovery
-                ]
-            })
-        # Sort by priority (lower number = higher priority)
-        faults_list.sort(key=lambda x: x.get("priority", 999))
-        return {"faults": faults_list, "equipment_model": equipment_model}
+        return {"faults": _build_faults_list(config), "equipment_model": equipment_model}
     
     elif request_type == "images":
-        """Return reference images with test point locations."""
-        images = []
-        for img in config.images.values():
-            # Use GitHub RAW URL format - images are stored in data/equipment/<equipment_id>-test-points/
-            # Format: https://raw.githubusercontent.com/<owner>/<repo>/main/data/equipment/<equipment_id>-test-points/<filename>
-            image_url = f"https://raw.githubusercontent.com/Michael-Gichamu/biomed-troubleshooter/main/data/equipment/{equipment_model}-test-points/{img.filename}"
-            images.append({
-                "image_id": img.image_id,
-                "filename": img.filename,
-                "description": img.description,
-                "test_points": img.test_points,
-                "image_url": image_url,
-                "annotations": [
-                    {
-                        "target": a.get("target", ""),
-                        "position": a.get("position", ""),
-                        "label": a.get("label", "")
-                    }
-                    for a in (img.annotations or [])
-                ]
-            })
-        return {"images": images, "equipment_model": equipment_model}
+        return {"images": _build_images_list(config, equipment_model), "equipment_model": equipment_model}
     
     elif request_type == "all":
-        # Return complete config
-        
-        # Build thresholds
-        thresholds = {}
-        for signal_id, threshold in config.thresholds.items():
-            states = {}
-            for state_name, state in threshold.states.items():
-                states[state_name] = {
-                    "min": state.min_value,
-                    "max": state.max_value,
-                    "description": state.description
-                }
-            thresholds[signal_id] = {
-                "signal_id": threshold.signal_id,
-                "states": states
-            }
-        
-        # Build faults list
-        faults_list = []
-        for fault_id, fault in config.faults.items():
-            faults_list.append({
-                "fault_id": fault.fault_id,
-                "name": fault.name,
-                "description": fault.description,
-                "priority": fault.priority,
-                "signatures": fault.signatures,
-                "hypotheses": [
-                    {
-                        "rank": h.rank,
-                        "component": h.component,
-                        "failure_mode": h.failure_mode,
-                        "cause": h.cause,
-                        "confidence": h.confidence
-                    }
-                    for h in fault.hypotheses
-                ],
-                "recovery": [
-                    {
-                        "step": r.step,
-                        "action": r.action,
-                        "target": r.target,
-                        "instruction": r.instruction,
-                        "verification": r.verification,
-                        "safety": r.safety,
-                        "difficulty": r.difficulty,
-                        "estimated_time": r.estimated_time
-                    }
-                    for r in fault.recovery
-                ]
-            })
-        faults_list.sort(key=lambda x: x.get("priority", 999))
-        
-        # Build images
-        images = []
-        for img in config.images.values():
-            image_url = f"https://raw.githubusercontent.com/Michael-Gichamu/biomed-troubleshooter/main/data/equipment/{equipment_model}-test-points/{img.filename}"
-            images.append({
-                "image_id": img.image_id,
-                "filename": img.filename,
-                "description": img.description,
-                "test_points": img.test_points,
-                "image_url": image_url,
-                "annotations": [
-                    {
-                        "target": a.get("target", ""),
-                        "position": a.get("position", ""),
-                        "label": a.get("label", "")
-                    }
-                    for a in (img.annotations or [])
-                ]
-            })
-
         return {
             "equipment_model": equipment_model,
             "metadata": {
@@ -332,7 +276,8 @@ def get_equipment_configuration(
                 "name": config.metadata.name,
                 "category": config.metadata.category,
                 "manufacturer": config.metadata.manufacturer,
-                "version": config.metadata.version
+                "version": config.metadata.version,
+                "created": getattr(config.metadata, "created", None)
             },
             "test_points": [
                 {
@@ -344,9 +289,9 @@ def get_equipment_configuration(
                 }
                 for s in config.signals.values()
             ],
-            "thresholds": thresholds,
-            "faults": faults_list,
-            "images": images
+            "thresholds": _build_thresholds_dict(config),
+            "faults": _build_faults_list(config),
+            "images": _build_images_list(config, equipment_model)
         }
     
     else:
@@ -405,7 +350,7 @@ def get_test_point_guidance(
 def read_multimeter(
     test_point: str,
     measurement_type: str = "voltage_dc",
-    max_duration: float = 180.0,
+    max_duration: float = 15.0,
     equipment_model: str = "cctv-psu-24w-v1"
 ) -> dict:
     """
@@ -608,7 +553,7 @@ def get_diagnostic_step(
             "step_number": 0
         }
     """
-    from src.domain.diagnostic_state import DiagnosticEngine, DiagnosticState
+    from src.domain.models import DiagnosticEngine, DiagnosticState
     
     try:
         # Reconstruct engine from state
@@ -617,14 +562,14 @@ def get_diagnostic_step(
         # Load config if not in state
         if not state.equipment_config:
             config_loader = _get_equipment_config()(equipment_model)
-            from src.domain.diagnostic_state import DiagnosticEngine
+            from src.domain.models import DiagnosticEngine
             engine = DiagnosticEngine(
                 equipment_config_loader=config_loader,
                 state=state
             )
             engine.load_equipment_config(equipment_model)
         else:
-            from src.domain.diagnostic_state import DiagnosticEngine
+            from src.domain.models import DiagnosticEngine
             engine = DiagnosticEngine(state=state)
         
         # Get current step
@@ -705,7 +650,7 @@ def record_measurement(
         )
         returns: {"status": "recorded", "test_point": "TP2", "measurement": {...}}
     """
-    from src.domain.diagnostic_state import DiagnosticEngine, DiagnosticState
+    from src.domain.models import DiagnosticEngine, DiagnosticState
     
     try:
         # Reconstruct engine from state
@@ -783,7 +728,7 @@ def evaluate_measurement(
             "is_within_threshold": True
         }
     """
-    from src.domain.diagnostic_state import DiagnosticEngine, DiagnosticState
+    from src.domain.models import DiagnosticEngine, DiagnosticState
     
     try:
         # Get measured value
@@ -890,7 +835,7 @@ def check_fault_confirmed(
             "conclusion": "Zero output confirmed - fault confirmed"
         }
     """
-    from src.domain.diagnostic_state import DiagnosticEngine, DiagnosticState
+    from src.domain.models import DiagnosticEngine, DiagnosticState
     
     try:
         # Reconstruct engine from state
@@ -1081,3 +1026,45 @@ TOOLS = [
 def get_tools() -> list:
     """Return the list of tools for the agent."""
     return TOOLS
+
+
+# =============================================================================
+# MODULE-LEVEL PRE-WARM
+# =============================================================================
+# sentence-transformers (all-MiniLM-L6-v2) triggers a full PyTorch cold-start
+# the first time it is imported.  On Windows this can take 2-5 minutes and
+# blocks the entire first graph invocation.
+#
+# We start the initialisation in a daemon thread at module import time so that
+# by the time the first conversation reaches rag_node, the model is already
+# loaded and the query completes in milliseconds.
+#
+# The background USB reader is also started here so the multimeter is ready
+# before the first interrupt/step cycle.
+
+import threading as _threading
+
+def _prewarm_rag() -> None:
+    """Load ChromaDB + sentence-transformers model in the background."""
+    try:
+        repo = _get_rag_repository()
+        repo.initialize()
+        print("[PREWARM] RAG repository + sentence-transformers ready.")
+    except Exception as exc:
+        # Non-fatal: rag_node will attempt lazy init and return a graceful error
+        print(f"[PREWARM] RAG pre-warm failed (non-fatal): {exc}")
+
+
+def _prewarm_usb_reader() -> None:
+    """Start the background USB multimeter reader early."""
+    try:
+        from src.studio.background_usb_reader import ensure_reader_running
+        result = ensure_reader_running()
+        print(f"[PREWARM] Background USB reader started: {result}")
+    except Exception as exc:
+        print(f"[PREWARM] USB reader pre-warm failed (non-fatal): {exc}")
+
+
+# Fire both pre-warms concurrently; daemon=True so they don't block process exit
+_threading.Thread(target=_prewarm_rag,        daemon=True, name="prewarm-rag").start()
+_threading.Thread(target=_prewarm_usb_reader, daemon=True, name="prewarm-usb").start()

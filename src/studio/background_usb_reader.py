@@ -472,11 +472,17 @@ class BackgroundReader:
     
     def _read_loop(self):
         """Background reading loop with noise filtering and stabilization."""
+        # Track consecutive None-returns so we can force a reconnect when the
+        # COM port gets stuck (e.g. after a Windows PermissionError cascade).
+        _consecutive_failures: int = 0
+        _FAILURE_RECONNECT_THRESHOLD: int = 30   # ~15 s at 0.5 s timeout each
+
         while not self._stop_event.is_set():
             try:
                 if self.client:
                     reading = self.client.read_measurement(timeout=0.5)
                     if reading and reading.value is not None:
+                        _consecutive_failures = 0   # reset on any good reading
                         value = abs(reading.value)  # Use absolute value
                         
                         # Filter noise based on measurement type
@@ -514,6 +520,22 @@ class BackgroundReader:
                                         )
                                         # Note: Don't clear stabilizer - allow continuous monitoring
                                         print(f"[BACKGROUND_READER] Stable reading: {stable_val} {reading.unit}")
+
+                    else:
+                        # read_measurement returned None — count the failure
+                        _consecutive_failures += 1
+                        if _consecutive_failures >= _FAILURE_RECONNECT_THRESHOLD:
+                            print(
+                                f"[BACKGROUND_READER] {_consecutive_failures} consecutive read "
+                                "failures — forcing port reconnect..."
+                            )
+                            try:
+                                self.client.disconnect()
+                                time.sleep(2.0)
+                                self.client.connect()
+                            except Exception as reconnect_err:
+                                print(f"[BACKGROUND_READER] Reconnect error: {reconnect_err}")
+                            _consecutive_failures = 0
                                 
             except Exception as e:
                 # Continue on error
