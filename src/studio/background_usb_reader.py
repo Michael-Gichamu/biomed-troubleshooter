@@ -18,6 +18,7 @@ Stabilization States:
 import threading
 import time
 import statistics
+from datetime import datetime
 from typing import Optional, List, Tuple
 from dataclasses import dataclass, field
 from collections import deque
@@ -426,7 +427,9 @@ class RobustStabilizer:
             "median": self._calculate_median(valid) if valid else None,
             "mad": self._calculate_mad(valid) if valid else None,
             "threshold_pct": self.get_fluctuation_threshold(),
-            "threshold_abs": self.get_absolute_threshold()
+            "threshold_abs": self.get_absolute_threshold(),
+            "window_values": list(self._window)[-5:] if self._window else [],  # Last 5 for debugging
+            "valid_readings": list(self._valid_readings)[-5:] if self._valid_readings else []
         }
 
 
@@ -435,7 +438,8 @@ class BackgroundReader:
     """Singleton background reader for USB multimeter with robust stabilization."""
     
     # Noise threshold - ignore readings below this (air interference)
-    NOISE_THRESHOLD = 0.7  # volts - ignore values below 0.7V
+    # Lowered from 0.7V to 0.1V to allow legitimate low voltage readings
+    NOISE_THRESHOLD = 0.1  # volts - ignore values below 0.1V
     
     client: Optional[USBMultimeterClient] = None
     _thread: Optional[threading.Thread] = None
@@ -472,96 +476,54 @@ class BackgroundReader:
     
     def _read_loop(self):
         """Background reading loop with noise filtering and stabilization."""
-        # ── Reconnect policy ──────────────────────────────────────────────────
-        # Only reconnect when read_measurement() returns None repeatedly.
-        # A parsed-but-noise-filtered reading is still a healthy port — do NOT
-        # treat it as a failure.  The old threshold of 30 (~15 s) was far too
-        # aggressive and caused constant COM-port thrashing on Windows because
-        # LangGraph's file-watcher restarts the process frequently; each restart
-        # races to open the same COM port before Windows releases the old handle.
-        #
-        # New policy:
-        #   • Threshold raised to 200 (~100 s) so transient dropouts don't trigger
-        #   • Exponential backoff: each reconnect attempt waits 2× longer than the
-        #     last (capped at 60 s) so we don't hammer a port that Windows has
-        #     locked after a PermissionError cascade.
-        _consecutive_failures: int = 0
-        _FAILURE_RECONNECT_THRESHOLD: int = 200   # ~100 s at 0.5 s timeout each
-        _reconnect_delay: float = 2.0             # starts at 2 s, doubles each time
-        _MAX_RECONNECT_DELAY: float = 60.0
-
         while not self._stop_event.is_set():
             try:
                 if self.client:
                     reading = self.client.read_measurement(timeout=0.5)
                     if reading and reading.value is not None:
-                        # A valid frame arrived → port is healthy, reset counters
-                        _consecutive_failures = 0
-                        _reconnect_delay = 2.0          # reset backoff on success
-
-                        value = abs(reading.value)
-
+                        value = abs(reading.value)  # Use absolute value
+                        
                         # Filter noise based on measurement type
-                        # For Voltage: Ignore < 0.5 V (floating-probe interference)
-                        # For Resistance/Continuity: Do NOT filter low values (0 Ω is valid)
+                        # For Voltage: Ignore < 0.5V (air interference)
+                        # For Resistance/Continuity: Do NOT filter low values
                         is_voltage = "VOLTAGE" in reading.measurement_type
                         threshold = self.NOISE_THRESHOLD if is_voltage else 0.01
 
                         if value < threshold:
-                            # Reading arrived but is below noise floor — port is fine,
-                            # just don't feed it to the stabilizer.  Do NOT reset the
-                            # stabilizer here: that wiped accumulated samples every time
-                            # a single low reading slipped through, preventing stabilisation.
+                            # Too low - likely noise
+                            with self._lock:
+                                self._stabilizer.reset()
                             continue
-
+                        
                         # Set measurement type for threshold calculation
                         self._stabilizer.set_measurement_type(reading.measurement_type)
-
-                        # Add to stabilizer and check for a stable cluster
+                        
+                        # Add to stabilizer - check if it passes noise filter
                         with self._lock:
                             was_added = self._stabilizer.add(value)
                             self._latest_reading = reading
-
+                            
                             if was_added:
+                                # Check if readings are now stable
                                 if self._stabilizer.is_stable():
                                     stable_val = self._stabilizer.get_stable_reading()
                                     if stable_val is not None:
+                                        # Stable reading found! Create a stable reading
                                         self._stable_reading = MultimeterReading(
+                                            raw_value=f"stable:{stable_val}",
                                             value=stable_val,
                                             unit=reading.unit,
                                             measurement_type=reading.measurement_type,
                                             timestamp=reading.timestamp,
-                                            test_point_id=reading.test_point_id,
+                                            test_point_id=reading.test_point_id
                                         )
-                                        print(
-                                            f"[BACKGROUND_READER] Stable reading: "
-                                            f"{stable_val} {reading.unit}"
-                                        )
-
-                    else:
-                        # read_measurement returned None — genuine parse / port failure
-                        _consecutive_failures += 1
-                        if _consecutive_failures >= _FAILURE_RECONNECT_THRESHOLD:
-                            print(
-                                f"[BACKGROUND_READER] {_consecutive_failures} consecutive "
-                                f"read failures — reconnecting (backoff {_reconnect_delay:.0f}s)…"
-                            )
-                            try:
-                                self.client.disconnect()
-                                time.sleep(_reconnect_delay)
-                                self.client.connect()
-                            except Exception as reconnect_err:
-                                print(f"[BACKGROUND_READER] Reconnect error: {reconnect_err}")
-
-                            # Exponential backoff, capped at _MAX_RECONNECT_DELAY
-                            _reconnect_delay = min(
-                                _reconnect_delay * 2.0, _MAX_RECONNECT_DELAY
-                            )
-                            _consecutive_failures = 0
-
-            except Exception:
+                                        # Note: Don't clear stabilizer - allow continuous monitoring
+                                        print(f"[BACKGROUND_READER] Stable reading: {stable_val} {reading.unit}")
+                                
+            except Exception as e:
+                # Continue on error
                 pass
-
+            
             time.sleep(0.1)  # Small delay between reads
     
     def get_latest_reading(self) -> Optional[MultimeterReading]:
@@ -620,10 +582,11 @@ class BackgroundReader:
                     if stable_val is not None and self._latest_reading:
                         print(f"[DEBUG] Stabilizer indicates stable, value={stable_val}")
                         self._stable_reading = MultimeterReading(
+                            raw_value=f"stabilized:{stable_val}",
                             value=stable_val,
                             unit=self._latest_reading.unit,
                             measurement_type=self._latest_reading.measurement_type,
-                            timestamp=time.time(),
+                            timestamp=datetime.utcnow().isoformat(),
                             test_point_id=self._latest_reading.test_point_id
                         )
                         return self._stable_reading
@@ -649,10 +612,11 @@ class BackgroundReader:
                 median_val = self._stabilizer._calculate_median(valid[-10:])  # Last 10
                 print(f"[DEBUG] No stable reading, returning median of last 10: {median_val}")
                 return MultimeterReading(
+                    raw_value=f"median:{median_val}",
                     value=median_val,
                     unit=self._latest_reading.unit,
                     measurement_type=self._latest_reading.measurement_type,
-                    timestamp=time.time(),
+                    timestamp=datetime.utcnow().isoformat(),
                     test_point_id=self._latest_reading.test_point_id
                 )
             
