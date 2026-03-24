@@ -91,17 +91,17 @@ signals:
       Set meter to DC Voltage, 750V range.
       RED probe on '+' terminal of C1 (primary side, 450V-rated).
       BLACK probe on C1 negative terminal or primary ground.
-      Expected: approximately 310V DC for 230VAC mains supply.
+      Expected: approximately 220 - 230 VDC for 230VAC mains supply.
     safety_warning: >
-      LETHAL — C1 stores approximately 310V DC. This charge is retained after AC is
+      LETHAL — C1 stores approximately 220 - 230VDC. This charge is retained after AC is
       disconnected. Discharge procedure: connect 10kΩ 2W resistor across C1 terminals
       for 30 seconds, then verify less than 10V with meter. CAT III 600V probes required.
     image_url: "https://raw.githubusercontent.com/Michael-Gichamu/biomed-troubleshooter/main/data/equipment/cctv-psu-24w-v1-test-points/main_capacitor_test_point.png"
     diagnostic_meaning: >
       Single highest-value diagnostic test. Splits fault space in half.
-      280–340V = primary input stage confirmed working. Fault is in Q1, U3, D3, or secondary.
+      210–225V = primary input stage confirmed working. Fault is in Q1, U3, D3, or secondary.
       0V = primary input failure. Test bridge rectifier diodes and MOV.
-      140–175V = unit on 115VAC supply — this is NORMAL for that region.
+      105–115V = unit on 115VAC supply — this is NORMAL for that region.
       Probing C8/C10/C14 (secondary output capacitors, ~12V-rated, output side of board)
       instead of C1 will return the 12V secondary voltage, not the primary DC bus voltage.
       These are physically different components on opposite halves of the board.
@@ -308,7 +308,7 @@ signals:
       R2 drifted high shifts output voltage proportionally upward.
       If output is high and TL431 REF is above 2.6V, measure R2 out-of-circuit.
       Replace with 240kΩ ±1% metal film resistor.
-    expected_behavior: "R2 approximately 240kΩ; R2A approximately 62kΩ; ratio satisfies 12V = 2.495 × (1 + R2/R2A)"
+    expected_behavior: "R2 approximately 240kΩ; R2A approximately 240kΩ; ratio satisfies 12V = 2.495 × (1 + R2/R2A)"
     pro_tips:
       - "Measure R2 with a multimeter — do not rely on colour band reading alone"
       - "R2 open is the primary cause of output overvoltage when TL431 REF > 2.6V"
@@ -719,7 +719,7 @@ faults:
         action: "replace"
         target: "F1 (T5A/250V time-delay)"
         instruction: "Install new T5A/250V time-delay fuse. Power on briefly with load connected."
-        verification: "F1 remains intact. output_12v = 11.4–12.6V."
+        verification: "F1 remains intact. output_12v = 11.4–12.7V."
 
   - fault_id: "low_output_voltage"
     name: "Low Output Voltage Under Load"
