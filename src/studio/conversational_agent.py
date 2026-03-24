@@ -121,6 +121,60 @@ class ConversationalAgentState:
 
 
 # =============================================================================
+# =============================================================================
+# RAG CACHE — singleton for diagnostic knowledge per equipment model
+# =============================================================================
+
+# Cache for RAG results per equipment model (loaded once, reused forever)
+_rag_cache: dict[str, list] = {}
+
+
+def _get_cached_rag_knowledge(equipment_model: str, force_refresh: bool = False) -> list:
+    """
+    Get diagnostic knowledge from RAG, with caching per equipment model.
+
+    Truly non-blocking: uses threading.Thread + join(timeout=5).
+    ThreadPoolExecutor.__exit__ calls shutdown(wait=True) which blocks until the
+    thread finishes even after a TimeoutError — that is why initialization was
+    still taking 5 minutes.  Thread.join(timeout) returns immediately once the
+    timeout expires and does NOT wait for the thread.  The daemon thread keeps
+    running in the background so RAG will be ready for later conversations.
+    """
+    if not force_refresh and equipment_model in _rag_cache:
+        return _rag_cache[equipment_model]
+
+    import threading
+    from src.studio.tools import query_diagnostic_knowledge
+
+    result_holder: list = [None]
+
+    def _do_query():
+        try:
+            result_holder[0] = query_diagnostic_knowledge.invoke({
+                "query": "diagnostic procedures troubleshooting fault",
+                "equipment_model": equipment_model,
+                "top_k": 5
+            })
+        except Exception as exc:
+            print(f"[RAG] Query thread error (non-fatal): {exc}")
+
+    t = threading.Thread(target=_do_query, daemon=True, name=f"rag-query-{equipment_model}")
+    t.start()
+    t.join(timeout=5.0)  # Returns immediately after 5 s — does NOT block like ThreadPoolExecutor
+
+    if t.is_alive():
+        # sentence-transformers still loading — proceed without RAG now.
+        # Not cached so the next conversation will retry.
+        print("[RAG] Cold-start timeout — proceeding without RAG knowledge.")
+        return []
+
+    r = result_holder[0]
+    results = r.get("results", []) if isinstance(r, dict) else []
+    _rag_cache[equipment_model] = results
+    return results
+
+
+# =============================================================================
 # NODE: RAG — fetch config & knowledge ONCE
 # =============================================================================
 
@@ -134,7 +188,7 @@ def rag_node(state: ConversationalAgentState):
       5. Build expected_values lookup with correct per-signal units.
       6. Emit a brief initialisation AIMessage.
     """
-    from src.studio.tools import query_diagnostic_knowledge, get_equipment_configuration
+    from src.infrastructure.equipment_config import get_equipment_config
 
     equipment_model = state.equipment_model
 
@@ -161,60 +215,99 @@ def rag_node(state: ConversationalAgentState):
             ))]
         }
 
-    # ── Steps 1-3: Parallelise all three API calls ───────────────────────────
-    from concurrent.futures import ThreadPoolExecutor, as_completed
+    # ── Load equipment config from local YAML (fast, no API calls) ─────────────
+    # ── and get cached RAG knowledge ──────────────────────────────────────────
+    from src.infrastructure.equipment_config import get_equipment_config
 
-    def _fetch_rag():
-        try:
-            r = query_diagnostic_knowledge.invoke({
-                "query": "diagnostic procedures troubleshooting fault",
-                "equipment_model": equipment_model,
-                "top_k": 5
-            })
-            return ("rag", r.get("results", []) if isinstance(r, dict) else [])
-        except Exception as e:
-            return ("rag", [{"error": str(e)}])
+    # Get RAG knowledge (cached per equipment model)
+    rag_knowledge = _get_cached_rag_knowledge(equipment_model)
 
-    def _fetch_config():
-        try:
-            r = get_equipment_configuration.invoke({
-                "equipment_model": equipment_model,
-                "request_type": "all"
-            })
-            return ("config", r if isinstance(r, dict) else {"test_points": [], "thresholds": {}, "faults": []})
-        except Exception as e:
-            return ("config", {"error": str(e), "test_points": [], "thresholds": {}, "faults": []})
+    # Load equipment config directly from YAML - much faster than API call
+    try:
+        config = get_equipment_config(equipment_model)
+        
+        # Build config_result dict from local YAML data
+        config_result = {
+            "test_points": [],
+            "thresholds": {},
+            "faults": [],
+            "signals": []
+        }
+        
+        # Get signals from config (signals is a Dict[str, SignalConfig])
+        if config.signals:
+            config_result["signals"] = [
+                {
+                    "signal_id": sig.signal_id,
+                    "name": sig.name,
+                    "test_point": sig.test_point,
+                    "parameter": sig.parameter,
+                    "unit": sig.unit,
+                    "physical_description": sig.physical_description or "",
+                    "image_url": sig.image_url or "",
+                    "pro_tips": sig.pro_tips or []
+                }
+                for sig in config.signals.values()
+            ]
+            config_result["test_points"] = config_result["signals"]
+        
+        # Get thresholds from config (thresholds is a Dict[str, ThresholdConfig])
+        if config.thresholds:
+            for signal_id, threshold_data in config.thresholds.items():
+                states = {}
+                for state_name, state in threshold_data.states.items():
+                    states[state_name] = {
+                        "min": state.min_value,
+                        "max": state.max_value,
+                        "description": state.description
+                    }
+                config_result["thresholds"][signal_id] = {
+                    "signal_id": threshold_data.signal_id,
+                    "states": states
+                }
+        
+        # Get faults from config (faults is a Dict[str, FaultConfig])
+        if config.faults:
+            config_result["faults"] = [
+                {
+                    "fault_id": f.fault_id,
+                    "name": f.name,
+                    "description": f.description,
+                    "priority": f.priority,
+                    "signatures": f.signatures,
+                    "hypotheses": [
+                        {
+                            "rank": h.rank,
+                            "component": h.component,
+                            "failure_mode": h.failure_mode,
+                            "cause": h.cause,
+                            "confidence": h.confidence
+                        }
+                        for h in f.hypotheses
+                    ],
+                    "recovery": [
+                        {
+                            "step": r.step,
+                            "action": r.action,
+                            "target": r.target,
+                            "instruction": r.instruction,
+                            "verification": r.verification,
+                            "safety": r.safety,
+                            "estimated_time": r.estimated_time,
+                            "difficulty": r.difficulty
+                        }
+                        for r in f.recovery
+                    ]
+                }
+                for f in config.faults.values()
+            ]
+        
+    except FileNotFoundError as e:
+        config_result = {"error": str(e), "test_points": [], "thresholds": {}, "faults": [], "signals": []}
+    except Exception as e:
+        config_result = {"error": str(e), "test_points": [], "thresholds": {}, "faults": [], "signals": []}
 
-    def _fetch_signals():
-        try:
-            r = get_equipment_configuration.invoke({
-                "equipment_model": equipment_model,
-                "request_type": "test_points"
-            })
-            return ("signals", r.get("test_points", []) if isinstance(r, dict) else [])
-        except Exception:
-            return ("signals", [])
-
-    rag_knowledge: list  = []
-    config_result: dict  = {"test_points": [], "thresholds": {}, "faults": []}
-    full_signals:  list  = []
-
-    with ThreadPoolExecutor(max_workers=3) as pool:
-        futures = [pool.submit(fn) for fn in (_fetch_rag, _fetch_config, _fetch_signals)]
-        for fut in as_completed(futures):
-            key, val = fut.result()
-            if key == "rag":
-                rag_knowledge = val
-            elif key == "config":
-                config_result = val
-            else:
-                full_signals = val
-
-    if not isinstance(config_result, dict):
-        config_result = {"test_points": [], "thresholds": {}, "faults": []}
-
-    # Store full signals so instruction_node and step_node can find them
-    config_result["signals"] = full_signals
+    full_signals = config_result.get("signals", [])
 
     # ── Step 4: Build expected_values with correct per-signal units ───────────
     # Signal units from the rich signal list
