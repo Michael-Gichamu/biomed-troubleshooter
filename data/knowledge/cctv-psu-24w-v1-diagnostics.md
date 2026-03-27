@@ -1,6 +1,6 @@
 # Diagnostic Documentation: CCTV-PSU-24W-V1
 
-**Equipment:** CCTV Multi-Camera Power Supply — 12V DC
+**Equipment:** CCTV Multi-Camera Power Supply -- 12V DC
 **PCB Marking:** SP-80W
 **Document Version:** 3.0
 **Purpose:** RAG retrieval for AI-powered troubleshooting agent
@@ -31,9 +31,9 @@ The CCTV-PSU-24W-V1 (PCB: SP-80W) is a flyback switched-mode power supply provid
 | Zone | Key Components | Voltage Level |
 |------|----------------|---------------|
 | Input section | F1 (T5A/250V), RT1 (NTC 5D-11), MOV varistor, CX1, CX2, MY1 | AC mains |
-| Primary side | C1 (450V 68μF), Bridge rectifier, Q1 (MOSFET), U3 (M5579P), TR1 | HIGH — ~310V DC |
-| Secondary side | D3 (TO-220), C8, C10, C14, TL431, Optocoupler, R2, R2A | LOW — 12V DC |
-| Output terminals | J1 test point, amber multi-way screw terminal block | LOW — 12V DC |
+| Primary side | C1 (450V 68μF), Bridge rectifier, Q1 (MOSFET), U3 (M5579P), TR1 | HIGH -- ~310V DC |
+| Secondary side | D3 (TO-220), C8, C10, C14, TL431, Optocoupler, R2, R2A | LOW -- 12V DC |
+| Output terminals | J1 test point, amber multi-way screw terminal block | LOW -- 12V DC |
 
 ---
 
@@ -42,31 +42,31 @@ The CCTV-PSU-24W-V1 (PCB: SP-80W) is a flyback switched-mode power supply provid
 ```
 AC Mains Input (100–240V AC)
     ↓
-MOV — Surge suppressor (red disc varistor, input section)
+MOV -- Surge suppressor (red disc varistor, input section)
     ↓
-RT1 — NTC 5D-11 inrush thermistor (limits startup inrush current)
+RT1 -- NTC 5D-11 inrush thermistor (limits startup inrush current)
     ↓
-F1 — T5A/250V time-delay fuse (sacrificial protection)
+F1 -- T5A/250V time-delay fuse (sacrificial protection)
     ↓
-EMI Filter — CX1, CX2 (X-capacitors) + MY1 (Y-capacitor)
+EMI Filter -- CX1, CX2 (X-capacitors) + MY1 (Y-capacitor)
     ↓
-Bridge Rectifier — Full-wave diode bridge
+Bridge Rectifier -- Full-wave diode bridge
     ↓
-C1 — Dongbaohe 450V 68μF 105°C (primary DC bus filter capacitor)
+C1 -- Dongbaohe 450V 68μF 105°C (primary DC bus filter capacitor)
      DC bus = ~310V DC at 230VAC input
      DC bus = ~155V DC at 115VAC input
     ↓
 Startup resistor → U3 (M5579P) VCC supply
     ↓
-U3 — M5579P PWM controller → Q1 gate drive at 50–100kHz
+U3 -- M5579P PWM controller → Q1 gate drive at 50–100kHz
     ↓
-Q1 — Primary switching MOSFET (switches 310V through TR1 primary winding)
+Q1 -- Primary switching MOSFET (switches 310V through TR1 primary winding)
     ↓
-TR1 — Flyback transformer (energy stored during Q1 ON, transferred to secondary during Q1 OFF)
+TR1 -- Flyback transformer (energy stored during Q1 ON, transferred to secondary during Q1 OFF)
     ↓
-D3 — Output Schottky rectifier, white-body TO-220 (fast-recovery type required)
+D3 -- Output Schottky rectifier, white-body TO-220 (fast-recovery type required)
     ↓
-C8 + C10 + C14 — Output filter capacitors (105°C grade, three capacitors)
+C8 + C10 + C14 -- Output filter capacitors (105°C grade, three capacitors)
     ↓
 12V DC Output → J1 test point → Amber output terminal block → Cameras
     ↓
@@ -90,32 +90,32 @@ ac_input → F1 → bridge → C1 (DC bus) → Q1 → TR1 → D3 → output_12v
 
 ## 3. Component Locations and Probe Placement
 
-### C1 — Primary Bulk Capacitor (DC Bus Measurement Point)
+### C1 -- Primary Bulk Capacitor (DC Bus Measurement Point)
 
 **Component:** Dongbaohe 450V 68μF 105°C
-**Location:** Primary side of board adjacent to TR1 (flyback transformer). This is the largest capacitor on the primary half and is rated 450V — this rating is printed on the capacitor body. The positive polarity is marked on the PCB.
+**Location:** Primary side of board adjacent to TR1 (flyback transformer). This is the largest capacitor on the primary half and is rated 450V -- this rating is printed on the capacitor body. The positive polarity is marked on the PCB.
 
-**⚠ LETHAL — C1 stores approximately 310V DC. This charge is retained after AC is disconnected. Discharge procedure: connect a 10kΩ 2W resistor across C1 terminals for 30 seconds, then verify less than 10V with a meter before touching any primary-side component. CAT III 600V rated probes required.**
+**⚠ LETHAL -- C1 stores approximately 310V DC. This charge is retained after AC is disconnected. Discharge procedure: connect a 10kΩ 2W resistor across C1 terminals for 30 seconds, then verify less than 10V with a meter before touching any primary-side component. CAT III 600V rated probes required.**
 
-**Probe placement (live — AC powered on):**
+**Probe placement (live -- AC powered on):**
 Set meter to DC Voltage, 750V range. RED probe on "+" terminal of C1. BLACK probe on C1 negative terminal or primary ground. Expected reading ~310V DC for 230VAC supply.
 
 **Important:** C8, C10, and C14 are the secondary-side output filter capacitors rated approximately 16–25V and located on the output half of the board. They are completely different components from C1. Probing C8/C10/C14 when attempting to measure the DC bus will yield the 12V secondary voltage, not the primary bus voltage.
 
 ---
 
-### J1 — 12V Output Test Point
+### J1 -- 12V Output Test Point
 
-**Location:** Secondary/output side of board, adjacent to D3 (white TO-220 Schottky rectifier). Alternatively measure at the positive terminal of C8, C10, or C14, or the positive rail of the amber output screw terminal block. All of these points are at 12V DC — safe to probe.
+**Location:** Secondary/output side of board, adjacent to D3 (white TO-220 Schottky rectifier). Alternatively measure at the positive terminal of C8, C10, or C14, or the positive rail of the amber output screw terminal block. All of these points are at 12V DC -- safe to probe.
 
 **Probe placement (live):**
 Set meter to DC Voltage, 20V range. RED probe on J1. BLACK probe on output ground.
 
 ---
 
-### F1 — Input Fuse
+### F1 -- Input Fuse
 
-**Rating:** T5A/250V — time-delay (slow-blow), 5 Ampere, 250 Volt. This specification is marked on the PCB silkscreen.
+**Rating:** T5A/250V -- time-delay (slow-blow), 5 Ampere, 250 Volt. This specification is marked on the PCB silkscreen.
 **Location:** Input section of board near RT1 (NTC 5D-11) and CX1.
 
 **⚠ Disconnect AC power completely before measuring fuse resistance.**
@@ -123,11 +123,11 @@ Set meter to DC Voltage, 20V range. RED probe on J1. BLACK probe on output groun
 **Probe placement (power off):**
 Set meter to resistance (Ω), lowest range. Probe across both fuse end-caps. Less than 0.1Ω = intact. OL = blown.
 
-**Rule:** F1 blows as a consequence of a downstream short — primarily Q1 drain-to-source failure. Never replace F1 before testing Q1. A shorted Q1 will blow a new fuse immediately on power-up. If Q1 is shorted, also test D3 before replacing anything — a shorted D3 is frequently the root cause of Q1 failure.
+**Rule:** F1 blows as a consequence of a downstream short -- primarily Q1 drain-to-source failure. Never replace F1 before testing Q1. A shorted Q1 will blow a new fuse immediately on power-up. If Q1 is shorted, also test D3 before replacing anything -- a shorted D3 is frequently the root cause of Q1 failure.
 
 ---
 
-### Q1 — Primary Switching MOSFET
+### Q1 -- Primary Switching MOSFET
 
 **Location:** Primary side of board adjacent to U3 (M5579P PWM controller) and TR1. Labeled Q1 on PCB.
 
@@ -138,7 +138,7 @@ Set meter to resistance (Ω). Measure drain-to-source in both probe orientations
 
 ---
 
-### D3 — Output Schottky Rectifier
+### D3 -- Output Schottky Rectifier
 
 **Package:** White-body TO-220, 3 pins. Labeled D3 on PCB. Located on the secondary/output side of board adjacent to J1 test point. D3 carries the full combined output current for all camera channels and has a heatsink for this reason.
 
@@ -151,14 +151,14 @@ Set meter to DIODE TEST mode. RED probe on anode, BLACK probe on cathode (verify
 
 ---
 
-### U3 — PWM Controller IC
+### U3 -- PWM Controller IC
 
 **Part number:** M5579P (8-pin DIP). Labeled U3 on PCB primary side.
 **Function:** Generates PWM drive signal to Q1 gate. Controls duty cycle based on feedback from optocoupler. Receives supply voltage from startup resistor circuit connected to C1 DC bus.
 
 ---
 
-### RT1 — Inrush Current Limiter
+### RT1 -- Inrush Current Limiter
 
 **Part number:** NTC 5D-11 (nominal 5Ω at 25°C, 11mm disc NTC thermistor).
 **Location:** Input section adjacent to F1 and CX1.
@@ -166,7 +166,7 @@ Set meter to DIODE TEST mode. RED probe on anode, BLACK probe on cathode (verify
 
 ---
 
-### MOV — Surge Suppressor
+### MOV -- Surge Suppressor
 
 **Type:** Metal oxide varistor, red disc body. Located in input section.
 **Function:** Clamps voltage spikes on the AC mains input. A shorted MOV pulls the mains to near-zero and may appear as total power loss.
@@ -176,42 +176,42 @@ Resistance mode. A healthy MOV reads several MΩ in both directions. A shorted M
 
 ---
 
-### C8, C10, C14 — Output Filter Capacitors
+### C8, C10, C14 -- Output Filter Capacitors
 
 **Grade:** 105°C rated (-40°C to +105°C operating range). Three capacitors on secondary/output side. Capacitance values: read from the top of each capacitor body.
 
 **⚠ Power off. Discharge each capacitor individually (brief 100Ω resistor across leads) before any measurement.**
 
-**Assessment method — MASTECH MS8250D — two steps, both required:**
+**Assessment method -- MASTECH MS8250D -- two steps, both required:**
 
-**STEP 1 — Visual inspection first (most reliable indicator):**
+**STEP 1 -- Visual inspection first (most reliable indicator):**
 Examine the top of each capacitor. A healthy electrolytic has a flat or very slightly concave top with undeformed vent score lines.
 
-Confirmed failure indicators — replace the capacitor if any of these are present:
-- **Bulging top:** Top surface is domed or rounded upward — internal pressure has pushed the vent outward
-- **Blown top:** Vent has actually opened — body is cracked or split at the top, sometimes with brown residue
+Confirmed failure indicators -- replace the capacitor if any of these are present:
+- **Bulging top:** Top surface is domed or rounded upward -- internal pressure has pushed the vent outward
+- **Blown top:** Vent has actually opened -- body is cracked or split at the top, sometimes with brown residue
 - **Leaked electrolyte:** Brown, crusty, or sticky residue around the base of the capacitor on the PCB
 - **Burnt or discoloured sleeve:** Plastic sleeve has darkened, blistered, or shows burn marks
 - **Discoloured PCB:** PCB area around the capacitor has turned dark brown or black
 
-**STEP 2 — Capacitance measurement (MS8250D, power off, one lead desoldered):**
-Discharge the capacitor first. Desolder one lead to isolate from circuit — in-circuit readings are unreliable. Set MS8250D to capacitance (F) position. Connect probes to capacitor leads. The MS8250D measures up to 66mF, which covers all capacitors on this board. Compare displayed reading to rated value on capacitor body.
+**STEP 2 -- Capacitance measurement (MS8250D, power off, one lead desoldered):**
+Discharge the capacitor first. Desolder one lead to isolate from circuit -- in-circuit readings are unreliable. Set MS8250D to capacitance (F) position. Connect probes to capacitor leads. The MS8250D measures up to 66mF, which covers all capacitors on this board. Compare displayed reading to rated value on capacitor body.
 
 | Reading vs Rated Value | Assessment | Action |
 |------------------------|------------|--------|
 | Within 20% of rated | Capacitance acceptable | Rely on visual inspection |
 | 20–50% below rated | Capacitor degraded | Replace |
 | More than 50% below rated | Capacitor severely failed | Replace immediately |
-| Reads 0 or OL (open) | Capacitor dead — open circuit | Replace immediately |
+| Reads 0 or OL (open) | Capacitor dead -- open circuit | Replace immediately |
 | Resistance mode reads <10Ω | Capacitor internally shorted | Replace immediately |
 
-**Limitation to understand:** The MS8250D capacitance test measures at low frequency. It reliably detects a dead capacitor (open or severely reduced capacitance) and a shorted capacitor. However, a capacitor that has developed high internal resistance (high ESR) while retaining correct capacitance will pass this electrical test. In that case, a slightly bulging top is the primary physical sign — if the symptom is output voltage droop under load or ripple and all electrical readings seem acceptable, replace the capacitors anyway. They are inexpensive and this is the most common failure mode on aged boards.
+**Limitation to understand:** The MS8250D capacitance test measures at low frequency. It reliably detects a dead capacitor (open or severely reduced capacitance) and a shorted capacitor. However, a capacitor that has developed high internal resistance (high ESR) while retaining correct capacitance will pass this electrical test. In that case, a slightly bulging top is the primary physical sign -- if the symptom is output voltage droop under load or ripple and all electrical readings seem acceptable, replace the capacitors anyway. They are inexpensive and this is the most common failure mode on aged boards.
 
 **Replacement specification:** Same capacitance (read from original body), same or higher voltage rating, low-ESR grade, 105°C minimum.
 
 ---
 
-### R2 / R2A — Output Voltage Setting Resistors
+### R2 / R2A -- Output Voltage Setting Resistors
 
 **R2:** 240kΩ ±5% (colour bands Red-Yellow-Yellow-Gold). Upper divider resistor. Labeled R2 on PCB.
 **R2A:** Approximately 62kΩ (calculated). Lower divider resistor. Labeled R2A on PCB.
@@ -225,7 +225,7 @@ Resistance mode, appropriate range. R2 expected ~240kΩ. R2A expected ~62kΩ. Ve
 
 ---
 
-### TL431 — Shunt Regulator (Feedback Reference)
+### TL431 -- Shunt Regulator (Feedback Reference)
 
 **Location:** Secondary side, 3-pin TO-92 package near R2/R2A. Body marked "TL431" or "431".
 **Internal reference voltage:** 2.495V (TI TL431 datasheet).
@@ -245,7 +245,7 @@ Set meter to DC Voltage, 5V range. RED probe on TL431 REF pin. BLACK probe on ou
 | input_fuse | F1 across fuse body (power off) | Resistance | <0.1Ω | OL = blown |
 | primary_mosfet | Q1 Drain–Source, both orientations (power off) | Resistance | >100kΩ | <10Ω = shorted |
 | schottky_diode | D3 forward diode test (power off) | Diode voltage | 0.15–0.45V forward | <0.1V = shorted; OL = open |
-| output_capacitor_esr | C8, C10, C14 — visual inspection + MS8250D capacitance (one lead desoldered) | Visual + Capacitance | Flat top, capacitance within 20% of rated | Bulging/blown top; capacitance >20% below rated; reads shorted |
+| output_capacitor_esr | C8, C10, C14 -- visual inspection + MS8250D capacitance (one lead desoldered) | Visual + Capacitance | Flat top, capacitance within 20% of rated | Bulging/blown top; capacitance >20% below rated; reads shorted |
 | feedback_resistor | R2 isolated (power off) | Resistance | ~240kΩ | OL = open, replace |
 
 ---
@@ -267,7 +267,7 @@ IF output_12v = 0V AND ac_input = normal AND F1 = intact:
     IF bridge_output = 0V:
         Primary input stage failure.
         → Test bridge rectifier diodes individually in diode test mode
-        → Test MOV resistance (should be >1MΩ — shorted MOV clamps mains)
+        → Test MOV resistance (should be >1MΩ -- shorted MOV clamps mains)
 
     IF bridge_output = 140–175V:
         Normal reading for unit operating on 115VAC supply region.
@@ -275,7 +275,7 @@ IF output_12v = 0V AND ac_input = normal AND F1 = intact:
 
     IF bridge_output = 50–200V (abnormally low for the supply voltage):
         C1 primary bulk capacitor (Dongbaohe 450V 68μF) degraded OR bridge partially failed.
-        → Visually inspect C1 for bulging top. Test C1 capacitance with MS8250D (power off, FULLY discharge C1 first — lethal stored voltage). Reading significantly below 68μF = degraded.
+        → Visually inspect C1 for bulging top. Test C1 capacitance with MS8250D (power off, FULLY discharge C1 first -- lethal stored voltage). Reading significantly below 68μF = degraded.
 ```
 
 **Secondary fault discrimination when bridge_output = 280–340V, output_12v = 0V:**
@@ -283,7 +283,7 @@ IF output_12v = 0V AND ac_input = normal AND F1 = intact:
 ```
 TEST 1: Q1 drain-to-source resistance (power off, C1 discharged)
     IF Q1 D-S < 10Ω → Q1 shorted.
-        Also test D3 — shorted D3 frequently causes Q1 overstress and failure.
+        Also test D3 -- shorted D3 frequently causes Q1 overstress and failure.
         Replace all shorted devices before replacing F1 or powering on.
     IF Q1 D-S > 100kΩ → Q1 healthy. Proceed to TEST 2.
 
@@ -297,7 +297,7 @@ TEST 3: Startup resistor continuity (power off)
     IF startup resistor = OL → U3 (M5579P) never receives VCC. No switching begins.
         Replace open startup resistor.
 
-TEST 4: U3 VCC pin voltage (live measurement — exercise full safety precautions)
+TEST 4: U3 VCC pin voltage (live measurement -- exercise full safety precautions)
     IF U3 VCC = 0V → Startup circuit failed or C1 not charged.
     IF U3 VCC = 10–25V → U3 has supply. Check gate drive signal to Q1.
     IF U3 VCC present and Q1 healthy → suspect TR1 winding fault or feedback startup loop.
@@ -318,7 +318,7 @@ IF output_12v = low (8–11V) under rated load:
         MEASURE feedback_ref at TL431 REF pin
             IF feedback_ref < 2.2V → R2/R2A divider values have changed.
         NOTE: If output droops under load but caps pass all tests, degraded cap ESR
-        is still the most likely cause — replace C8, C10, C14 as a set regardless.
+        is still the most likely cause -- replace C8, C10, C14 as a set regardless.
 
 IF output_12v > 13.2V:
     DISCONNECT ALL CAMERA LOADS IMMEDIATELY.
@@ -356,39 +356,39 @@ D3 fails shorted → transformer TR1 secondary winding is effectively short-circ
 1. RT1 (NTC 5D-11) limits inrush current as C1 charges from the bridge rectifier
 2. C1 charges to ~310V DC (230V supply)
 3. Startup resistor circuit provides initial VCC to U3 (M5579P)
-4. U3 begins generating PWM drive signal — Q1 starts switching at 50–100kHz
+4. U3 begins generating PWM drive signal -- Q1 starts switching at 50–100kHz
 5. TR1 transfers energy to secondary on each Q1 off-cycle
 6. D3 rectifies pulsed secondary output to DC
 7. C8, C10, C14 filter the rectified output to clean DC
-8. TL431 and optocoupler feedback loop closes — output stabilises at 12V
+8. TL431 and optocoupler feedback loop closes -- output stabilises at 12V
 
 **Steady-state indicators:**
 - Output voltage stable at 11.4–12.6V under rated load
-- No audible noise from TR1 — squealing or whining indicates feedback instability or overload
-- D3 (TO-220) and Q1 warm but not hot — D3 case temperature less than 70°C at rated load
+- No audible noise from TR1 -- squealing or whining indicates feedback instability or overload
+- D3 (TO-220) and Q1 warm but not hot -- D3 case temperature less than 70°C at rated load
 - Output ripple less than 50mV peak-to-peak
 
 ---
 
 ## 7. Fault Signatures
 
-### SIG-001: Unit Completely Dead — No Output, No Indicators
+### SIG-001: Unit Completely Dead -- No Output, No Indicators
 
 **Observable:** Zero output at J1, no LED illumination, silence on power-up.
 
 **IF-THEN Reasoning:**
 ```
 IF output_12v = 0V AND ac_input = 0V
-    THEN check power cord and wall outlet — fault is upstream of PSU
+    THEN check power cord and wall outlet -- fault is upstream of PSU
 
 IF output_12v = 0V AND ac_input = normal AND F1 = blown
     THEN test Q1 D-S resistance before replacing F1
-    THEN test D3 — shorted D3 is common cascade root cause
+    THEN test D3 -- shorted D3 is common cascade root cause
     THEN replace all shorted semiconductors, then replace F1
 
 IF output_12v = 0V AND ac_input = normal AND F1 = intact AND bridge_output = 0V
     THEN bridge rectifier has failed open
-    THEN OR MOV has shorted — test MOV resistance
+    THEN OR MOV has shorted -- test MOV resistance
 
 IF output_12v = 0V AND ac_input = normal AND F1 = intact AND bridge_output = 280–340V
     THEN fault in Q1, startup circuit, D3, or U3
@@ -416,12 +416,12 @@ D3 shorted → TR1 secondary short → primary current spike
 → Q1 thermal overstress → Q1 D-S shorted → F1 (T5A/250V) blows
 ```
 
-**Critical rule:** Never replace F1 without first testing Q1. If Q1 is shorted, a new T5A/250V fuse blows immediately. Always test D3 after finding a shorted Q1 — D3 failure is the most common root cause.
+**Critical rule:** Never replace F1 without first testing Q1. If Q1 is shorted, a new T5A/250V fuse blows immediately. Always test D3 after finding a shorted Q1 -- D3 failure is the most common root cause.
 
 **Required test sequence before replacing F1:**
-1. Q1 D-S resistance — less than 10Ω = shorted
-2. D3 diode test — approximately 0V both orientations = shorted
-3. Bridge rectifier diodes — any reading OL in forward direction = open diode
+1. Q1 D-S resistance -- less than 10Ω = shorted
+2. D3 diode test -- approximately 0V both orientations = shorted
+3. Bridge rectifier diodes -- any reading OL in forward direction = open diode
 4. Replace all shorted semiconductors
 5. Verify no shorts remain before installing new F1 (T5A/250V)
 
@@ -453,7 +453,7 @@ IF output cycles AND all loads disconnected → still cycles
 
 ---
 
-### SIG-004: Low Output Voltage — Below 10.8V Under Load
+### SIG-004: Low Output Voltage -- Below 10.8V Under Load
 
 **Observable:** Output reads 8–11V under rated load; acceptable at no-load.
 
@@ -465,7 +465,7 @@ IF output_12v = low under load AND output_12v = normal at no-load
 
 IF output_12v = low at no-load as well AND feedback_ref = 2.44–2.55V
     THEN D3 forward voltage has increased (Schottky degradation)
-    THEN measure D3 Vf — if >0.6V, replace D3
+    THEN measure D3 Vf -- if >0.6V, replace D3
 
 IF output_12v = low AND feedback_ref < 2.2V
     THEN feedback divider R2/R2A has changed value
@@ -482,7 +482,7 @@ IF output_12v = low AND feedback_ref < 2.2V
 
 ---
 
-### SIG-005: High Output Voltage — Above 13.2V
+### SIG-005: High Output Voltage -- Above 13.2V
 
 **Observable:** Output exceeds 13.2V. Risk of permanent damage to connected camera electronics.
 
@@ -509,31 +509,31 @@ IF output_12v > 13.2V AND feedback_ref > 2.6V
 **IF-THEN Reasoning:**
 ```
 IF ripple > 200mV peak-to-peak AND output_12v average = normal
-    THEN C8/C10/C14 are degraded — internal resistance increased
+    THEN C8/C10/C14 are degraded -- internal resistance increased
     THEN visually inspect C8, C10, C14 for bulging tops. Test capacitance with MS8250D (one lead desoldered). Replace any cap showing physical failure signs or reading >20% below rated value.
 
 IF ripple present at 100Hz (twice mains frequency)
     THEN C1 (primary bulk capacitor 450V 68μF) degraded
-    THEN visually inspect C1. Test capacitance with MS8250D (power off, fully discharge C1 first — lethal stored voltage). Reading significantly below 68μF = degraded.
+    THEN visually inspect C1. Test capacitance with MS8250D (power off, fully discharge C1 first -- lethal stored voltage). Reading significantly below 68μF = degraded.
 ```
 
 ---
 
-### SIG-007: Thermal Shutdown — Works Cold, Fails After Warm-Up
+### SIG-007: Thermal Shutdown -- Works Cold, Fails After Warm-Up
 
 **Observable:** Unit operates correctly from a cold start, shuts down after 5–30 minutes, recovers when cooled.
 
 **IF-THEN Reasoning:**
 ```
 IF fails when hot AND output current > rated maximum
-    THEN overload condition — reduce camera count or find short
+    THEN overload condition -- reduce camera count or find short
 
 IF fails when hot AND current within rating AND improves with added ventilation
-    THEN inadequate airflow — improve installation environment
+    THEN inadequate airflow -- improve installation environment
 
 IF fails when hot AND current within rating AND no improvement with ventilation
-    THEN Q1 partially degraded — higher RDS(on) causing excess heat generation
-    THEN OR D3 thermal interface degraded — poor contact to heatsink
+    THEN Q1 partially degraded -- higher RDS(on) causing excess heat generation
+    THEN OR D3 thermal interface degraded -- poor contact to heatsink
 ```
 
 ---
@@ -580,19 +580,19 @@ STEP 1: Visual inspection
     → F1 may be visually blown (blackened or broken wire visible)
 
 STEP 2: Confirm AC input (200–250V AC at input connector)
-    → 0V = upstream fault (cord, outlet, breaker) — not a PSU fault
+    → 0V = upstream fault (cord, outlet, breaker) -- not a PSU fault
 
 STEP 3: Test F1 continuity (power off)
     → <0.1Ω = intact → go to STEP 4
     → OL = blown → go to STEP 3A before replacing
 
-    STEP 3A — F1 blown, before replacing:
+    STEP 3A -- F1 blown, before replacing:
         Test Q1 D-S resistance (power off, C1 discharged)
         Test D3 diode test (power off)
         Replace all shorted semiconductors found
         Then replace F1 (T5A/250V only)
 
-STEP 4: Measure DC bus at C1 (live — 310V lethal, full precautions)
+STEP 4: Measure DC bus at C1 (live -- 310V lethal, full precautions)
     → 280–340V = primary working → go to STEP 5
     → 0V = primary failure → test bridge diodes, test MOV resistance
 
@@ -614,32 +614,32 @@ STEP 7: Test startup resistor continuity (power off, C1 discharged)
 ```
 STEP 1: Measure output_12v at J1 under rated load
     → <10.8V → PATH B1 (low output)
-    → >13.2V → PATH B2 (high output) — DISCONNECT ALL LOADS FIRST
+    → >13.2V → PATH B2 (high output) -- DISCONNECT ALL LOADS FIRST
     → 11.4–12.6V but high ripple → PATH B3 (ripple)
 
-PATH B1 — Low Output:
+PATH B1 -- Low Output:
     STEP 1a: Visually inspect C8, C10, C14 (power off). Look for bulging or blown top, leaked electrolyte.
         → Any physical failure sign → replace that capacitor with low-ESR 105°C grade
     STEP 1b: Test capacitance with MS8250D (one lead desoldered, discharged)
         → Reading >20% below rated value → replace
         → Reads shorted in resistance mode (<10Ω) → replace
-    STEP 1b: If all caps pass visual inspection and capacitance test — measure TL431 REF pin (live)
+    STEP 1b: If all caps pass visual inspection and capacitance test -- measure TL431 REF pin (live)
         → REF = 2.44–2.55V → test D3 forward voltage (power off)
           D3 Vf > 0.6V → D3 degraded → replace D3
         → REF < 2.2V → R2 or R2A value has changed → measure both out-of-circuit
 
-PATH B2 — High Output (loads disconnected):
+PATH B2 -- High Output (loads disconnected):
     STEP 2a: Measure TL431 REF pin (live)
         → REF ≈ 2.495V → optocoupler CTR degraded → replace optocoupler
         → REF > 2.6V → R2 (240kΩ) open or drifted → measure R2 out-of-circuit
                         Replace with 240kΩ ±1% metal film
 
-PATH B3 — Excessive Ripple:
+PATH B3 -- Excessive Ripple:
     STEP 3a: Visually inspect C8, C10, C14 (power off). Look for bulging top, leaked electrolyte.
         → Physical failure sign → replace that capacitor
     STEP 3b: Test capacitance of C8, C10, C14 with MS8250D (one lead desoldered, discharged)
         → Reading >20% below rated → replace
-    STEP 3c: If all output caps pass — visually inspect C1 (450V 68μF, power off, DISCHARGE FIRST)
+    STEP 3c: If all output caps pass -- visually inspect C1 (450V 68μF, power off, DISCHARGE FIRST)
         → Bulging top or capacitance significantly below 68μF → replace with 450V 68μF 105°C
 ```
 
@@ -649,7 +649,7 @@ PATH B3 — Excessive Ripple:
 
 ### REP-001: Primary MOSFET Q1 Replacement
 
-**Prerequisites:** Identify and replace D3 if also shorted — do not replace Q1 alone if D3 caused the failure, or Q1 will fail again.
+**Prerequisites:** Identify and replace D3 if also shorted -- do not replace Q1 alone if D3 caused the failure, or Q1 will fail again.
 
 **Procedure:**
 1. Disconnect AC. Discharge C1 (10kΩ 2W resistor for 30 seconds). Verify less than 10V at C1.
@@ -672,7 +672,7 @@ PATH B3 — Excessive Ripple:
 1. Disconnect AC. Discharge C8, C10, C14 (100Ω resistor briefly across each).
 2. Note D3 anode/cathode orientation from PCB or datasheet.
 3. Desolder D3. Clean pads.
-4. Install replacement — fast-recovery Schottky type, same or higher Vrrm and rated current. Do not use 1N400x or any standard silicon rectifier.
+4. Install replacement -- fast-recovery Schottky type, same or higher Vrrm and rated current. Do not use 1N400x or any standard silicon rectifier.
 5. Test replacement with diode meter before powering on: 0.15–0.45V forward, OL reverse.
 
 ---
@@ -718,7 +718,7 @@ PATH B3 — Excessive Ripple:
 3. Verify less than 10V at C1 with a meter before touching any primary-side component
 4. During live high-voltage measurements, keep one hand away from the board
 5. Use probes rated CAT III 600V minimum for all primary-side measurements
-6. Replace F1 only with T5A/250V time-delay fuse — no substitution
+6. Replace F1 only with T5A/250V time-delay fuse -- no substitution
 7. Never replace F1 without first confirming Q1 D-S resistance is greater than 100kΩ
 8. Disconnect all camera loads before investigating any overvoltage condition (output >13.2V)
 
@@ -732,9 +732,9 @@ PATH B3 — Excessive Ripple:
 | 2 | Output Schottky | D3 | Short or open | Dead unit or Q1 cascade | 25% |
 | 3 | Output capacitors | C8/C10/C14 | High ESR | Low voltage under load, ripple | 20% |
 | 4 | Startup circuit | R25 area | Open | Dead unit, F1 and Q1 intact | 10% |
-| 5 | Bridge rectifier | — | Diode open | Dead unit, F1 intact | 5% |
+| 5 | Bridge rectifier | -- | Diode open | Dead unit, F1 intact | 5% |
 | 6 | PWM controller | U3 (M5579P) | Failed | Dead unit | 5% |
-| 7 | Optocoupler | — | CTR degraded | Output overvoltage | 3% |
+| 7 | Optocoupler | -- | CTR degraded | Output overvoltage | 3% |
 | 8 | Feedback resistor | R2 | Open | Output overvoltage | 2% |
 
 ---
@@ -758,7 +758,7 @@ PATH B3 — Excessive Ripple:
 | 10.8–11.4V | Marginally low | Visually inspect C8/C10/C14, test capacitance with MS8250D |
 | <10.8V | Under-voltage | Visually inspect C8/C10/C14, test capacitance, test D3, check feedback |
 | 12.6–13.2V | Marginally high | Test TL431 REF pin, check optocoupler |
-| >13.2V | Overvoltage — disconnect loads immediately | Test TL431 REF, measure R2 |
+| >13.2V | Overvoltage -- disconnect loads immediately | Test TL431 REF, measure R2 |
 | 0V | No output | Measure DC bus at C1 first |
 
 ### TL431 REF Pin (Feedback Reference)
@@ -767,26 +767,26 @@ PATH B3 — Excessive Ripple:
 |---------|----------------|-------------|
 | 2.44–2.55V | Normal | Optocoupler if output is high; D3 Vf if output is low |
 | <2.2V | Low reference | Measure R2/R2A values out-of-circuit |
-| >2.6V | High reference | R2 (240kΩ) open or drifted — measure R2 |
-| 0V | No reference | Secondary dead — check D3, output capacitors |
+| >2.6V | High reference | R2 (240kΩ) open or drifted -- measure R2 |
+| 0V | No reference | Secondary dead -- check D3, output capacitors |
 
 ### Q1 Drain-to-Source Resistance
 
 | Reading | Interpretation | Next Action |
 |---------|----------------|-------------|
 | >100kΩ both orientations | Healthy | Check startup circuit, D3, U3 |
-| <10Ω both orientations | Shorted — Q1 failed | Replace Q1, also test D3 |
+| <10Ω both orientations | Shorted -- Q1 failed | Replace Q1, also test D3 |
 | 0.5–0.7V one direction (diode mode) | Normal body diode | Q1 is healthy |
 
-### Output Capacitor Assessment (C8, C10, C14) — MASTECH MS8250D
+### Output Capacitor Assessment (C8, C10, C14) -- MASTECH MS8250D
 
 **Visual inspection first:**
 | Physical Sign | Assessment | Action |
 |---------------|------------|--------|
 | Flat top, clean base | Healthy | Proceed to capacitance test |
-| Top slightly domed or rounded | Degraded — internal pressure building | Replace |
+| Top slightly domed or rounded | Degraded -- internal pressure building | Replace |
 | Top visibly bulging or cracked open | Failed | Replace immediately |
-| Brown residue at base | Leaked electrolyte — failed | Replace immediately |
+| Brown residue at base | Leaked electrolyte -- failed | Replace immediately |
 | Darkened or blistered sleeve | Thermal damage | Replace immediately |
 
 **Capacitance measurement (MS8250D, one lead desoldered, cap discharged):**
@@ -795,7 +795,7 @@ PATH B3 — Excessive Ripple:
 | Within 20% of rated | Capacitance acceptable | Rely on visual inspection |
 | 20–50% below rated | Capacitor degraded | Replace |
 | >50% below rated | Capacitor severely failed | Replace immediately |
-| Reads 0 or OL | Dead — open circuit | Replace immediately |
+| Reads 0 or OL | Dead -- open circuit | Replace immediately |
 | Resistance mode <10Ω | Internally shorted | Replace immediately |
 
 ---
@@ -807,7 +807,7 @@ Output = 0V?
 ├─► Yes
 │   ├─► F1 blown?
 │   │   ├─► Yes → Test Q1 D-S and D3 → replace shorted parts → replace F1 (T5A/250V)
-│   │   └─► No → Measure C1 DC bus (LETHAL — full precautions)
+│   │   └─► No → Measure C1 DC bus (LETHAL -- full precautions)
 │   │           ├─► 280–340V → Test Q1, D3, startup circuit, U3 (M5579P)
 │   │           └─► 0V → Test bridge rectifier diodes, test MOV resistance
 │

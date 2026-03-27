@@ -140,7 +140,10 @@ class MastechMS8250DParser:
     def parse_frame(cls, buf: bytes) -> Optional[MultimeterReading]:
         if len(buf) != 18:
             return None
-            
+        # Per sigrok sr_ms8250d_packet_valid: byte 17 must be 0x00
+        if buf[17] != 0x00:
+            return None
+
         try:
             # Parse flags
             flags = cls.parse_flags(buf)
@@ -398,6 +401,11 @@ class USBMultimeterClient:
                         stopbits=serial.STOPBITS_ONE,
                         timeout=self.timeout
                     )
+                    # Match raw_dump.py settings that produce valid frames
+                    self._serial.dtr = True
+                    self._serial.rts = False
+                    time.sleep(0.1)
+                    self._serial.reset_input_buffer()
                     self.baud_rate = baud
                     break
                 except serial.SerialException:
@@ -518,52 +526,27 @@ class USBMultimeterClient:
     def _parse_binary_frame(self, raw_bytes: bytes) -> Optional[MultimeterReading]:
         """
         Parse binary frame from MS8250D multimeter.
-        
+
+        Uses ONLY the verified 18-byte MS8250D protocol (sigrok-based).
+        Slides through the buffer looking for a valid frame where
+        buf[17]==0x00 and flags pass validation.
+
         Args:
             raw_bytes: Raw binary data from multimeter
-            
+
         Returns:
             MultimeterReading or None if parsing failed
         """
-        if not raw_bytes:
+        if not raw_bytes or len(raw_bytes) < 18:
             return None
 
-        # Look for 18-byte MS8250D frame
-        # These frames don't always have a fixed header, but we can look for patterns 
-        # or just try parsing if we have enough bytes. 
-        # Often they start with common status bits or sync by length.
-        
-        if len(raw_bytes) >= 18:
-            # Shift buffer until we find what looks like a valid 18-byte frame
-            # For MS8250D, bytes are often 0x0X or have specific masks.
-            # Byte 17 often has 0x00 or fixed bits.
-            for i in range(len(raw_bytes) - 17):
-                candidate = raw_bytes[i:i+18]
-                reading = MastechMS8250DParser.parse_frame(candidate)
-                if reading and reading.measurement_type != "UNKNOWN":
-                    # print(f"[DEBUG MS8250D] Valid frame found at offset {i}")
-                    return reading
+        # Slide through buffer looking for a valid 18-byte MS8250D frame
+        for i in range(len(raw_bytes) - 17):
+            candidate = raw_bytes[i:i+18]
+            reading = MastechMS8250DParser.parse_frame(candidate)
+            if reading and reading.measurement_type != "UNKNOWN":
+                return reading
 
-        # Fallback to older 10-byte formats if it doesn't look like MS8250D
-        if len(raw_bytes) >= 10:
-            i = 0
-            while i < len(raw_bytes) - 9:
-                # Format 1: Starts with 0xC8FEEC or 0xC8EECC
-                if (raw_bytes[i] == 0xC8 and i + 2 < len(raw_bytes) and 
-                    ((raw_bytes[i+1] == 0xFE and raw_bytes[i+2] == 0xEC) or 
-                     (raw_bytes[i+2] == 0xCC and raw_bytes[i+1] == 0xEE))):
-                    
-                    if i + 14 <= len(raw_bytes):
-                        reading = self._parse_new_frame_format(raw_bytes[i:i+14])
-                        if reading: return reading
-                
-                # Format 2: Old 10-byte format starting with 0x40 or 0x44
-                if raw_bytes[i] in [0x40, 0x44]:
-                    if i + 10 <= len(raw_bytes):
-                        reading = self._parse_um24c_frame(raw_bytes[i:i+10])
-                        if reading: return reading
-                i += 1
-        
         return None
     def _parse_new_frame_format(self, frame: bytes) -> Optional[MultimeterReading]:
         """
@@ -774,20 +757,18 @@ class USBMultimeterClient:
             while time.time() - start_time < timeout:
                 if self._serial.in_waiting > 0:
                     buffer += self._serial.read(self._serial.in_waiting)
-                    
-                    # Try to parse binary frames
-                    binary_reading = self._parse_binary_frame(buffer)
-                    if binary_reading:
-                        # Clear buffer after successful parse
-                        # Note: In a real stream we might only clear the parsed part,
-                        # but for 2400 baud unidirectional, clearing is safer.
-                        self._last_reading = binary_reading
-                        return binary_reading
-                        
-                    # Limit buffer size for MS8250D (18 bytes frame)
+
+                    # Only try parsing when we have enough for a full 18-byte MS8250D frame
+                    if len(buffer) >= 18:
+                        binary_reading = self._parse_binary_frame(buffer)
+                        if binary_reading:
+                            self._last_reading = binary_reading
+                            return binary_reading
+
+                    # Limit buffer size -- keep last 2 potential frames
                     if len(buffer) > 64:
-                        buffer = buffer[-36:] # Keep last 2 potential frames
-                        
+                        buffer = buffer[-36:]
+
                 else:
                     time.sleep(0.01)
             

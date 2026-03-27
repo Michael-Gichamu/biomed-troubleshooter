@@ -12,15 +12,15 @@ Workflow:
   decision → END  (inconclusive / max steps)
 
 Node roles:
-  rag          — Fetch equipment config and RAG knowledge ONCE at start (parallel calls)
-  hypotheses   — Generate ranked fault hypotheses from symptom + RAG
-  instruction  — Show probe placement for current test point (NO pause)
-  step         — Take stabilised multimeter reading; report result
-  reason       — Update hypothesis probabilities from measurement; advance step counter
-  decision     — Route: repair | interrupt (next step) | END
-  interrupt    — Pause for engineer "Next" confirmation ONLY (no probe info)
-  resume       — Clear waiting flag; pass control back to instruction
-  repair       — Identify root cause + secondary damage; emit combined repair plan; END
+  rag          -- Fetch equipment config and RAG knowledge ONCE at start (parallel calls)
+  hypotheses   -- Generate ranked fault hypotheses from symptom + RAG
+  instruction  -- Show probe placement for current test point (NO pause)
+  step         -- Take stabilised multimeter reading; report result
+  reason       -- Update hypothesis probabilities from measurement; advance step counter
+  decision     -- Route: repair | interrupt (next step) | END
+  interrupt    -- Pause for engineer "Next" confirmation ONLY (no probe info)
+  resume       -- Clear waiting flag; pass control back to instruction
+  repair       -- Identify root cause + secondary damage; emit combined repair plan; END
 """
 
 from dataclasses import dataclass, field
@@ -38,7 +38,7 @@ from langgraph.checkpoint.memory import MemorySaver
 from langgraph.types import interrupt
 from langchain_core.messages import BaseMessage, HumanMessage, AIMessage
 
-from src.studio.tools import get_tools  # noqa — keeps tool registration alive
+from src.studio.tools import get_tools  # noqa -- keeps tool registration alive
 
 
 # =============================================================================
@@ -67,7 +67,7 @@ class ConversationalAgentState:
     All state for the hypothesis-driven diagnostic workflow.
 
     Populated in rag_node ONCE and carried forward.  Nodes return dicts
-    with only the keys they change — LangGraph merges them into state.
+    with only the keys they change -- LangGraph merges them into state.
     """
     # ── Messaging ────────────────────────────────────────────────────────────
     messages: Annotated[list[BaseMessage], add_messages] = field(default_factory=list)
@@ -122,7 +122,7 @@ class ConversationalAgentState:
 
 # =============================================================================
 # =============================================================================
-# RAG CACHE — singleton for diagnostic knowledge per equipment model
+# RAG CACHE -- singleton for diagnostic knowledge per equipment model
 # =============================================================================
 
 # Cache for RAG results per equipment model (loaded once, reused forever)
@@ -135,7 +135,7 @@ def _get_cached_rag_knowledge(equipment_model: str, force_refresh: bool = False)
 
     Truly non-blocking: uses threading.Thread + join(timeout=5).
     ThreadPoolExecutor.__exit__ calls shutdown(wait=True) which blocks until the
-    thread finishes even after a TimeoutError — that is why initialization was
+    thread finishes even after a TimeoutError -- that is why initialization was
     still taking 5 minutes.  Thread.join(timeout) returns immediately once the
     timeout expires and does NOT wait for the thread.  The daemon thread keeps
     running in the background so RAG will be ready for later conversations.
@@ -160,12 +160,12 @@ def _get_cached_rag_knowledge(equipment_model: str, force_refresh: bool = False)
 
     t = threading.Thread(target=_do_query, daemon=True, name=f"rag-query-{equipment_model}")
     t.start()
-    t.join(timeout=5.0)  # Returns immediately after 5 s — does NOT block like ThreadPoolExecutor
+    t.join(timeout=5.0)  # Returns immediately after 5 s -- does NOT block like ThreadPoolExecutor
 
     if t.is_alive():
-        # sentence-transformers still loading — proceed without RAG now.
+        # sentence-transformers still loading -- proceed without RAG now.
         # Not cached so the next conversation will retry.
-        print("[RAG] Cold-start timeout — proceeding without RAG knowledge.")
+        print("[RAG] Cold-start timeout -- proceeding without RAG knowledge.")
         return []
 
     r = result_holder[0]
@@ -175,7 +175,7 @@ def _get_cached_rag_knowledge(equipment_model: str, force_refresh: bool = False)
 
 
 # =============================================================================
-# NODE: RAG — fetch config & knowledge ONCE
+# NODE: RAG -- fetch config & knowledge ONCE
 # =============================================================================
 
 def rag_node(state: ConversationalAgentState):
@@ -352,7 +352,7 @@ def rag_node(state: ConversationalAgentState):
     init_msg = (
         f"**[1. Initialization]**\n\n"
         f"{greeting}"
-        f"Equipment **{equipment_model}** loaded — "
+        f"Equipment **{equipment_model}** loaded -- "
         f"**{len(test_points)}** test points · **{len(faults)}** fault definitions."
         f"{rag_line}"
     )
@@ -370,7 +370,7 @@ def rag_node(state: ConversationalAgentState):
 
 
 # =============================================================================
-# NODE: HYPOTHESES — rank fault candidates from symptom
+# NODE: HYPOTHESES -- rank fault candidates from symptom
 # =============================================================================
 
 def hypotheses_node(state: ConversationalAgentState):
@@ -400,7 +400,7 @@ def hypotheses_node(state: ConversationalAgentState):
     ) or "No test points defined"
 
     faults_str = "\n".join(
-        f"- {f.get('fault_id','')}: {f.get('name','')} — {f.get('description','')[:150]}"
+        f"- {f.get('fault_id','')}: {f.get('name','')} -- {f.get('description','')[:150]}"
         for f in faults[:10]
     ) or "No fault definitions available"
 
@@ -511,12 +511,12 @@ Output ONLY a valid JSON object, nothing else:
     ]
     for h in sorted_h:
         prob = hypothesis_probabilities.get(h["id"], 0)
-        lines.append(f"- **{h.get('description', h['id'])}** — {prob:.0%}")
+        lines.append(f"- **{h.get('description', h['id'])}** -- {prob:.0%}")
 
     lines.append(
         "\n---\n"
         "_Test sequence calculated. "
-        f"Starting with {len(test_point_rankings)} measurements — "
+        f"Starting with {len(test_point_rankings)} measurements -- "
         "showing first probe placement now..._"
     )
 
@@ -534,7 +534,7 @@ Output ONLY a valid JSON object, nothing else:
 
 
 # =============================================================================
-# NODE: STEP — take the measurement, report the result
+# NODE: STEP -- take the measurement, report the result
 # =============================================================================
 
 def step_node(state: ConversationalAgentState):
@@ -578,13 +578,13 @@ def step_node(state: ConversationalAgentState):
         ""
     )
 
-    # ── Take measurement (explicit 15 s timeout) ──────────────────────────────
+    # ── Take measurement (180 s max window for engineer to place probes) ────
     try:
         result = read_multimeter.invoke({
             "equipment_model": state.equipment_model,
             "test_point": test_point_id,
             "measurement_type": measurement_type,
-            "max_duration": 15.0
+            "max_duration": 180.0
         })
     except Exception as e:
         result = {"status": "error", "error": str(e), "test_point": test_point_id, "value": None}
@@ -617,7 +617,7 @@ def step_node(state: ConversationalAgentState):
         parts.append(f"*Testing: {hyp_desc}*\n")
 
     if evaluation == "fault":
-        parts.append(f"### ⚠️ FAULT — {signal_name}")
+        parts.append(f"### ⚠️ FAULT -- {signal_name}")
         parts.append(f"**Measured:** {meas_value} {meas_unit}{param_label}")
         parts.append(f"**Expected:** {expected['min']} – {expected['max']} {meas_unit}")
         diag = signal_def.get("diagnostic_meaning", "")
@@ -625,7 +625,7 @@ def step_node(state: ConversationalAgentState):
             parts.append(f"**Implication:** {diag}")
 
     elif evaluation == "measurement_unavailable":
-        parts.append(f"### ⚠️ READING UNAVAILABLE — {signal_name}")
+        parts.append(f"### ⚠️ READING UNAVAILABLE -- {signal_name}")
         if meas_value is not None:
             parts.append(f"**Best-effort reading:** {meas_value} {meas_unit}")
         parts.append(f"**Expected:** {expected['min']} – {expected['max']} {meas_unit}")
@@ -637,7 +637,7 @@ def step_node(state: ConversationalAgentState):
         )
 
     else:  # normal
-        parts.append(f"### ✓ NORMAL — {signal_name}")
+        parts.append(f"### ✓ NORMAL -- {signal_name}")
         parts.append(f"**Measured:** {meas_value} {meas_unit}{param_label}")
         parts.append(f"**Expected:** {expected['min']} – {expected['max']} {meas_unit}")
         diag = signal_def.get("diagnostic_meaning", "")
@@ -683,7 +683,7 @@ def step_node(state: ConversationalAgentState):
 
 
 # =============================================================================
-# NODE: REASON — update hypothesis probabilities
+# NODE: REASON -- update hypothesis probabilities
 # =============================================================================
 
 def reason_node(state: ConversationalAgentState):
@@ -712,7 +712,7 @@ def reason_node(state: ConversationalAgentState):
             "step_result": {
                 "measurement": last,
                 "evaluation":  evaluation,
-                "reasoning":   "Measurement unavailable — hypothesis probabilities unchanged.",
+                "reasoning":   "Measurement unavailable -- hypothesis probabilities unchanged.",
                 "decision":    "continue_diagnosis",
                 "next_test_point": (
                     state.test_point_rankings[state.current_step + 1]
@@ -722,7 +722,7 @@ def reason_node(state: ConversationalAgentState):
             },
             "messages": [AIMessage(content=(
                 "**[5. Results Analysis]**\n\n"
-                f"⚠️ No reliable reading at **{signal_name}** — "
+                f"⚠️ No reliable reading at **{signal_name}** -- "
                 "hypothesis probabilities unchanged. Continuing to next test point."
             ))],
             "current_step": state.current_step + 1
@@ -783,7 +783,7 @@ Return ONLY valid JSON:
                     eliminated.append(e)
             confirmed_hypothesis = data.get("confirmed_hypothesis") or None
     except Exception:
-        reasoning = "Analysis inconclusive — carrying forward current probabilities."
+        reasoning = "Analysis inconclusive -- carrying forward current probabilities."
 
     # ── Normalise active probabilities ────────────────────────────────────────
     active = {h: p for h, p in updated_probs.items() if h not in eliminated}
@@ -831,7 +831,7 @@ Return ONLY valid JSON:
         h_id = h.get("id", "")
         desc = h.get("description", h_id)
         if h_id in eliminated:
-            parts.append(f"- ~~{desc}~~ — eliminated")
+            parts.append(f"- ~~{desc}~~ -- eliminated")
         else:
             p      = updated_probs.get(h_id, 0)
             marker = " ← **most likely**" if h_id == new_current else ""
@@ -868,7 +868,7 @@ Return ONLY valid JSON:
 
 
 # =============================================================================
-# NODE: DECISION — deterministic routing
+# NODE: DECISION -- deterministic routing
 # =============================================================================
 
 def decision_node(state: ConversationalAgentState):
@@ -897,7 +897,7 @@ def decision_node(state: ConversationalAgentState):
             "diagnosis_status": "inconclusive",
             "diagnosis_complete": True,
             "messages": [AIMessage(content=(
-                "## Diagnosis Complete — Inconclusive\n\n"
+                "## Diagnosis Complete -- Inconclusive\n\n"
                 "All fault hypotheses have been eliminated by measurements. "
                 "The fault may lie outside the modelled failure modes. "
                 "Consider a visual inspection or component-level tests."
@@ -910,7 +910,7 @@ def decision_node(state: ConversationalAgentState):
             "diagnosis_status": "max_steps_reached",
             "diagnosis_complete": True,
             "messages": [AIMessage(content=(
-                f"## Diagnosis Complete — Step Limit Reached\n\n"
+                f"## Diagnosis Complete -- Step Limit Reached\n\n"
                 f"Completed {state.max_steps} diagnostic steps without a conclusive result. "
                 f"Most likely candidate: **{_top_hypothesis_desc(state)}**."
             ))]
@@ -922,7 +922,7 @@ def decision_node(state: ConversationalAgentState):
             "diagnosis_status": "no_more_tests",
             "diagnosis_complete": True,
             "messages": [AIMessage(content=(
-                "## Diagnosis Complete — All Tests Exhausted\n\n"
+                "## Diagnosis Complete -- All Tests Exhausted\n\n"
                 "No further test points available. "
                 f"Most likely candidate: **{_top_hypothesis_desc(state)}**."
             ))]
@@ -944,7 +944,7 @@ def _top_hypothesis_desc(state: ConversationalAgentState) -> str:
 
 
 # =============================================================================
-# NODE: REPAIR — emit repair procedure
+# NODE: REPAIR -- emit repair procedure
 # =============================================================================
 
 def repair_node(state: ConversationalAgentState):
@@ -1139,7 +1139,7 @@ def repair_node(state: ConversationalAgentState):
 
     msg_parts = [
         "**[6. Repair Procedure]**\n",
-        "## ✅ Diagnosis Complete — Fault Confirmed\n",
+        "## ✅ Diagnosis Complete -- Fault Confirmed\n",
         f"**Root Cause:** {fault_name}",
     ]
     if hyp_mechanism:
@@ -1147,7 +1147,7 @@ def repair_node(state: ConversationalAgentState):
     msg_parts.append(f"**Confirmed by:** {last_tp} = {last_val} {last_unit}{sec_line}\n")
     msg_parts.append("### Evidence Summary\n")
     msg_parts.append(evidence_table)
-    msg_parts.append(f"\n### Repair Steps — *{fault_name}*")
+    msg_parts.append(f"\n### Repair Steps -- *{fault_name}*")
     if secondary_fault_records:
         sec_list = ", ".join(s.get("name","?") for s in secondary_fault_records)
         msg_parts.append(f"_Includes secondary damage: {sec_list}_")
@@ -1164,13 +1164,13 @@ def repair_node(state: ConversationalAgentState):
 
 
 # =============================================================================
-# NODE: INSTRUCTION — show probe placement for current test point (NO pause)
+# NODE: INSTRUCTION -- show probe placement for current test point (NO pause)
 # =============================================================================
 
 def instruction_node(state: ConversationalAgentState):
     """
     Emit the probe-placement instructions for the CURRENT test point as a
-    plain AIMessage.  Does NOT call interrupt() — execution continues
+    plain AIMessage.  Does NOT call interrupt() -- execution continues
     immediately into step_node.
 
     state.current_step already points at the test to perform (set to 0 by
@@ -1198,7 +1198,7 @@ def instruction_node(state: ConversationalAgentState):
         step_num    = state.current_step + 1
         signal_name = current_signal.get("name", current_signal_id)
 
-        parts.append(f"## 🔬 Measurement {step_num} of {total_steps} — {signal_name}")
+        parts.append(f"## 🔬 Measurement {step_num} of {total_steps} -- {signal_name}")
 
         # Image first
         image_url = current_signal.get("image_url", "")
@@ -1233,16 +1233,16 @@ def instruction_node(state: ConversationalAgentState):
         if hyp_desc:
             parts.append(f"*Testing hypothesis: {hyp_desc}*")
 
-        parts.append("\n_Place probes and hold steady — taking measurement now..._")
+        parts.append("\n_Place probes and hold steady -- taking measurement now..._")
 
     else:
-        parts.append("## All measurements complete — proceeding to analysis.")
+        parts.append("## All measurements complete -- proceeding to analysis.")
 
     return {"messages": [AIMessage(content="\n\n".join(parts))]}
 
 
 # =============================================================================
-# NODE: INTERRUPT — pause ONLY; no probe info (fires after full step cycle)
+# NODE: INTERRUPT -- pause ONLY; no probe info (fires after full step cycle)
 # =============================================================================
 
 def interrupt_node(state: ConversationalAgentState):
@@ -1251,7 +1251,7 @@ def interrupt_node(state: ConversationalAgentState):
     review the result before continuing.
 
     The probe instructions for the NEXT test point will be shown by
-    instruction_node after the engineer presses resume — not here.
+    instruction_node after the engineer presses resume -- not here.
     """
     interrupt(
         "**Measurement cycle complete.**\n\n"
@@ -1262,12 +1262,12 @@ def interrupt_node(state: ConversationalAgentState):
 
 
 # =============================================================================
-# NODE: RESUME — clear waiting flag
+# NODE: RESUME -- clear waiting flag
 # =============================================================================
 
 def resume_node(state: ConversationalAgentState):
     """
-    Clear the waiting flag.  current_step is NOT changed here — it was
+    Clear the waiting flag.  current_step is NOT changed here -- it was
     already incremented by reason_node.  step_node reads current_step
     as-is and measures test_point_rankings[current_step].
     """
