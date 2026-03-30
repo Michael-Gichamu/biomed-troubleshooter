@@ -76,7 +76,7 @@ class RobustStabilizer:
     MIN_VALID_SAMPLES = 10      # Minimum samples before checking stability
     
     # Noise threshold - ignore readings below this
-    NOISE_THRESHOLD_VOLTS = 0.5
+    NOISE_THRESHOLD_VOLTS = 0.1   # matches BackgroundReader.NOISE_THRESHOLD; allows sub-0.5V test points
     NOISE_THRESHOLD_OHMS = 1.0
     
     _window: deque = field(default_factory=lambda: deque(maxlen=30))
@@ -108,13 +108,24 @@ class RobustStabilizer:
         """Return only valid (above noise threshold) readings."""
         return list(self._valid_readings)
     
+    # Types that share the same physical measurement mode on the meter.
+    # Switching between these should NOT reset accumulated samples.
+    _COMPATIBLE_GROUPS = [{"RESISTANCE", "CONTINUITY"}]
+
     def set_measurement_type(self, m_type: str):
         """Set the measurement type for threshold calculation.
         Only resets when the type actually changes to preserve accumulated samples.
+        Compatible type transitions (e.g. RESISTANCE ↔ CONTINUITY) update the type
+        but preserve samples, since they represent the same physical measurement.
         """
         new_type = m_type.upper() if m_type else "DEFAULT"
         if new_type == self.measurement_type:
             return  # Same type — preserve accumulated samples
+        # Don't reset for compatible type transitions
+        for group in self._COMPATIBLE_GROUPS:
+            if new_type in group and self.measurement_type in group:
+                self.measurement_type = new_type
+                return  # update type but preserve accumulated samples
         self.measurement_type = new_type
         self.reset()
     
@@ -492,10 +503,14 @@ class BackgroundReader:
                         value = abs(reading.value)  # Use absolute value
                         
                         # Filter noise based on measurement type
-                        # For Voltage: Ignore < 0.5V (air interference)
-                        # For Resistance/Continuity: Do NOT filter low values
                         is_voltage = "VOLTAGE" in reading.measurement_type
-                        threshold = self.NOISE_THRESHOLD if is_voltage else 0.01
+                        is_ohmic = reading.measurement_type in ("RESISTANCE", "CONTINUITY")
+                        if is_ohmic:
+                            threshold = 0.0   # Accept all values including 0.0Ω
+                        elif is_voltage:
+                            threshold = self.NOISE_THRESHOLD  # 0.1V
+                        else:
+                            threshold = 0.01
 
                         if value < threshold:
                             # Too low - likely noise; skip but don't destroy
