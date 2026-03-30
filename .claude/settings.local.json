@@ -4,7 +4,8 @@
       "Bash(python -c \"import ast; ast.parse\\(open\\(''src/studio/background_usb_reader.py''\\).read\\(\\)\\); print\\(''background_usb_reader.py: OK''\\)\")",
       "Bash(python -c \"import ast; ast.parse\\(open\\(''src/studio/tools.py''\\).read\\(\\)\\); print\\(''tools.py: OK''\\)\")",
       "Read(//c/Users/Tech/Documents/AI Automation/ai-agent/**)",
-      "Bash(dir /a nul)"
+      "Bash(dir /a nul)",
+      "Bash(python -c \"import py_compile; py_compile.compile\\(''src/infrastructure/usb_multimeter.py'', doraise=True\\); py_compile.compile\\(''src/studio/background_usb_reader.py'', doraise=True\\); py_compile.compile\\(''src/studio/tools.py'', doraise=True\\); print\\(''All files compile OK''\\)\")"
     ]
   }
 }
