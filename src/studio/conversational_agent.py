@@ -593,6 +593,17 @@ def step_node(state: ConversationalAgentState):
     meas_unit   = result.get("unit", expected.get("unit", "V"))
     status      = result.get("status", "unknown")
 
+    # ── Build unit label that includes AC/DC qualifier ─────────────────────────
+    meas_type_display = {
+        "DC_VOLTAGE":  "V DC",
+        "AC_VOLTAGE":  "V AC",
+        "DC_CURRENT":  "A DC",
+        "AC_CURRENT":  "A AC",
+        "RESISTANCE":  "Ω",
+        "CONTINUITY":  "Ω",
+        "FREQUENCY":   "Hz",
+    }.get((result.get("measurement_type") or measurement_type or "").upper(), meas_unit)
+
     # ── Evaluate ──────────────────────────────────────────────────────────────
     evaluation = "normal"
     if status == "success" and meas_value is not None:
@@ -618,8 +629,8 @@ def step_node(state: ConversationalAgentState):
 
     if evaluation == "fault":
         parts.append(f"### ⚠️ FAULT -- {signal_name}")
-        parts.append(f"**Measured:** {meas_value} {meas_unit}{param_label}")
-        parts.append(f"**Expected:** {expected['min']} – {expected['max']} {meas_unit}")
+        parts.append(f"**Measured:** {meas_value} {meas_type_display}")
+        parts.append(f"**Expected:** {expected['min']} -- {expected['max']} {meas_type_display}")
         diag = signal_def.get("diagnostic_meaning", "")
         if diag:
             parts.append(f"**Implication:** {diag}")
@@ -627,9 +638,9 @@ def step_node(state: ConversationalAgentState):
     elif evaluation == "measurement_unavailable":
         parts.append(f"### ⚠️ READING UNAVAILABLE -- {signal_name}")
         if meas_value is not None:
-            parts.append(f"**Best-effort reading:** {meas_value} {meas_unit}")
-        parts.append(f"**Expected:** {expected['min']} – {expected['max']} {meas_unit}")
-        reason = result.get("message", "Could not obtain a stable reading within 15 s.")
+            parts.append(f"**Best-effort reading:** {meas_value} {meas_type_display}")
+        parts.append(f"**Expected:** {expected['min']} -- {expected['max']} {meas_type_display}")
+        reason = result.get("message", "Could not obtain a stable reading.")
         parts.append(f"**Reason:** {reason}")
         parts.append(
             "_Check probe contact and hold steady. "
@@ -638,8 +649,8 @@ def step_node(state: ConversationalAgentState):
 
     else:  # normal
         parts.append(f"### ✓ NORMAL -- {signal_name}")
-        parts.append(f"**Measured:** {meas_value} {meas_unit}{param_label}")
-        parts.append(f"**Expected:** {expected['min']} – {expected['max']} {meas_unit}")
+        parts.append(f"**Measured:** {meas_value} {meas_type_display}")
+        parts.append(f"**Expected:** {expected['min']} -- {expected['max']} {meas_type_display}")
         diag = signal_def.get("diagnostic_meaning", "")
         if diag:
             parts.append(f"**Implication:** {diag}")
@@ -1233,12 +1244,30 @@ def instruction_node(state: ConversationalAgentState):
         if hyp_desc:
             parts.append(f"*Testing hypothesis: {hyp_desc}*")
 
-        parts.append("\n_Place probes and hold steady -- taking measurement now..._")
+        parts.append("\n_Place probes at the test point above, then press **Resume** when ready to measure._")
 
     else:
         parts.append("## All measurements complete -- proceeding to analysis.")
 
     return {"messages": [AIMessage(content="\n\n".join(parts))]}
+
+
+# =============================================================================
+# NODE: PROBE_WAIT -- pause AFTER probe instructions; BEFORE measurement fires
+# =============================================================================
+
+def probe_wait_node(state: ConversationalAgentState) -> dict:
+    """
+    Pause after probe placement instructions are shown so the engineer can
+    read the instructions and place the probes before the measurement starts.
+
+    instruction_node already emitted all the probe details and the image.
+    This node calls interrupt() so LangGraph Studio renders that message and
+    shows the Resume button.  When the engineer presses Resume, probe_wait_node
+    returns {} and step_node fires immediately on the already-placed probes.
+    """
+    interrupt("probes_ready")
+    return {}
 
 
 # =============================================================================
@@ -1322,13 +1351,15 @@ def create_conversational_graph():
     builder.add_node("repair",      repair_node)
     builder.add_node("interrupt",   interrupt_node)
     builder.add_node("resume",      resume_node)
+    builder.add_node("probe_wait",  probe_wait_node)
 
     builder.add_edge(START,        "rag")
     builder.add_edge("rag",        "hypotheses")
 
-    # After hypotheses: go straight to instruction (no pre-measurement interrupt)
-    builder.add_edge("hypotheses", "instruction")
-    builder.add_edge("instruction", "step")
+    # After hypotheses: instruction shows probe placement, then pause for engineer
+    builder.add_edge("hypotheses",  "instruction")
+    builder.add_edge("instruction", "probe_wait")   # pause here -- engineer places probes
+    builder.add_edge("probe_wait",  "step")         # fires immediately on Resume
     builder.add_edge("step",       "reason")
     builder.add_edge("reason",     "decision")
 

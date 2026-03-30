@@ -1059,7 +1059,24 @@ def _prewarm_llm() -> None:
         print(f"[PREWARM] LLM pre-warm failed (non-fatal): {exc}")
 
 
+def _prewarm_embeddings() -> None:
+    """Load SentenceTransformer embedding model at server startup.
+
+    chromadb_client._get_embedding_function() caches the model in a module-level
+    global so this call is idempotent.  By loading it here (at tools.py import
+    time) the model is in memory before the first diagnostic session starts,
+    so rag_node's 5s thread timeout is sufficient for a full RAG query.
+    """
+    try:
+        from src.infrastructure.chromadb_client import _get_embedding_function
+        _get_embedding_function()  # forces SentenceTransformer('all-MiniLM-L6-v2') to load
+        print("[PREWARM] Embedding model ready.")
+    except Exception as exc:
+        print(f"[PREWARM] Embedding pre-warm failed (non-fatal): {exc}")
+
+
 # Fire all pre-warms concurrently; daemon=True so they don't block process exit
 _threading.Thread(target=_prewarm_rag,        daemon=True, name="prewarm-rag").start()
 _threading.Thread(target=_prewarm_usb_reader, daemon=True, name="prewarm-usb").start()
 _threading.Thread(target=_prewarm_llm,        daemon=True, name="prewarm-llm").start()
+_threading.Thread(target=_prewarm_embeddings, daemon=True, name="prewarm-embeddings").start()
