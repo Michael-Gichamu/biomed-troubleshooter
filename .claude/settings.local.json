@@ -2,7 +2,9 @@
   "permissions": {
     "allow": [
       "Bash(python -c \"import ast; ast.parse\\(open\\(''src/studio/background_usb_reader.py''\\).read\\(\\)\\); print\\(''background_usb_reader.py: OK''\\)\")",
-      "Bash(python -c \"import ast; ast.parse\\(open\\(''src/studio/tools.py''\\).read\\(\\)\\); print\\(''tools.py: OK''\\)\")"
+      "Bash(python -c \"import ast; ast.parse\\(open\\(''src/studio/tools.py''\\).read\\(\\)\\); print\\(''tools.py: OK''\\)\")",
+      "Read(//c/Users/Tech/Documents/AI Automation/ai-agent/**)",
+      "Bash(dir /a nul)"
     ]
   }
 }
