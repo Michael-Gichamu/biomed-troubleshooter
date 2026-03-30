@@ -158,8 +158,12 @@ class MastechMS8250DParser:
             digit3 = cls.parse_main_digit(d3_word)
             digit4 = cls.parse_main_digit(d4_word)
             
-            # Note: Unlike C code, we allow invalid digits to proceed (they become -1)
-            
+            # Reject misaligned frames: all four digits must decode to a valid
+            # 7-segment pattern.  parse_main_digit() returns -1 for unrecognised
+            # bit patterns, which is the primary signal of byte misalignment.
+            if digit1 < 0 or digit2 < 0 or digit3 < 0 or digit4 < 0:
+                return None
+
             # Build numeric value
             value = digit1 * 1000 + digit2 * 100 + digit3 * 10 + digit4
             
@@ -216,7 +220,9 @@ class MastechMS8250DParser:
             elif flags['is_beep']:
                 unit = "Ω"
                 m_type = "CONTINUITY"
-                value = 0.0 if value == float('inf') else 1.0
+                # Keep actual resistance from digit parsing.
+                # OL (inf) is already set by the overflow check above
+                # and will be filtered by math.isfinite() downstream.
             elif flags['is_diode']:
                 unit = "V"
                 m_type = "DIODE"
