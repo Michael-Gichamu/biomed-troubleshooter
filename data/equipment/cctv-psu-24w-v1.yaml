@@ -105,7 +105,7 @@ signals:
       Probing C8/C10/C14 (secondary output capacitors, ~12V-rated, output side of board)
       instead of C1 will return the 12V secondary voltage, not the primary DC bus voltage.
       These are physically different components on opposite halves of the board.
-    expected_behavior: "280–340V DC for 230VAC supply; 140–175V DC for 115VAC supply"
+    expected_behavior: "215–340V DC for 230VAC supply; 140–175V DC for 115VAC supply"
     pro_tips:
       - "C1 is Dongbaohe 450V 68μF 105°C -- primary side only"
       - "C8/C10/C14 are secondary output caps (~16-25V rated) -- they read ~12V, not 310V"
@@ -386,7 +386,7 @@ thresholds:
     states:
       normal:
         min: 0
-        max: 0.1
+        max: 3
         description: "F1 intact. Rating: T5A/250V time-delay."
       failed:
         min: 1000
