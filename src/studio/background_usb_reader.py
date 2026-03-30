@@ -20,7 +20,7 @@ import threading
 import time
 import statistics
 from datetime import datetime
-from typing import Optional, List, Tuple
+from typing import ClassVar, Optional, List, Tuple
 from dataclasses import dataclass, field
 from collections import deque
 from enum import Enum
@@ -457,6 +457,10 @@ class BackgroundReader:
     # Noise threshold - ignore readings below this (air interference)
     # Lowered from 0.7V to 0.1V to allow legitimate low voltage readings
     NOISE_THRESHOLD = 0.1  # volts - ignore values below 0.1V
+
+    # Reconnection backoff bounds (seconds)
+    _RECONNECT_BACKOFF_MIN: ClassVar[float] = 1.0
+    _RECONNECT_BACKOFF_MAX: ClassVar[float] = 30.0
     
     client: Optional[USBMultimeterClient] = None
     _thread: Optional[threading.Thread] = None
@@ -471,6 +475,7 @@ class BackgroundReader:
     _last_probe_time: float = 0.0
     _regime_change_count: int = 0  # consecutive readings far from current stable
     _last_printed_stable: Optional[float] = None  # for change-only terminal output
+    _reconnect_backoff: float = 1.0  # current backoff delay (seconds)
     
     def start(self) -> bool:
         """Start the background reader."""
@@ -492,14 +497,34 @@ class BackgroundReader:
         self._is_running = True
         print("[BACKGROUND_READER] Started")
         return True
-    
+
     def _read_loop(self):
         """Background reading loop with noise filtering and stabilization."""
         while not self._stop_event.is_set():
             try:
+                if self.client and not self.client.is_connected():
+                    # Port was lost — attempt reconnection with backoff
+                    print(f"[BACKGROUND_READER] Port lost, reconnecting "
+                          f"in {self._reconnect_backoff:.0f}s...")
+                    self._stop_event.wait(self._reconnect_backoff)
+                    if self._stop_event.is_set():
+                        break
+                    if self.client.reconnect():
+                        print("[BACKGROUND_READER] Reconnected to multimeter")
+                        self._reconnect_backoff = self._RECONNECT_BACKOFF_MIN
+                    else:
+                        # Double backoff, capped
+                        self._reconnect_backoff = min(
+                            self._reconnect_backoff * 2,
+                            self._RECONNECT_BACKOFF_MAX
+                        )
+                    continue
+
                 if self.client:
                     reading = self.client.read_measurement(timeout=0.5)
                     if reading and reading.value is not None:
+                        # Successful read — reset reconnect backoff
+                        self._reconnect_backoff = self._RECONNECT_BACKOFF_MIN
                         value = abs(reading.value)  # Use absolute value
                         
                         # Filter noise based on measurement type

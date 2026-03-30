@@ -446,6 +446,27 @@ class USBMultimeterClient:
     def is_connected(self) -> bool:
         """Check if connected to multimeter."""
         return self._connected and self._serial and self._serial.is_open
+
+    def reconnect(self) -> bool:
+        """Close the current connection and attempt to reconnect.
+
+        Useful when the COM port becomes inaccessible (USB disconnect,
+        PermissionError, device sleep) and needs to be re-opened.
+
+        Returns:
+            True if reconnection succeeded.
+        """
+        # Silently close whatever state exists
+        try:
+            if self._serial and self._serial.is_open:
+                self._serial.close()
+        except Exception:
+            pass
+        self._serial = None
+        self._connected = False
+
+        # Re-use existing connect() which handles auto-detect + baud cycling
+        return self.connect()
     
     def _parse_reading(self, raw_data: str) -> Optional[MultimeterReading]:
         """
@@ -781,6 +802,13 @@ class USBMultimeterClient:
             # Timeout - no valid frame received
             return None
             
+        except (PermissionError, OSError) as e:
+            # COM port became inaccessible (USB disconnect, device sleep,
+            # another process grabbed the port).  Mark disconnected so the
+            # caller (BackgroundReader) can attempt reconnection.
+            print(f"[USB] Port lost: {e}")
+            self._connected = False
+            return None
         except Exception as e:
             print(f"[USB] Read error: {e}")
             return None
