@@ -15,6 +15,7 @@ Stabilization States:
 - timeout: No stable reading after timeout
 """
 
+import math
 import threading
 import time
 import statistics
@@ -75,7 +76,7 @@ class RobustStabilizer:
     MIN_VALID_SAMPLES = 10      # Minimum samples before checking stability
     
     # Noise threshold - ignore readings below this
-    NOISE_THRESHOLD_VOLTS = 0.5
+    NOISE_THRESHOLD_VOLTS = 0.1   # matches BackgroundReader.NOISE_THRESHOLD; allows sub-0.5V test points
     NOISE_THRESHOLD_OHMS = 1.0
     
     _window: deque = field(default_factory=lambda: deque(maxlen=30))
@@ -457,7 +458,9 @@ class BackgroundReader:
     # Robust stabilizer for measurement
     _stabilizer: RobustStabilizer = field(default_factory=RobustStabilizer)
     _last_probe_time: float = 0.0
-    
+    _regime_change_count: int = 0  # consecutive readings far from current stable
+    _last_printed_stable: Optional[float] = None  # for change-only terminal output
+
     def start(self) -> bool:
         """Start the background reader."""
         if self._is_running:
@@ -499,15 +502,43 @@ class BackgroundReader:
                             # accumulated samples (RobustStabilizer.add() already
                             # filters noise via its own _valid_readings gate)
                             continue
-                        
+
+                        # Skip non-finite values (multimeter OL/overload display,
+                        # parser edge cases) -- float('inf') or nan must not enter
+                        # the stabilizer or appear in terminal output
+                        if not math.isfinite(value):
+                            continue
+
                         # Set measurement type for threshold calculation
                         self._stabilizer.set_measurement_type(reading.measurement_type)
-                        
+
                         # Add to stabilizer - check if it passes noise filter
                         with self._lock:
+                            # ── Regime change detection ───────────────────────────────────
+                            # If the engineer moved probes to a new test point the incoming
+                            # values will be far from the current stable reading.  After 5
+                            # consecutive readings >50% away from current stable we reset
+                            # the stabilizer so it can lock onto the new range.
+                            if self._stable_reading is not None and value > 0:
+                                stable_val = self._stable_reading.value
+                                relative_diff = abs(value - stable_val) / max(abs(stable_val), 1.0)
+                                if relative_diff > 0.50:   # >50% away from last stable
+                                    self._regime_change_count += 1
+                                    if self._regime_change_count >= 5:
+                                        self._stabilizer.reset()
+                                        self._stable_reading = None
+                                        self._regime_change_count = 0
+                                        print(f"[BACKGROUND_READER] Regime change: "
+                                              f"{round(stable_val, 2)} -> {round(value, 2)}"
+                                              f" -- stabilizer reset")
+                                else:
+                                    self._regime_change_count = 0
+                            else:
+                                self._regime_change_count = 0
+
                             was_added = self._stabilizer.add(value)
                             self._latest_reading = reading
-                            
+
                             if was_added:
                                 # Check if readings are now stable
                                 if self._stabilizer.is_stable():
@@ -523,7 +554,11 @@ class BackgroundReader:
                                             test_point_id=reading.test_point_id
                                         )
                                         # Note: Don't clear stabilizer - allow continuous monitoring
-                                        print(f"[BACKGROUND_READER] Stable reading: {stable_val} {reading.unit}")
+                                        rounded = round(stable_val, 3)
+                                        if self._last_printed_stable != rounded:
+                                            print(f"[BACKGROUND_READER] Stable reading: "
+                                                  f"{rounded} {reading.unit}")
+                                            self._last_printed_stable = rounded
                                 
             except Exception as e:
                 # Continue on error
@@ -566,26 +601,51 @@ class BackgroundReader:
         """
         print(f"[DEBUG] get_reading_with_stabilization called: type={measurement_type}, timeout={timeout}")
 
+        # How long to wait after Resume before accepting any reading.
+        # The engineer needs to walk to the test point and place both probes.
+        PROBE_SETTLE_SECS = 5.0
+
+        # ── Reset A (at call start) ───────────────────────────────────────────
+        # Discard all pre-Resume samples so a stale stable reading from a
+        # previous test point cannot bleed through.
         with self._lock:
-            # Set measurement type (guarded — only resets if type actually changed)
             self._stabilizer.set_measurement_type(measurement_type)
-            # Clear the result flag so we re-evaluate stability freshly,
-            # but keep accumulated samples from the background _read_loop
+            self._stabilizer.reset()
             self._stable_reading = None
-        
+            self._regime_change_count = 0
+
+        # Wait for settle window.  The background loop keeps running here and
+        # accumulates readings -- but we intentionally ignore them.
+        probe_settle_end = time.time() + PROBE_SETTLE_SECS
+        while time.time() < probe_settle_end:
+            time.sleep(0.2)
+
+        # ── Reset B (after settle window) ────────────────────────────────────
+        # Any readings the background loop acquired during the settle window
+        # (e.g. residual frames from the previous test point still draining
+        # from the OS serial buffer) are discarded here.  Only data that
+        # arrives AFTER this second reset can contribute to the result.
+        with self._lock:
+            self._stabilizer.reset()
+            self._stable_reading = None
+            self._regime_change_count = 0
+
         start_time = time.time()
-        
-        while time.time() - start_time < timeout:
+        remaining = max(1.0, timeout - PROBE_SETTLE_SECS)
+
+        while time.time() - start_time < remaining:
+            time.sleep(0.2)
+
             with self._lock:
-                # Check if we have a stable reading
-                if self._stable_reading:
+                # Check if background loop already promoted a stable reading
+                if self._stable_reading and math.isfinite(self._stable_reading.value):
                     print(f"[DEBUG] Returning stable reading: {self._stable_reading.value}")
                     return self._stable_reading
-                
-                # Check if stabilizer indicates stable
+
+                # Check stabilizer directly
                 if self._stabilizer.is_stable():
                     stable_val = self._stabilizer.get_stable_reading()
-                    if stable_val is not None and self._latest_reading:
+                    if stable_val is not None and math.isfinite(stable_val) and self._latest_reading:
                         print(f"[DEBUG] Stabilizer indicates stable, value={stable_val}")
                         self._stable_reading = MultimeterReading(
                             raw_value=f"stabilized:{stable_val}",
@@ -596,41 +656,42 @@ class BackgroundReader:
                             test_point_id=self._latest_reading.test_point_id
                         )
                         return self._stable_reading
-                
+
                 # Debug: show statistics periodically
                 if self._stabilizer.sample_count % 20 == 0 and self._stabilizer.sample_count > 0:
                     stats = self._stabilizer.get_statistics()
                     print(f"[DEBUG] Stabilizer stats: {stats}")
-            
-            time.sleep(0.2)
-        
-        # Timeout - return best effort reading if we have any
+
+        # Timeout - return best effort reading if we have any valid data
         with self._lock:
             print(f"[DEBUG] Timeout. Stabilizer stats: {self._stabilizer.get_statistics()}")
-            
+
             # Try to return whatever stable reading we might have
-            if self._stable_reading:
+            if self._stable_reading and math.isfinite(self._stable_reading.value):
                 return self._stable_reading
-            
+
             # If we have valid readings but no stability, try to return median
             valid = self._stabilizer.valid_readings
             if len(valid) >= 5 and self._latest_reading:
                 median_val = self._stabilizer._calculate_median(valid[-10:])  # Last 10
-                print(f"[DEBUG] No stable reading, returning median of last 10: {median_val}")
-                return MultimeterReading(
-                    raw_value=f"median:{median_val}",
-                    value=median_val,
-                    unit=self._latest_reading.unit,
-                    measurement_type=self._latest_reading.measurement_type,
-                    timestamp=datetime.utcnow().isoformat(),
-                    test_point_id=self._latest_reading.test_point_id
-                )
-            
-            # Last resort: return latest if above noise threshold
-            if self._latest_reading and abs(self._latest_reading.value) > self._stabilizer._get_noise_threshold():
+                if math.isfinite(median_val):
+                    print(f"[DEBUG] No stable reading, returning median of last 10: {median_val}")
+                    return MultimeterReading(
+                        raw_value=f"median:{median_val}",
+                        value=median_val,
+                        unit=self._latest_reading.unit,
+                        measurement_type=self._latest_reading.measurement_type,
+                        timestamp=datetime.utcnow().isoformat(),
+                        test_point_id=self._latest_reading.test_point_id
+                    )
+
+            # Last resort: return latest if above noise threshold and finite
+            if (self._latest_reading
+                    and math.isfinite(self._latest_reading.value)
+                    and abs(self._latest_reading.value) > self._stabilizer._get_noise_threshold()):
                 print(f"[DEBUG] Timeout, returning latest: {self._latest_reading.value}")
                 return self._latest_reading
-        
+
         print(f"[DEBUG] Complete timeout - no readings")
         return None
     

@@ -458,7 +458,7 @@ def read_multimeter(
                 "unit": reading.unit,
                 "status": "success",
                 "test_point": test_point,
-                "measurement_type": mtype_enum,
+                "measurement_type": reading.measurement_type,
                 "measurement_type_requested": measurement_type,
                 "confidence": "HIGH",
                 "stability_status": "stable",
@@ -472,7 +472,7 @@ def read_multimeter(
         return {
             "status": "timeout_unstable",
             "test_point": test_point,
-            "measurement_type": mtype_enum,
+            "measurement_type": reading.measurement_type,
             "measurement_type_requested": measurement_type,
             "guidance": guidance_result,
             "value": round(reading.value, 2),

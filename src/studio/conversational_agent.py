@@ -1233,7 +1233,11 @@ def instruction_node(state: ConversationalAgentState):
         if hyp_desc:
             parts.append(f"*Testing hypothesis: {hyp_desc}*")
 
-        parts.append("\n_Place probes and hold steady — taking measurement now..._")
+        parts.append(
+            "\n**Action required:** Walk to the test point, place both probes firmly, "
+            "then hold steady — measurement will start automatically. "
+            "_Do not move the probes once placed._"
+        )
 
     else:
         parts.append("## All measurements complete — proceeding to analysis.")
