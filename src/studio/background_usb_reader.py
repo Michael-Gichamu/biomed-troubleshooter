@@ -471,7 +471,7 @@ class BackgroundReader:
     _last_probe_time: float = 0.0
     _regime_change_count: int = 0  # consecutive readings far from current stable
     _last_printed_stable: Optional[float] = None  # for change-only terminal output
-
+    
     def start(self) -> bool:
         """Start the background reader."""
         if self._is_running:
@@ -531,9 +531,11 @@ class BackgroundReader:
                         with self._lock:
                             # ── Regime change detection ───────────────────────────────────
                             # If the engineer moved probes to a new test point the incoming
-                            # values will be far from the current stable reading.  After 5
-                            # consecutive readings >50% away from current stable we reset
-                            # the stabilizer so it can lock onto the new range.
+                            # values will be far from the current stable reading.  The
+                            # RobustStabilizer's dwell counter would block the new value from
+                            # ever being accepted (it keeps comparing against _last_stable_value).
+                            # After 5 consecutive readings that are >50% away from current
+                            # stable we reset the stabilizer so it can lock onto the new range.
                             if self._stable_reading is not None and value > 0:
                                 stable_val = self._stable_reading.value
                                 relative_diff = abs(value - stable_val) / max(abs(stable_val), 1.0)
@@ -617,39 +619,28 @@ class BackgroundReader:
         print(f"[DEBUG] get_reading_with_stabilization called: type={measurement_type}, timeout={timeout}")
 
         # How long to wait after Resume before accepting any reading.
-        # The engineer needs to walk to the test point and place both probes.
+        # The engineer needs to walk back to the test point and place both probes.
         PROBE_SETTLE_SECS = 5.0
 
-        # ── Reset A (at call start) ───────────────────────────────────────────
-        # Discard all pre-Resume samples so a stale stable reading from a
-        # previous test point cannot bleed through.
         with self._lock:
+            # Set measurement type and ALWAYS reset so pre-Resume data is discarded.
+            # Without this reset the stabilizer's dwell counter is still satisfied
+            # from the previous measurement and will return stale data instantly.
             self._stabilizer.set_measurement_type(measurement_type)
-            self._stabilizer.reset()
+            self._stabilizer.reset()            # discard all pre-Resume samples
             self._stable_reading = None
-            self._regime_change_count = 0
+            self._regime_change_count = 0       # reset alongside stabilizer
 
-        # Wait for settle window.  The background loop keeps running here and
-        # accumulates readings -- but we intentionally ignore them.
         probe_settle_end = time.time() + PROBE_SETTLE_SECS
-        while time.time() < probe_settle_end:
-            time.sleep(0.2)
-
-        # ── Reset B (after settle window) ────────────────────────────────────
-        # Any readings the background loop acquired during the settle window
-        # (e.g. residual frames from the previous test point still draining
-        # from the OS serial buffer) are discarded here.  Only data that
-        # arrives AFTER this second reset can contribute to the result.
-        with self._lock:
-            self._stabilizer.reset()
-            self._stable_reading = None
-            self._regime_change_count = 0
-
         start_time = time.time()
-        remaining = max(1.0, timeout - PROBE_SETTLE_SECS)
 
-        while time.time() - start_time < remaining:
+        while time.time() - start_time < timeout:
             time.sleep(0.2)
+
+            # Don't accept any reading during the settle window -- the engineer
+            # is still walking back to the test point after pressing Resume.
+            if time.time() < probe_settle_end:
+                continue
 
             with self._lock:
                 # Check if background loop already promoted a stable reading
