@@ -802,10 +802,9 @@ class USBMultimeterClient:
             # Timeout - no valid frame received
             return None
             
-        except (PermissionError, OSError) as e:
-            # COM port became inaccessible (USB disconnect, device sleep,
-            # another process grabbed the port).  Mark disconnected so the
-            # caller (BackgroundReader) can attempt reconnection.
+        except PermissionError as e:
+            # Windows ClearCommError(13) = COM port truly gone (USB
+            # disconnect, device sleep, another process grabbed port).
             print(f"[USB] Port lost: {e}")
             self._connected = False
             return None

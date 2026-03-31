@@ -2,7 +2,7 @@
 CLI Interface
 
 Command-line interface for the troubleshooting agent.
-Supports interactive mode, mock mode, USB multimeter mode, and scenario replay.
+Supports interactive mode and USB multimeter mode.
 """
 
 import os
@@ -21,8 +21,7 @@ from pathlib import Path
 from typing import Optional
 
 from src.application.agent import run_diagnostic
-from src.interfaces.mode_router import ModeRouter, MockSignalSource
-from src.infrastructure.mock_generator import MockSignalGenerator, list_available_scenarios
+from src.interfaces.mode_router import ModeRouter
 from src.domain.models import SignalBatch
 
 
@@ -60,83 +59,6 @@ def print_header(title: str) -> None:
 def print_section(title: str) -> None:
     """Print formatted section header."""
     print(f"\n--- {title} ---")
-
-
-def run_mock_mode(scenario: str = "cctv-psu-output-rail") -> dict:
-    """
-    Run agent in mock mode with predefined scenario.
-
-    Args:
-        scenario: Name of the scenario to run
-
-    Returns:
-        Diagnostic result dictionary
-    """
-    print_header("MOCK MODE - Biomedical Troubleshooting Agent")
-
-    # Get mode info
-    router = ModeRouter()
-    mode = router.get_mode()
-    mode_info = router.get_mode_info()
-
-    print(f"Mode: {mode}")
-    print(f"Scenario: {scenario}")
-    print()
-
-    # Show available scenarios
-    print("Available scenarios:")
-    scenarios = list_available_scenarios()
-    for s in scenarios:
-        marker = "*" if s["id"] == scenario else " "
-        print(f"  {marker} {s['id']}: {s['name']} ({s['difficulty']})")
-    print()
-
-    # Generate mock signals
-    generator = MockSignalGenerator(scenario)
-    signal_batch = generator.generate_signal_batch()
-
-    print_section("Generated Signals")
-    for sig in signal_batch.signals:
-        anomaly_mark = "[!]" if sig.anomaly else ""
-        print(f"  {sig.test_point.id}: {sig.value} {sig.unit} ({sig.measurement_type}){anomaly_mark}")
-
-    print()
-
-    # Run diagnostic
-    result = run_diagnostic(
-        trigger_type="mock_signal",
-        trigger_content=f"Mock scenario: {scenario}",
-        equipment_model=signal_batch.equipment_id,
-        equipment_serial="MOCK-001",
-        measurements=[
-            {
-                "test_point": s.test_point.id,
-                "value": s.value,
-                "unit": s.unit
-            }
-            for s in signal_batch.signals
-        ]
-    )
-
-    # Display results
-    print_section("Diagnosis Result")
-
-    if "diagnosis" in result:
-        diag = result["diagnosis"]
-        print(f"  Primary Cause: {diag.get('primary_cause', 'Unknown')}")
-        print(f"  Confidence: {diag.get('confidence_score', 'Unknown')}")
-        print(f"  Severity: {diag.get('severity', 'Unknown')}")
-
-        if "recommended_actions" in diag:
-            print("\n  Recommended Actions:")
-            for i, action in enumerate(diag["recommended_actions"], 1):
-                print(f"    {i}. {action}")
-
-    print("\n" + "=" * 60)
-    print(f"Full result saved. Traces available in LangSmith.")
-    print("=" * 60)
-
-    return result
 
 
 def run_usb_mode(equipment_id: str, timeout: int = 60) -> None:
@@ -333,21 +255,14 @@ def show_mode_status() -> None:
     print(f"Current Mode: {mode_info['mode'].upper()}")
     print()
 
-    if mode_info['mode'] == 'mock':
-        print("Mock Configuration:")
-        print(f"  Scenario: {mode_info['mock_scenario']}")
-        print()
-        print("Available Scenarios:")
-        scenarios = list_available_scenarios()
-        for s in scenarios:
-            print(f"  - {s['id']}: {s['name']} ({s['difficulty']})")
-    else:
+    if mode_info['mode'] == 'usb':
         print("USB Configuration:")
         print(f"  Port: {mode_info['usb_port']}")
-
+    else:
+        print("Mode: USB (multimeter)")
+    
     print()
     print("To change mode, set APP_MODE in .env file:")
-    print("  APP_MODE=mock   # For simulation")
     print("  APP_MODE=usb    # For USB multimeter")
 
 
@@ -450,12 +365,6 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  # Run in mock mode with default scenario
-  python -m src.interfaces.cli --mock
-
-  # Run in mock mode with specific scenario
-  python -m src.interfaces.cli --mock cctv-psu-overvoltage
-
   # Run in USB multimeter mode
   python -m src.interfaces.cli --usb CCTV-PSU-24W-V1
 
@@ -464,22 +373,12 @@ Examples:
 
   # Interactive mode with manual input
   python -m src.interfaces.cli --interactive
-
-  # Replay scenario from file
-  python -m src.interfaces.cli -s data/mock_signals/scenario.json
         """
     )
 
     # Mode commands
     mode_group = parser.add_mutually_exclusive_group()
 
-    mode_group.add_argument(
-        "--mock", "-M",
-        const="cctv-psu-output-rail",
-        nargs="?",
-        metavar="SCENARIO",
-        help="Run in mock mode with predefined scenario (default: cctv-psu-output-rail)"
-    )
     mode_group.add_argument(
         "--usb", "-U",
         metavar="EQUIPMENT_ID",
@@ -496,11 +395,6 @@ Examples:
         "--interactive", "-i",
         action="store_true",
         help="Run in interactive mode with manual input"
-    )
-    parser.add_argument(
-        "--scenario", "-s",
-        type=str,
-        help="Replay a scenario from JSON file"
     )
 
     # Standard diagnostic arguments
@@ -525,16 +419,12 @@ Examples:
     args = parser.parse_args()
 
     # Handle mode commands
-    if args.mock is not None:
-        run_mock_mode(args.mock)
-    elif args.usb:
+    if args.usb:
         run_usb_mode(args.usb)
     elif args.status:
         show_mode_status()
     elif args.interactive:
         interactive_mode()
-    elif args.scenario:
-        scenario_replay(args.scenario)
     elif args.model and args.measurements:
         measurements = [parse_measurement(m) for m in args.measurements]
         result = run_diagnostic(
@@ -552,7 +442,6 @@ Examples:
         print("LangGraph-powered AI agent for biomedical equipment troubleshooting")
         print()
         print("Quick Start:")
-        print("  python -m src.interfaces.cli --mock           # Run demo scenario")
         print("  python -m src.interfaces.cli --usb <model>    # Use USB multimeter")
         print("  python -m src.interfaces.cli --status         # Check configuration")
         print()

@@ -480,7 +480,11 @@ class BackgroundReader:
     def start(self) -> bool:
         """Start the background reader."""
         if self._is_running:
-            return True
+            if self._thread and self._thread.is_alive():
+                return True
+            # Thread died (hot-reload, crash, etc.) — reset and allow restart
+            print("[BACKGROUND_READER] Thread died, restarting...")
+            self._is_running = False
             
         # Try to connect to multimeter
         self.client = USBMultimeterClient()
@@ -500,114 +504,107 @@ class BackgroundReader:
 
     def _read_loop(self):
         """Background reading loop with noise filtering and stabilization."""
-        while not self._stop_event.is_set():
-            try:
-                if self.client and not self.client.is_connected():
-                    # Port was lost — attempt reconnection with backoff
-                    print(f"[BACKGROUND_READER] Port lost, reconnecting "
-                          f"in {self._reconnect_backoff:.0f}s...")
-                    self._stop_event.wait(self._reconnect_backoff)
-                    if self._stop_event.is_set():
-                        break
-                    if self.client.reconnect():
-                        print("[BACKGROUND_READER] Reconnected to multimeter")
-                        self._reconnect_backoff = self._RECONNECT_BACKOFF_MIN
-                    else:
-                        # Double backoff, capped
-                        self._reconnect_backoff = min(
-                            self._reconnect_backoff * 2,
-                            self._RECONNECT_BACKOFF_MAX
-                        )
-                    continue
-
-                if self.client:
-                    reading = self.client.read_measurement(timeout=0.5)
-                    if reading and reading.value is not None:
-                        # Successful read — reset reconnect backoff
-                        self._reconnect_backoff = self._RECONNECT_BACKOFF_MIN
-                        value = abs(reading.value)  # Use absolute value
-                        
-                        # Filter noise based on measurement type
-                        is_voltage = "VOLTAGE" in reading.measurement_type
-                        is_ohmic = reading.measurement_type in ("RESISTANCE", "CONTINUITY")
-                        if is_ohmic:
-                            threshold = 0.0   # Accept all values including 0.0Ω
-                        elif is_voltage:
-                            threshold = self.NOISE_THRESHOLD  # 0.1V
+        try:
+            while not self._stop_event.is_set():
+                try:
+                    if self.client and not self.client.is_connected():
+                        # Port was lost — attempt reconnection with backoff
+                        print(f"[BACKGROUND_READER] Port lost, reconnecting "
+                              f"in {self._reconnect_backoff:.0f}s...")
+                        self._stop_event.wait(self._reconnect_backoff)
+                        if self._stop_event.is_set():
+                            break
+                        if self.client.reconnect():
+                            print("[BACKGROUND_READER] Reconnected to multimeter")
+                            self._reconnect_backoff = self._RECONNECT_BACKOFF_MIN
                         else:
-                            threshold = 0.01
+                            # Double backoff, capped
+                            self._reconnect_backoff = min(
+                                self._reconnect_backoff * 2,
+                                self._RECONNECT_BACKOFF_MAX
+                            )
+                        continue
 
-                        if value < threshold:
-                            # Too low - likely noise; skip but don't destroy
-                            # accumulated samples (RobustStabilizer.add() already
-                            # filters noise via its own _valid_readings gate)
-                            continue
+                    if self.client:
+                        reading = self.client.read_measurement(timeout=0.5)
+                        if reading and reading.value is not None:
+                            # Successful read — reset reconnect backoff
+                            self._reconnect_backoff = self._RECONNECT_BACKOFF_MIN
+                            value = abs(reading.value)  # Use absolute value
 
-                        # Skip non-finite values (multimeter OL/overload display,
-                        # parser edge cases) -- float('inf') or nan must not enter
-                        # the stabilizer or appear in terminal output
-                        if not math.isfinite(value):
-                            continue
+                            # Filter noise based on measurement type
+                            is_voltage = "VOLTAGE" in reading.measurement_type
+                            is_ohmic = reading.measurement_type in ("RESISTANCE", "CONTINUITY")
+                            if is_ohmic:
+                                threshold = 0.0   # Accept all values including 0.0Ω
+                            elif is_voltage:
+                                threshold = self.NOISE_THRESHOLD  # 0.1V
+                            else:
+                                threshold = 0.01
 
-                        # Set measurement type for threshold calculation
-                        self._stabilizer.set_measurement_type(reading.measurement_type)
+                            if value < threshold:
+                                continue
 
-                        # Add to stabilizer - check if it passes noise filter
-                        with self._lock:
-                            # ── Regime change detection ───────────────────────────────────
-                            # If the engineer moved probes to a new test point the incoming
-                            # values will be far from the current stable reading.  The
-                            # RobustStabilizer's dwell counter would block the new value from
-                            # ever being accepted (it keeps comparing against _last_stable_value).
-                            # After 5 consecutive readings that are >50% away from current
-                            # stable we reset the stabilizer so it can lock onto the new range.
-                            if self._stable_reading is not None and value > 0:
-                                stable_val = self._stable_reading.value
-                                relative_diff = abs(value - stable_val) / max(abs(stable_val), 1.0)
-                                if relative_diff > 0.50:   # >50% away from last stable
-                                    self._regime_change_count += 1
-                                    if self._regime_change_count >= 5:
-                                        self._stabilizer.reset()
-                                        self._stable_reading = None
+                            # Handle non-finite values (OL / overload from multimeter).
+                            if not math.isfinite(value):
+                                if reading.measurement_type == "CONTINUITY":
+                                    value = 999_999.0   # OL sentinel: open circuit
+                                else:
+                                    continue
+
+                            # Set measurement type for threshold calculation
+                            self._stabilizer.set_measurement_type(reading.measurement_type)
+
+                            # Add to stabilizer - check if it passes noise filter
+                            with self._lock:
+                                # ── Regime change detection ──────────────────────
+                                if self._stable_reading is not None and value > 0:
+                                    stable_val = self._stable_reading.value
+                                    relative_diff = abs(value - stable_val) / max(abs(stable_val), 1.0)
+                                    if relative_diff > 0.50:
+                                        self._regime_change_count += 1
+                                        if self._regime_change_count >= 5:
+                                            self._stabilizer.reset()
+                                            self._stable_reading = None
+                                            self._regime_change_count = 0
+                                            print(f"[BACKGROUND_READER] Regime change: "
+                                                  f"{round(stable_val, 2)} -> {round(value, 2)}"
+                                                  f" -- stabilizer reset")
+                                    else:
                                         self._regime_change_count = 0
-                                        print(f"[BACKGROUND_READER] Regime change: "
-                                              f"{round(stable_val, 2)} -> {round(value, 2)}"
-                                              f" -- stabilizer reset")
                                 else:
                                     self._regime_change_count = 0
-                            else:
-                                self._regime_change_count = 0
 
-                            was_added = self._stabilizer.add(value)
-                            self._latest_reading = reading
+                                was_added = self._stabilizer.add(value)
+                                self._latest_reading = reading
 
-                            if was_added:
-                                # Check if readings are now stable
-                                if self._stabilizer.is_stable():
-                                    stable_val = self._stabilizer.get_stable_reading()
-                                    if stable_val is not None:
-                                        # Stable reading found! Create a stable reading
-                                        self._stable_reading = MultimeterReading(
-                                            raw_value=f"stable:{stable_val}",
-                                            value=stable_val,
-                                            unit=reading.unit,
-                                            measurement_type=reading.measurement_type,
-                                            timestamp=reading.timestamp,
-                                            test_point_id=reading.test_point_id
-                                        )
-                                        # Note: Don't clear stabilizer - allow continuous monitoring
-                                        rounded = round(stable_val, 3)
-                                        if self._last_printed_stable != rounded:
-                                            print(f"[BACKGROUND_READER] Stable reading: "
-                                                  f"{rounded} {reading.unit}")
-                                            self._last_printed_stable = rounded
-                                
-            except Exception as e:
-                # Continue on error
-                pass
-            
-            time.sleep(0.1)  # Small delay between reads
-    
+                                if was_added:
+                                    if self._stabilizer.is_stable():
+                                        stable_val = self._stabilizer.get_stable_reading()
+                                        if stable_val is not None:
+                                            self._stable_reading = MultimeterReading(
+                                                raw_value=f"stable:{stable_val}",
+                                                value=stable_val,
+                                                unit=reading.unit,
+                                                measurement_type=reading.measurement_type,
+                                                timestamp=reading.timestamp,
+                                                test_point_id=reading.test_point_id
+                                            )
+                                            rounded = round(stable_val, 3)
+                                            if self._last_printed_stable != rounded:
+                                                print(f"[BACKGROUND_READER] Stable reading: "
+                                                      f"{rounded} {reading.unit}")
+                                                self._last_printed_stable = rounded
+
+                except Exception as e:
+                    # Continue on error
+                    pass
+
+                time.sleep(0.1)  # Small delay between reads
+        finally:
+            self._is_running = False
+            print("[BACKGROUND_READER] Read loop exited")
+
     def get_latest_reading(self) -> Optional[MultimeterReading]:
         """Get the latest raw reading."""
         with self._lock:
@@ -758,7 +755,10 @@ class BackgroundReader:
     
     def is_connected(self) -> bool:
         """Check if connected to multimeter."""
-        return self.client is not None and self.client._connected
+        return (self.client is not None
+                and self.client._connected
+                and self._thread is not None
+                and self._thread.is_alive())
 
 
 # Global singleton instance

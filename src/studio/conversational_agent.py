@@ -116,6 +116,9 @@ class ConversationalAgentState:
     iteration_count: int = 0
     max_steps: int = 9
 
+    # ── Measurement failure tracking ─────────────────────────────────────────
+    consecutive_failures: int = 0   # resets to 0 on any successful/fault reading
+
     # ── Routing (set by decision_node) ───────────────────────────────────────
     next_node: str = ""
 
@@ -668,7 +671,8 @@ def step_node(state: ConversationalAgentState):
         "expected_min": expected.get("min", 0),
         "expected_max": expected.get("max", 999_999),
         "hypothesis_being_tested": state.current_hypothesis,
-        "timestamp": str(datetime.now())
+        "message":     result.get("message", result.get("error", "")),
+        "timestamp":   str(datetime.now())
     }
 
     next_tp = (
@@ -717,27 +721,71 @@ def reason_node(state: ConversationalAgentState):
     evaluation   = last.get("evaluation", "normal")
     signal_name  = last.get("signal_name", tp_id)
 
-    # ── Skip update for unavailable readings ──────────────────────────────────
+    # ── Handle unavailable readings: retry once, then abort ──────────────────
     if evaluation == "measurement_unavailable":
-        return {
-            "step_result": {
-                "measurement": last,
-                "evaluation":  evaluation,
-                "reasoning":   "Measurement unavailable -- hypothesis probabilities unchanged.",
-                "decision":    "continue_diagnosis",
-                "next_test_point": (
-                    state.test_point_rankings[state.current_step + 1]
-                    if state.current_step + 1 < len(state.test_point_rankings)
-                    else None
-                )
-            },
-            "messages": [AIMessage(content=(
-                "**[5. Results Analysis]**\n\n"
-                f"⚠️ No reliable reading at **{signal_name}** -- "
-                "hypothesis probabilities unchanged. Continuing to next test point."
-            ))],
-            "current_step": state.current_step + 1
-        }
+        status_code = last.get("status", "timeout")
+
+        if status_code == "error":
+            cause = "The multimeter could not be contacted — USB port not identified."
+            fix   = (
+                "1. Check the USB cable is firmly seated.\n"
+                "2. Verify the multimeter is powered on.\n"
+                "3. Confirm the correct COM/USB port is selected in settings."
+            )
+        elif status_code == "timeout_unstable":
+            cause = "Readings were unstable — probe contact was unreliable."
+            fix   = (
+                "1. Press probes firmly onto bare metal at the test point.\n"
+                "2. Avoid touching adjacent traces.\n"
+                "3. Hold probes steady for at least 3 seconds."
+            )
+        else:
+            cause = "No reading was received within the allowed time window."
+            fix   = (
+                "1. Confirm probe tips are making solid contact.\n"
+                "2. Re-check the test point location in the image above.\n"
+                "3. Ensure the equipment is powered on."
+            )
+
+        if state.consecutive_failures == 0:
+            # First failure — retry the same test point (do NOT increment current_step)
+            return {
+                "consecutive_failures": 1,
+                "step_result": {
+                    "measurement": last,
+                    "evaluation":  evaluation,
+                    "reasoning":   f"First failure at {tp_id}: {cause}",
+                    "decision":    "retry_probe",
+                },
+                "messages": [AIMessage(content=(
+                    "**[5. Results Analysis]**\n\n"
+                    f"⚠️ **No reliable reading at {signal_name}**\n\n"
+                    f"**Cause:** {cause}\n\n"
+                    f"**How to fix:**\n{fix}\n\n"
+                    "_Retrying the same test point. Place probes again and press **Resume**._"
+                ))],
+            }
+        else:
+            # Second consecutive failure — abort diagnosis
+            return {
+                "consecutive_failures": 2,
+                "diagnosis_complete": True,
+                "diagnosis_status": "aborted_no_reading",
+                "step_result": {
+                    "measurement": last,
+                    "evaluation":  evaluation,
+                    "reasoning":   f"Second failure at {tp_id} — aborting.",
+                    "decision":    "abort_no_reading",
+                },
+                "messages": [AIMessage(content=(
+                    "**[5. Results Analysis]**\n\n"
+                    f"🛑 **Diagnosis halted — {signal_name}**\n\n"
+                    "A reliable reading could not be obtained after two attempts.\n\n"
+                    f"**Cause:** {cause}\n\n"
+                    "Without a valid measurement here the diagnostic cannot continue reliably. "
+                    "Please resolve the instrument connection issue and restart the session."
+                ))],
+            }
 
     expected = state.expected_values.get(tp_id, {"min": 0, "max": 999_999, "unit": "V"})
 
@@ -873,8 +921,9 @@ Return ONLY valid JSON:
             "decision":       decision,
             "next_test_point": next_tp
         },
-        "messages":     [AIMessage(content="\n".join(parts))],
-        "current_step": state.current_step + 1
+        "messages":            [AIMessage(content="\n".join(parts))],
+        "current_step":        state.current_step + 1,
+        "consecutive_failures": 0,
     }
 
 
@@ -897,6 +946,16 @@ def decision_node(state: ConversationalAgentState):
         return {"next_node": "repair"}
 
     decision = state.step_result.get("decision", "continue_diagnosis")
+
+    if decision == "retry_probe":
+        return {"next_node": "instruction"}   # re-show same test point; current_step unchanged
+
+    if decision == "abort_no_reading":
+        return {
+            "next_node": "end",
+            "diagnosis_complete": True,
+            "diagnosis_status": "aborted_no_reading",
+        }
 
     if decision == "fault_confirmed":
         return {"next_node": "repair"}
@@ -1228,6 +1287,11 @@ def instruction_node(state: ConversationalAgentState):
             tip_lines = "\n".join(f"- {t}" for t in tips)
             parts.append(f"**💡 Pro tips:**\n{tip_lines}")
 
+        # Probe placement & multimeter mode (from YAML probe_placement field)
+        probe_placement = current_signal.get("probe_placement", "")
+        if probe_placement:
+            parts.append(f"**🔧 Probe placement & meter setting:**\n{probe_placement.strip()}")
+
         # Expected reading
         exp = state.expected_values.get(current_signal_id, {})
         if exp:
@@ -1244,7 +1308,10 @@ def instruction_node(state: ConversationalAgentState):
         if hyp_desc:
             parts.append(f"*Testing hypothesis: {hyp_desc}*")
 
-        parts.append("\n_Place probes at the test point above, then press **Resume** when ready to measure._")
+        if probe_placement:
+            parts.append("\n_Follow the instructions above, then press **Resume** when ready to measure._")
+        else:
+            parts.append("\n_Place probes at the test point above, then press **Resume** when ready to measure._")
 
     else:
         parts.append("## All measurements complete -- proceeding to analysis.")
@@ -1313,6 +1380,8 @@ def route_from_decision(state: ConversationalAgentState) -> str:
         return "repair"
     if next_node == "end":
         return "end"
+    if next_node == "instruction":
+        return "instruction"
     return "interrupt"
 
 
@@ -1366,7 +1435,7 @@ def create_conversational_graph():
     builder.add_conditional_edges(
         "decision",
         route_from_decision,
-        {"repair": "repair", "interrupt": "interrupt", "end": END}
+        {"repair": "repair", "interrupt": "interrupt", "end": END, "instruction": "instruction"}
     )
 
     # interrupt pauses; resume routes to instruction (shows next probe placement)
@@ -1388,7 +1457,41 @@ def create_conversational_graph():
 # =============================================================================
 
 def graph():
-    """Return the compiled graph for LangGraph Studio."""
+    """
+    Return the compiled graph for LangGraph Studio.
+
+    Also fires a fire-and-forget background thread that pre-warms:
+      1. The Groq LLM (first API call is slow on a cold server cache)
+      2. The SentenceTransformer embedding model (40-70 s cold-start)
+
+    By the time the engineer types their first message the warm-up is
+    already underway (or complete), cutting initialisation from 60-90 s
+    down to 2-5 s.
+    """
+    import threading
+
+    def _prewarm():
+        """Pre-warm LLM server cache and SentenceTransformer model."""
+        # 1. Warm up the Groq model inference cache
+        try:
+            from src.infrastructure.llm_manager import get_llm_manager
+            mgr = get_llm_manager()
+            mgr.current_llm.invoke([{"role": "user", "content": "hi"}])
+            print("[PREWARM] LLM warm-up complete.")
+        except Exception as exc:
+            print(f"[PREWARM] LLM warm-up skipped: {exc}")
+
+        # 2. Load SentenceTransformer into memory
+        try:
+            from src.infrastructure.chromadb_client import _get_embedding_function
+            _get_embedding_function()
+            print("[PREWARM] Embedding model warm-up complete.")
+        except Exception as exc:
+            print(f"[PREWARM] Embedding warm-up skipped: {exc}")
+
+    t = threading.Thread(target=_prewarm, daemon=True, name="startup-prewarm")
+    t.start()
+
     return create_conversational_graph()
 
 

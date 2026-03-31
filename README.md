@@ -17,7 +17,6 @@
 - 🤖 **AI-Powered Diagnostics**: LangGraph-based workflow with LLM reasoning
 - 🔍 **RAG Knowledge Base**: ChromaDB vector database for equipment documentation
 - 🔌 **USB Multimeter Integration**: Direct measurement from Mastech MS8250D (CP210x)
-- 🎭 **Mock Mode**: Built-in simulation scenarios for testing/demo
 - 📊 **LangSmith Tracing**: Full observability of agent behavior
 
 ---
@@ -31,6 +30,7 @@
 | **Python 3.10+** | https://python.org |
 | **Docker Desktop** | https://docs.docker.com/desktop/ |
 | **Git** | https://git-scm.com/ |
+| **Mastech MS8250D** | USB multimeter with serial interface |
 
 ### 1. Clone and Setup
 
@@ -63,11 +63,11 @@ This starts:
 pip install -r requirements.txt
 ```
 
-### 4. Run Demo
+### 4. Run with USB Multimeter
 
 ```bash
-# Run mock mode with CCTV PSU output rail collapse scenario
-python -m src.interfaces.cli --mock
+# Connect multimeter and run
+python -m src.interfaces.cli --usb CCTV-PSU-24W-V1
 ```
 
 ---
@@ -78,46 +78,34 @@ python -m src.interfaces.cli --mock
 ┌─────────────────────────────────────────────────────────────────┐
 │                     Biomedical Troubleshooting Agent              │
 ├─────────────────────────────────────────────────────────────────┤
-│  ┌─────────────┐    ┌─────────────┐    ┌─────────────────────┐ │
-│  │ Mock Mode   │    │ USB Mode    │    │ LangGraph Workflow  │ │
-│  │ (Simulator) │    │ (Multimeter)│    │ (Diagnostic Logic)  │ │
-│  └──────┬──────┘    └──────┬──────┘    └──────────┬──────────┘ │
-│         │                  │                       │            │
-│         └──────────────────┼───────────────────────┘            │
-│                            ▼                                    │
-│                 ┌─────────────────────┐                        │
-│                 │    Mode Router      │                        │
-│                 │  (Switch Handler)   │                        │
-│                 └──────────┬──────────┘                        │
-│                            ▼                                    │
-│  ┌─────────────────────────────────────────────────────────┐   │
-│  │                    ChromaDB                             │   │
-│  │              (RAG Knowledge Base)                        │   │
-│  └─────────────────────────────────────────────────────────┘   │
-│                            │                                    │
-│                            ▼                                    │
-│  ┌─────────────────────────────────────────────────────────┐   │
-│  │                    LangSmith                            │   │
-│  │              (Observability & Tracing)                  │   │
-│  └─────────────────────────────────────────────────────────┘   │
+│  ┌─────────────┐    ┌─────────────────────┐                     │
+│  │ USB Mode    │    │ LangGraph Workflow  │                     │
+│  │ (Multimeter)│    │ (Diagnostic Logic)  │                     │
+│  └──────┬──────┘    └──────────┬──────────┘                     │
+│         │                      │                                 │
+│         └──────────────────────┼───────────────────────          │
+│                                ▼                                 │
+│                 ┌─────────────────────┐                          │
+│                 │    Mode Router      │                          │
+│                 │  (Switch Handler)   │                          │
+│                 └──────────┬──────────┘                          │
+│                            ▼                                     │
+│  ┌─────────────────────────────────────────────────────────┐    │
+│  │                    ChromaDB                              │    │
+│  │              (RAG Knowledge Base)                        │    │
+│  └─────────────────────────────────────────────────────────┘    │
+│                            │                                     │
+│                            ▼                                     │
+│  ┌─────────────────────────────────────────────────────────┐    │
+│  │                    LangSmith                             │    │
+│  │              (Observability & Tracing)                   │    │
+│  └─────────────────────────────────────────────────────────┘    │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
 ## Usage Modes
-
-### Mock Mode (Default)
-
-Run with simulated signals:
-
-```bash
-# Default scenario (output rail collapse)
-python -m src.interfaces.cli --mock
-
-# Specific scenario
-python -m src.interfaces.cli --mock cctv-psu-overvoltage
-```
 
 ### USB Mode (Real Hardware)
 
@@ -126,6 +114,14 @@ Run with real-time signals from Mastech MS8250D:
 ```bash
 # Connect multimeter and run
 python -m src.interfaces.cli --usb CCTV-PSU-24W-V1
+```
+
+### Interactive Mode
+
+Run with manual input:
+
+```bash
+python -m src.interfaces.cli --interactive
 ```
 
 ---
@@ -165,7 +161,6 @@ biomed-troubleshooter/
 ├── .env.example               # Environment template
 │
 ├── data/
-│   ├── mock_signals/          # Mock scenario files
 │   └── equipment/             # Equipment configurations
 │
 ├── src/
