@@ -248,7 +248,8 @@ def rag_node(state: ConversationalAgentState):
                     "unit": sig.unit,
                     "physical_description": sig.physical_description or "",
                     "image_url": sig.image_url or "",
-                    "pro_tips": sig.pro_tips or []
+                    "pro_tips": sig.pro_tips or [],
+                    "probe_placement": sig.probe_placement or ""
                 }
                 for sig in config.signals.values()
             ]
@@ -581,13 +582,13 @@ def step_node(state: ConversationalAgentState):
         ""
     )
 
-    # ── Take measurement (180 s max window for engineer to place probes) ────
+    # ── Take measurement (60 s max window for engineer to place probes) ────
     try:
         result = read_multimeter.invoke({
             "equipment_model": state.equipment_model,
             "test_point": test_point_id,
             "measurement_type": measurement_type,
-            "max_duration": 180.0
+            "max_duration": 60.0
         })
     except Exception as e:
         result = {"status": "error", "error": str(e), "test_point": test_point_id, "value": None}

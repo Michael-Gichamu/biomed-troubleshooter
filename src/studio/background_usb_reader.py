@@ -664,6 +664,11 @@ class BackgroundReader:
             if time.time() < probe_settle_end:
                 continue
 
+            # Early exit: if reader lost connection, don't wait the full timeout
+            if not self.is_connected():
+                print("[BACKGROUND_READER] Disconnected during measurement wait — returning early")
+                return None
+
             with self._lock:
                 # Check if background loop already promoted a stable reading
                 if self._stable_reading and math.isfinite(self._stable_reading.value):

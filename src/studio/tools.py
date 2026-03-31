@@ -362,7 +362,7 @@ def read_multimeter(
         test_point: The test point identifier (e.g., "TP2", "output_rail")
         measurement_type: Type of measurement - "voltage_dc", "voltage_ac", 
                          "resistance", "current_dc", "continuity"
-        max_duration: Maximum time to wait for stable reading in seconds (default 180s)
+        max_duration: Maximum time to wait for stable reading in seconds (default 60s)
         equipment_model: Equipment model identifier (default: cctv-psu-24w-v1)
         
     Returns:

@@ -8,7 +8,11 @@
       "Bash(python -c \"import py_compile; py_compile.compile\\(''src/infrastructure/usb_multimeter.py'', doraise=True\\); py_compile.compile\\(''src/studio/background_usb_reader.py'', doraise=True\\); py_compile.compile\\(''src/studio/tools.py'', doraise=True\\); print\\(''All files compile OK''\\)\")",
       "Bash(python -c \"import py_compile; py_compile.compile\\(''src/studio/background_usb_reader.py'', doraise=True\\); print\\(''OK''\\)\")",
       "Bash(python -c \"import py_compile; py_compile.compile\\(''src/infrastructure/usb_multimeter.py'', doraise=True\\); print\\(''OK''\\)\")",
-      "Bash(python -c \"import py_compile; py_compile.compile\\(''src/studio/background_usb_reader.py'', doraise=True\\); py_compile.compile\\(''src/infrastructure/usb_multimeter.py'', doraise=True\\); print\\(''Both OK''\\)\")"
+      "Bash(python -c \"import py_compile; py_compile.compile\\(''src/studio/background_usb_reader.py'', doraise=True\\); py_compile.compile\\(''src/infrastructure/usb_multimeter.py'', doraise=True\\); print\\(''Both OK''\\)\")",
+      "Bash(ls \"/c/Users/Tech/Downloads/\"*.docx)",
+      "Bash(npm list:*)",
+      "Bash(npm install:*)",
+      "Bash(node -e \"const {Document} = require\\(''docx''\\); console.log\\(''docx OK''\\);\")"
     ]
   }
 }

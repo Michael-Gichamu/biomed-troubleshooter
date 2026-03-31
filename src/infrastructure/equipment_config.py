@@ -51,6 +51,7 @@ class SignalConfig:
     physical_description: Optional[str] = ""
     image_url: Optional[str] = ""
     pro_tips: List[str] = field(default_factory=list)
+    probe_placement: Optional[str] = ""
 
     @classmethod
     def from_dict(cls, data: dict) -> "SignalConfig":
@@ -63,7 +64,8 @@ class SignalConfig:
             measurability=data.get("measurability", "internal"),
             physical_description=data.get("physical_description", ""),
             image_url=data.get("image_url", ""),
-            pro_tips=data.get("pro_tips", [])
+            pro_tips=data.get("pro_tips", []),
+            probe_placement=data.get("probe_placement", "")
         )
 
 
