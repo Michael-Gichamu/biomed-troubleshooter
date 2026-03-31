@@ -140,9 +140,6 @@ class MastechMS8250DParser:
     def parse_frame(cls, buf: bytes) -> Optional[MultimeterReading]:
         if len(buf) != 18:
             return None
-        # Per sigrok sr_ms8250d_packet_valid: byte 17 must be 0x00
-        if buf[17] != 0x00:
-            return None
 
         try:
             # Parse flags

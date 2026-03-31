@@ -12,7 +12,11 @@
       "Bash(ls \"/c/Users/Tech/Downloads/\"*.docx)",
       "Bash(npm list:*)",
       "Bash(npm install:*)",
-      "Bash(node -e \"const {Document} = require\\(''docx''\\); console.log\\(''docx OK''\\);\")"
+      "Bash(node -e \"const {Document} = require\\(''docx''\\); console.log\\(''docx OK''\\);\")",
+      "Read(//c/Users/Tech/AppData/Local/Temp/**)",
+      "Read(//c/tmp/**)",
+      "Bash(mkdir -p \"C:/Users/Tech/AppData/Local/Temp/docx_build\")",
+      "Bash(cp \"C:/Users/Tech/AppData/Local/Temp/docx_build/package.json\" \"C:/Users/Tech/AppData/Local/Temp/docx_build/\")"
     ]
   }
 }

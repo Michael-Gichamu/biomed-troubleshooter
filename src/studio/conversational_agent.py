@@ -119,6 +119,9 @@ class ConversationalAgentState:
     # ── Measurement failure tracking ─────────────────────────────────────────
     consecutive_failures: int = 0   # resets to 0 on any successful/fault reading
 
+    # ── Manual reading entered by engineer at probe interrupt ─────────────────
+    pending_manual_reading: Optional[dict] = None
+
     # ── Routing (set by decision_node) ───────────────────────────────────────
     next_node: str = ""
 
@@ -582,16 +585,27 @@ def step_node(state: ConversationalAgentState):
         ""
     )
 
-    # ── Take measurement (60 s max window for engineer to place probes) ────
-    try:
-        result = read_multimeter.invoke({
-            "equipment_model": state.equipment_model,
+    # ── Take measurement: manual entry takes priority over USB reader ────────
+    if state.pending_manual_reading:
+        m = state.pending_manual_reading
+        result = {
+            "status": "success",
+            "value": m["value"],
+            "unit": m.get("unit", expected.get("unit", "")),
+            "measurement_type": m.get("measurement_type", "manual"),
             "test_point": test_point_id,
-            "measurement_type": measurement_type,
-            "max_duration": 60.0
-        })
-    except Exception as e:
-        result = {"status": "error", "error": str(e), "test_point": test_point_id, "value": None}
+            "message": "Manual reading entered by engineer"
+        }
+    else:
+        try:
+            result = read_multimeter.invoke({
+                "equipment_model": state.equipment_model,
+                "test_point": test_point_id,
+                "measurement_type": measurement_type,
+                "max_duration": 60.0
+            })
+        except Exception as e:
+            result = {"status": "error", "error": str(e), "test_point": test_point_id, "value": None}
 
     meas_value  = result.get("value", None)
     meas_unit   = result.get("unit", expected.get("unit", "V"))
@@ -691,10 +705,11 @@ def step_node(state: ConversationalAgentState):
             "decision": "pending_reasoning",
             "next_test_point": next_tp
         },
-        "measurements":     state.measurements + [record],
-        "next_test_point":  next_tp or "",
-        "messages":         [AIMessage(content="\n".join(parts))],
-        "iteration_count":  state.iteration_count + 1
+        "measurements":          state.measurements + [record],
+        "next_test_point":       next_tp or "",
+        "messages":              [AIMessage(content="\n".join(parts))],
+        "iteration_count":       state.iteration_count + 1,
+        "pending_manual_reading": None   # consumed — clear for next measurement
     }
 
 
@@ -1310,14 +1325,60 @@ def instruction_node(state: ConversationalAgentState):
             parts.append(f"*Testing hypothesis: {hyp_desc}*")
 
         if probe_placement:
-            parts.append("\n_Follow the instructions above, then press **Resume** when ready to measure._")
+            parts.append(
+                "\n_Follow the instructions above, then:_\n"
+                "- _Press **Resume** to auto-read from USB multimeter, **or**_\n"
+                "- _Type your reading (e.g. `280 V DC` · `12.5 V` · `0.5 ohm` · `OL`) "
+                "and press **Enter** to enter it manually._"
+            )
         else:
-            parts.append("\n_Place probes at the test point above, then press **Resume** when ready to measure._")
+            parts.append(
+                "\n_Place probes at the test point above, then:_\n"
+                "- _Press **Resume** to auto-read from USB multimeter, **or**_\n"
+                "- _Type your reading (e.g. `280 V DC` · `12.5 V` · `0.5 ohm` · `OL`) "
+                "and press **Enter** to enter it manually._"
+            )
 
     else:
         parts.append("## All measurements complete -- proceeding to analysis.")
 
     return {"messages": [AIMessage(content="\n\n".join(parts))]}
+
+
+# =============================================================================
+# HELPER: parse a manual reading typed by the engineer at the probe interrupt
+# =============================================================================
+
+def _parse_manual_reading(text) -> Optional[dict]:
+    """
+    Parse a free-text manual reading entered by the engineer.
+
+    Accepted formats (case-insensitive):
+      "280 V DC"   "12.5V"   "0.5 ohm"   "OL"   "open"   "1.2 kohm"
+
+    Returns a dict {"value": float, "unit": str} or None if the text does
+    not look like a measurement value (e.g. plain "resume", empty string).
+    """
+    if not text or not isinstance(text, str):
+        return None
+    text = text.strip()
+    if not text:
+        return None
+
+    # Open-circuit / OL sentinel (continuity mode)
+    if text.upper() in ("OL", "OPEN", "OPEN CIRCUIT", "OPEN-CIRCUIT"):
+        return {"value": 999_999.0, "unit": "ohm", "measurement_type": "CONTINUITY"}
+
+    # Numeric value optionally followed by a unit string
+    m = re.match(r'^([+-]?\d+\.?\d*(?:[eE][+-]?\d+)?)\s*([A-Za-z°Ω%/][A-Za-z°Ω%/ ]*)?\s*$', text)
+    if m:
+        try:
+            value = float(m.group(1))
+            unit = (m.group(2) or "").strip()
+            return {"value": value, "unit": unit, "measurement_type": "manual"}
+        except ValueError:
+            pass
+    return None
 
 
 # =============================================================================
@@ -1331,11 +1392,14 @@ def probe_wait_node(state: ConversationalAgentState) -> dict:
 
     instruction_node already emitted all the probe details and the image.
     This node calls interrupt() so LangGraph Studio renders that message and
-    shows the Resume button.  When the engineer presses Resume, probe_wait_node
-    returns {} and step_node fires immediately on the already-placed probes.
+    shows the Resume button.  When the engineer presses Resume (or types a
+    manual reading and presses Enter), probe_wait_node captures the resume
+    value, parses it as a manual reading if possible, and stores it in state
+    so step_node can use it instead of the USB reader.
     """
-    interrupt("probes_ready")
-    return {}
+    resume_value = interrupt("probes_ready")
+    manual = _parse_manual_reading(resume_value)
+    return {"pending_manual_reading": manual}
 
 
 # =============================================================================

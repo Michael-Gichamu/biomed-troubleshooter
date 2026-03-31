@@ -644,17 +644,19 @@ class BackgroundReader:
         # The engineer needs to walk back to the test point and place both probes.
         PROBE_SETTLE_SECS = 5.0
 
+        # ── Reset A (at call start) ───────────────────────────────────────────
+        # Discard all pre-Resume samples so a stale stable reading from a
+        # previous test point cannot bleed through.
         with self._lock:
-            # Set measurement type and ALWAYS reset so pre-Resume data is discarded.
-            # Without this reset the stabilizer's dwell counter is still satisfied
-            # from the previous measurement and will return stale data instantly.
             self._stabilizer.set_measurement_type(measurement_type)
-            self._stabilizer.reset()            # discard all pre-Resume samples
+            self._stabilizer.reset()
             self._stable_reading = None
-            self._regime_change_count = 0       # reset alongside stabilizer
+            self._latest_reading = None         # prevent stale fallback values
+            self._regime_change_count = 0
 
         probe_settle_end = time.time() + PROBE_SETTLE_SECS
         start_time = time.time()
+        _post_settle_reset_done = False
 
         while time.time() - start_time < timeout:
             time.sleep(0.2)
@@ -663,6 +665,16 @@ class BackgroundReader:
             # is still walking back to the test point after pressing Resume.
             if time.time() < probe_settle_end:
                 continue
+
+            # ── Reset B (after settle window, runs once) ─────────────────
+            # Readings the _read_loop added during the 5s settle are ghost
+            # voltages from probes being moved.  Discard them now.
+            if not _post_settle_reset_done:
+                with self._lock:
+                    self._stabilizer.reset()
+                    self._stable_reading = None
+                    self._regime_change_count = 0
+                _post_settle_reset_done = True
 
             # Early exit: if reader lost connection, don't wait the full timeout
             if not self.is_connected():
