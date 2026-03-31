@@ -87,13 +87,12 @@ signals:
       Discharge: connect 10kohm 2W resistor across C1 for 30 seconds, then verify less than 10V. CAT III 600V probes required.
     image_url: "https://raw.githubusercontent.com/Michael-Gichamu/biomed-troubleshooter/main/data/equipment/cctv-psu-24w-v1-test-points/main_capacitor_test_point.png"
     diagnostic_meaning: >
-      Single highest-value diagnostic test. Splits fault space in half.
-      210–225V = primary input stage confirmed working. Fault is in Q1, U3, D3, or secondary.
-      0V = primary input failure. Test bridge rectifier diodes and MOV.
-      105–115V = unit on 115VAC supply -- this is NORMAL for that region.
-      Probing C8/C10/C14 (secondary output capacitors, ~12V-rated, output side of board)
-      instead of C1 will return the 12V secondary voltage, not the primary DC bus voltage.
-      These are physically different components on opposite halves of the board.
+      Discriminates primary vs secondary fault when the fault stage is not yet known.
+      280–340V = primary input stage (AC, F1, bridge, C1) confirmed working — fault is in Q1, startup circuit, U3, TR1, D3, or secondary.
+      0V = primary input stage has failed — test bridge rectifier diodes individually and MOV resistance.
+      140–175V = unit operating on 115VAC supply — this is NORMAL for that region, not a fault.
+      Do not probe C8/C10/C14 (secondary output capacitors, ~12V-rated, output side of board)
+      when targeting C1 — they are on the opposite half of the board and return the 12V secondary voltage.
     expected_behavior: "215–340V DC for 230VAC supply; 140–175V DC for 115VAC supply"
     pro_tips:
       - "C1 is Dongbaohe 450V -- primary side only"
@@ -147,10 +146,11 @@ signals:
       BLACK probe on output ground.
     image_url: "https://raw.githubusercontent.com/Michael-Gichamu/biomed-troubleshooter/main/data/equipment/cctv-psu-24w-v1-test-points/main_capacitor_test_point.png"
     diagnostic_meaning: >
-      Primary symptom indicator. First measurement in any diagnostic session.
-      Zero output with zero DC bus = primary input failure.
-      Zero output with DC bus = 280–340V = switching stage or secondary failure.
-      Low output under load = C8/C10/C14 degraded (visually inspect + test capacitance with MS8250D) or D3 degraded.
+      The engineer's observation of output state is the starting point for fault categorisation.
+      Zero output + zero DC bus = primary input failure (bridge, MOV, C1, or upstream).
+      Zero output + DC bus 280–340V = switching stage or secondary failure (Q1, D3, startup circuit).
+      Zero output + F1 blown (or blew again after replacement) = active short circuit — test Q1 D-S resistance with power off before anything else.
+      Low output under load = C8/C10/C14 degraded (visually inspect for bulging top, confirm with MS8250D capacitance) or D3 Vf increased.
       High output (>13.2V) = feedback loop failure -- disconnect loads immediately.
       Cycling output = protection mode -- disconnect cameras to isolate internal vs load fault.
     expected_behavior: "11.4–12.6V DC no-load; 10.8–12.6V DC under rated load"
@@ -489,8 +489,10 @@ signal_dependencies:
   - upstream: "bridge_output"
     downstream: "output_12v"
     relationship: >
-      C1 = 0V guarantees output_12v = 0V. Measure C1 DC bus first before any other test.
+      C1 = 0V guarantees output_12v = 0V; confirms primary input failure.
       C1 = 280–340V with output = 0V localises fault to Q1, startup circuit, D3, or secondary.
+      This test is most useful when the fault stage is unknown and AC input plus fuse are confirmed intact.
+      Skip if primary stage has already been confirmed (fuse replaced but blew again = short circuit still present — test Q1 D-S with power off first).
 
   - upstream: "primary_mosfet"
     downstream: "output_12v"

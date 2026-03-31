@@ -540,33 +540,45 @@ IF fails when hot AND current within rating AND no improvement with ventilation
 
 ## 8. Diagnostic Strategy
 
-### Primary Strategy: Half-Split at DC Bus (C1)
+### Strategy Selection: Start From What the Engineer Already Knows
 
-Measuring the DC bus voltage at C1 is the single highest-information-value first test. One measurement eliminates approximately 50% of all possible fault locations by determining whether the fault is in the primary input section or the switching/secondary section.
+**There is no universal first measurement.** The correct first test depends entirely on what has already been established. Choosing by symptom and prior findings is faster and safer than applying a fixed sequence.
+
+| What the engineer has confirmed | First test | Reason |
+|--------------------------------|------------|--------|
+| Nothing yet — unit completely dead, cause unknown | C1 DC bus voltage (live) | Splits fault space: primary vs secondary; valid only with fuse intact |
+| AC input OK, F1 intact, output 0V | C1 DC bus voltage (live) | Confirms whether fault is primary or secondary |
+| F1 found blown (first discovery) | Q1 D-S resistance (power OFF) | Q1 short is most common cause of F1 failure — never replace F1 before testing Q1 |
+| F1 replaced, unit blew up again | Q1 D-S resistance (power OFF) | Active short still present — all powered-on tests are invalid until short is found |
+| Q1 confirmed shorted | D3 diode test (power OFF) | D3 short is the most common root cause of Q1 failure — must be found before replacement |
+| DC bus confirmed 280–340V, output 0V | Q1 D-S resistance (power OFF) | Primary stage working — fault is in switching or secondary; Q1 most likely |
+| Output low under load | C8/C10/C14 visual inspection (power OFF) | Most common cause of load droop — inspect before testing anything else |
+| Output high (>13.2V) | TL431 REF pin voltage (live) | Identifies optocoupler vs R2 root cause |
+| Output cycling at 0.5–2Hz | Load disconnect test | Distinguishes external load fault from internal PSU fault |
+| Works cold, fails warm | Output current measurement | Confirms or rules out overload as thermal trigger |
+
+### When DC Bus Half-Split Is the Right Strategy
+
+DC bus voltage at C1 is the correct first test **only when the fault stage is genuinely unknown** — the engineer has confirmed AC input is present and F1 is intact, but does not yet know whether the problem is in the primary input section or the switching/secondary section. One measurement eliminates half the fault space.
 
 ```
 DC bus at C1 = 280–340V?
     │
-    ├─► YES → Primary input stage is working
+    ├─► YES → Primary input stage confirmed working
     │         Fault is in: Q1, startup circuit, U3, TR1, D3, or secondary
     │         Eliminates: AC input, F1, MOV, RT1, bridge rectifier, C1
+    │         → Next: Q1 D-S resistance (power off, C1 discharged)
     │
     └─► NO → Primary input stage has failed
-              Fault is in: bridge rectifier, MOV, C1, or F1
+              Fault is in: bridge rectifier, MOV, or C1
               Eliminates: Q1, U3, TR1, D3, secondary stage
+              → Next: bridge rectifier diode test, then MOV resistance
 ```
 
-### Strategy by Symptom
-
-| Symptom | First Test | Recommended Strategy |
-|---------|------------|----------------------|
-| Dead unit (SIG-001) | C1 DC bus voltage | Half-split at DC bus |
-| F1 blown (SIG-002) | Q1 D-S resistance | Cascade trace: Q1 → D3 → F1 |
-| Low output (SIG-004) | C8/C10/C14 visual + capacitance | Feedback trace: visual → capacitance test → D3 Vf → divider |
-| High output (SIG-005) | TL431 REF pin | Feedback trace: REF → optocoupler → R2 |
-| Hiccup (SIG-003) | Load disconnect test | Load isolation first |
-| Ripple (SIG-006) | C8/C10/C14 visual + capacitance | Visually inspect then test capacitance with MS8250D |
-| Thermal (SIG-007) | Output current measurement | Thermal profiling |
+**This strategy does NOT apply when:**
+- F1 has blown (or blown again after replacement) — measuring live voltage is uninformative and potentially unsafe if the short is still present. Test Q1 D-S resistance with power off first.
+- The engineer has already confirmed the DC bus state from a previous measurement in the same session.
+- The symptom directly indicates a secondary-side fault (low output, high output, cycling, ripple) — go to the relevant symptom path directly.
 
 ---
 

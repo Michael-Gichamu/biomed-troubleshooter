@@ -391,6 +391,52 @@ def rag_node(state: ConversationalAgentState):
 # NODE: HYPOTHESES -- rank fault candidates from symptom
 # =============================================================================
 
+def _extract_confirmed_findings(symptom: str, test_points: list) -> str:
+    """
+    Build a CONFIRMED FINDINGS block from the user's symptom text.
+    Looks for phrases like 'X is okay', 'X confirmed', 'X replaced', 'blew up', etc.
+    Returns a formatted string for injection into the hypotheses_node LLM prompt.
+    """
+    lines = []
+    lower = symptom.lower()
+
+    confirmed_ok: list[str] = []
+    already_replaced: list[str] = []
+    failure_mode: list[str] = []
+
+    for tp in test_points:
+        sid = tp.get("signal_id", "")
+        name = tp.get("name", "").lower()
+        for kw in [sid.lower(), name]:
+            if not kw:
+                continue
+            if (f"{kw} is okay" in lower or f"{kw} ok" in lower
+                    or f"{kw} confirmed" in lower or f"{kw} fine" in lower
+                    or f"{kw} good" in lower or f"confirmed {kw}" in lower):
+                confirmed_ok.append(f"{sid} ({tp.get('name', '')})")
+                break
+            if (f"replaced {kw}" in lower or f"{kw} replaced" in lower
+                    or f"changed {kw}" in lower or f"{kw} changed" in lower):
+                already_replaced.append(f"{sid} ({tp.get('name', '')})")
+                break
+
+    if "blew up" in lower or "blew again" in lower or "fuse blew" in lower or "fuse blown" in lower:
+        failure_mode.append(
+            "CATASTROPHIC FAILURE: fuse blew again — indicates active short circuit in primary stage"
+        )
+    if "no output" in lower or "0v" in lower or "dead" in lower:
+        failure_mode.append("Zero output voltage reported")
+
+    if confirmed_ok:
+        lines.append(f"CONFIRMED WORKING (do NOT re-test these): {', '.join(confirmed_ok)}")
+    if already_replaced:
+        lines.append(f"ALREADY REPLACED/TESTED: {', '.join(already_replaced)}")
+    for fm in failure_mode:
+        lines.append(f"FAILURE MODE INDICATOR: {fm}")
+
+    return "\n".join(lines) if lines else "None extracted"
+
+
 def hypotheses_node(state: ConversationalAgentState):
     """
     Single LLM call that produces BOTH the ranked fault hypotheses AND the
@@ -428,11 +474,17 @@ def hypotheses_node(state: ConversationalAgentState):
         if isinstance(k, dict)
     ) or "No diagnostic knowledge available"
 
+    # ── Extract structured findings from symptom ──────────────────────────────
+    confirmed_findings = _extract_confirmed_findings(symptom, test_points)
+
     # ── Combined prompt: one call, one JSON response ──────────────────────────
-    prompt = f"""You are a diagnostic expert. Analyse the symptom and produce a JSON response.
+    prompt = f"""You are a senior electronics diagnostic expert. Analyse the symptom and produce a JSON response.
 
 EQUIPMENT: {equipment_model}
 SYMPTOM: {symptom}
+
+CONFIRMED FINDINGS (extracted from engineer's report):
+{confirmed_findings}
 
 AVAILABLE TEST POINTS:
 {tp_str}
@@ -447,11 +499,45 @@ TASK:
 1. Generate 3–5 fault hypotheses ranked by probability.
 2. Rank ALL available test points by diagnostic value for distinguishing these hypotheses.
 
-Rules:
-- Each hypothesis: unique id (HYPOTHESIS_1 …), fault_id if applicable, description, probability 0.0–1.0
-- Probabilities must sum to 1.0
-- For a dead/low output with AC input confirmed, always put DC-bus measurement first in rankings
-- Use signal_id values EXACTLY as listed above
+STEP 1 — HYPOTHESIS FILTERING (apply before assigning any probabilities):
+Cross-reference every KNOWN FAULT against the CONFIRMED FINDINGS.
+If a fault's symptom_pattern or signature requires a component to be in a failed state
+that the engineer has CONFIRMED IS WORKING, that fault is impossible in this session — exclude it entirely.
+Examples:
+- input_fuse CONFIRMED WORKING → exclude any fault requiring input_fuse=blown (e.g. fuse_cascade_failure)
+- ac_input CONFIRMED WORKING → exclude any fault requiring ac_input=missing
+- bridge_output CONFIRMED NORMAL → exclude input_stage_failure entirely
+Only hypotheses consistent with ALL confirmed findings may appear in the output.
+
+STEP 2 — PROBABILITY RANKING:
+Rank surviving hypotheses by probability given the symptom and confirmed findings.
+Each hypothesis: unique id (HYPOTHESIS_1 …), fault_id if applicable, description, probability 0.0–1.0.
+Probabilities must sum to 1.0.
+
+STEP 3 — TEST SEQUENCE (reason by diagnostic topology, not by component failure frequency):
+The first test must be the FAULT BOUNDARY MEASUREMENT for the current confirmed state —
+the single test whose result, regardless of outcome, eliminates the most hypotheses.
+
+Apply the following topology reasoning:
+- CASE A — Fuse blown or blew again after replacement (CATASTROPHIC FAILURE / active short):
+  Power-off resistance tests come first. Q1 drain-source short is the most common cause.
+  Sequence: primary_mosfet → schottky_diode → bridge diodes.
+  Do NOT place any live voltage test before a confirmed short is ruled out.
+
+- CASE B — AC input and fuse BOTH confirmed working, output = 0V, DC bus state unknown:
+  bridge_output is the fault boundary. It determines in ONE measurement whether the failure
+  is upstream (bridge rectifier, MOV, C1) or downstream (Q1, startup circuit, D3, secondary).
+  Place bridge_output FIRST. After bridge_output result, the remaining sequence follows naturally.
+
+- CASE C — DC bus already confirmed normal (280–340V), output = 0V:
+  Fault is in the switching or secondary stage. Place primary_mosfet first (most common failure
+  in this sub-tree), then schottky_diode, then startup circuit checks.
+
+- CASE D — All other scenarios: place the test whose two possible outcomes (fault / normal)
+  produce the greatest change in probability distribution across the active hypotheses.
+
+CONFIRMED WORKING signals must NOT appear in test_point_rankings.
+Use signal_id values EXACTLY as listed above.
 
 Output ONLY a valid JSON object, nothing else:
 {{
@@ -841,6 +927,20 @@ def reason_node(state: ConversationalAgentState):
         for d in dependencies_def
     ) if dependencies_def else "None provided"
 
+    # ── Collect engineer's confirmed findings from symptom ────────────────────
+    symptom = " ".join(
+        _text(m.content)
+        for m in state.messages
+        if isinstance(m, HumanMessage)
+    ).strip()
+    engineer_findings = _extract_confirmed_findings(symptom, state.test_points)
+
+    # ── Build completed measurements summary ──────────────────────────────────
+    completed_str = "\n".join(
+        f"- {m.get('test_point','?')} ({m.get('signal_name','?')}): {m.get('value','?')} {m.get('unit','')} [{m.get('evaluation','?').upper()}]"
+        for m in state.measurements
+    ) or "None"
+
     prompt = f"""Update hypothesis probabilities based on this measurement.
 
 TEST POINT: {tp_id} ({signal_name})
@@ -852,6 +952,12 @@ RESULT:     {evaluation.upper()}
 HYPOTHESES:
 {hyp_lines}
 
+ENGINEER'S CONFIRMED FINDINGS (from symptom report — treat as already known facts):
+{engineer_findings}
+
+ALL MEASUREMENTS SO FAR (this session):
+{completed_str}
+
 SIGNAL TOPOLOGY DEPENDENCIES:
 {dependencies_str}
 
@@ -861,12 +967,24 @@ REMAINING TEST PLAN:
 Rules:
 - A FAULT result supports hypotheses that predict failure at this point; contradicts those that do not
 - A NORMAL result contradicts hypotheses that require this point to be faulty
-- **Use the SIGNAL TOPOLOGY DEPENDENCIES** to determine logical eliminations. If a measurement confirms a downstream point works, ALL upstream components must be working. Eliminate hypotheses blaming upstream components.
-- Set probability to 0 only when a hypothesis is definitively disproved
-- A hypothesis is CONFIRMED when its probability exceeds 0.90 and no other active hypothesis is plausible
-- **CRITICAL**: Do NOT confirm a broad hypothesis (like a stage failure) until the specific root component (e.g. Q1, D3) is measured and confirmed. If a hypothesis requires further pinpointing, leave 'confirmed_hypothesis' as null and just update probabilities.
+- Use the SIGNAL TOPOLOGY DEPENDENCIES to determine logical eliminations. If a downstream point works, all upstream components must be working — eliminate hypotheses blaming upstream.
+
+CONFIRMATION RULE (two independent paths — either is sufficient):
+  PATH 1 — Definitive component test: A power-off resistance or diode test returns an unambiguous physical result that directly identifies the failed component (e.g. Q1 D-S = 0 ohm = hard short; D3 forward = OL = open; bridge diode = 0 ohm = shorted). This IS confirmation of that component's failure. Do not withhold confirmed_hypothesis waiting for probability to climb — the measurement itself is the evidence.
+  PATH 2 — Probability convergence: All active hypotheses have been evaluated and one exceeds 0.85 with no remaining plausible alternative.
+  In both cases: set confirmed_hypothesis to the hypothesis ID that best matches the finding.
+
+- Do NOT require additional measurements if a definitive component test has already directly identified the failed part. Continuing to measure after this point is wasted time.
+- Do NOT confirm a stage-level hypothesis (e.g. "primary input failure") without first identifying the specific component within that stage that failed.
+
+PRUNING RULE — After each measurement, aggressively remove from the remaining test plan:
+  1. Any live powered-on voltage test (bridge_output, output_12v, feedback_ref) when a short circuit has been confirmed or when the input fuse is known to be blown — powered-on tests are uninformative and potentially misleading with a known open fuse or shorted component.
+  2. Any test for a component that topology confirms is irrelevant given the current measurement outcome.
+  3. Any test that was only needed to distinguish between hypotheses that are now eliminated.
+  4. Any test that duplicates information the engineer already provided in their symptom report (e.g. input_fuse test when user has already stated the fuse blew).
+
 - Probabilities of non-eliminated hypotheses must sum to 1.0
-- IMPORTANT: Review the REMAINING TEST PLAN. First, REMOVE any test points that are no longer necessary (e.g. if a downstream point works, upstream points also work). Second, REORDER the remaining list so that the most diagnostically valuable test point for the MOST LIKELY active hypothesis is positioned first. Do NOT add new points not in the original list.
+- Review the REMAINING TEST PLAN after every measurement. Remove irrelevant tests first, then reorder survivors so the most discriminating test for the leading hypothesis comes first. Do NOT add test points not in the original list.
 
 Return ONLY valid JSON:
 {{
