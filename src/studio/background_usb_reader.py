@@ -476,14 +476,22 @@ class BackgroundReader:
     _regime_change_count: int = 0  # consecutive readings far from current stable
     _last_printed_stable: Optional[float] = None  # for change-only terminal output
     _reconnect_backoff: float = 1.0  # current backoff delay (seconds)
+    _last_loop_error: str = ""  # for change-only error logging in _read_loop
     
     def start(self) -> bool:
         """Start the background reader."""
         if self._is_running:
             if self._thread and self._thread.is_alive():
-                return True
-            # Thread died (hot-reload, crash, etc.) — reset and allow restart
-            print("[BACKGROUND_READER] Thread died, restarting...")
+                # Thread alive — verify connection is also healthy
+                if self.client and self.client.is_connected():
+                    return True
+                # Zombie state: thread alive but client disconnected
+                # (e.g. stuck in reconnect backoff). Stop cleanly and restart.
+                print("[BACKGROUND_READER] Thread alive but disconnected, restarting...")
+                self.stop()
+            else:
+                # Thread died (hot-reload, crash, etc.)
+                print("[BACKGROUND_READER] Thread died, restarting...")
             self._is_running = False
             
         # Try to connect to multimeter
@@ -597,8 +605,10 @@ class BackgroundReader:
                                                 self._last_printed_stable = rounded
 
                 except Exception as e:
-                    # Continue on error
-                    pass
+                    error_msg = str(e)
+                    if self._last_loop_error != error_msg:
+                        print(f"[BACKGROUND_READER] Read loop error: {error_msg}")
+                        self._last_loop_error = error_msg
 
                 time.sleep(0.1)  # Small delay between reads
         finally:
@@ -676,10 +686,17 @@ class BackgroundReader:
                     self._regime_change_count = 0
                 _post_settle_reset_done = True
 
-            # Early exit: if reader lost connection, don't wait the full timeout
+            # Early exit: if reader lost connection, try one reconnect
             if not self.is_connected():
-                print("[BACKGROUND_READER] Disconnected during measurement wait — returning early")
-                return None
+                reconnected = False
+                if self.client:
+                    print("[BACKGROUND_READER] Attempting reconnect during measurement...")
+                    if self.client.reconnect():
+                        print("[BACKGROUND_READER] Reconnected successfully during measurement")
+                        reconnected = True
+                if not reconnected:
+                    print("[BACKGROUND_READER] Disconnected during measurement wait — returning early")
+                    return None
 
             with self._lock:
                 # Check if background loop already promoted a stable reading

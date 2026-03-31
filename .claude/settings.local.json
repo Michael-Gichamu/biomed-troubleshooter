@@ -17,7 +17,10 @@
       "Read(//c/tmp/**)",
       "Bash(mkdir -p \"C:/Users/Tech/AppData/Local/Temp/docx_build\")",
       "Bash(cp \"C:/Users/Tech/AppData/Local/Temp/docx_build/package.json\" \"C:/Users/Tech/AppData/Local/Temp/docx_build/\")",
-      "Bash(node build_report.js)"
+      "Bash(node build_report.js)",
+      "Bash(python -c \"import ast; ast.parse\\(open\\(''src/studio/background_usb_reader.py''\\).read\\(\\)\\); print\\(''Syntax OK''\\)\")",
+      "Bash(python test_mm.py)",
+      "Bash(python -c \":*)"
     ]
   }
 }
