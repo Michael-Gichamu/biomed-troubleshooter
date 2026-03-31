@@ -866,7 +866,7 @@ Rules:
 - A hypothesis is CONFIRMED when its probability exceeds 0.90 and no other active hypothesis is plausible
 - **CRITICAL**: Do NOT confirm a broad hypothesis (like a stage failure) until the specific root component (e.g. Q1, D3) is measured and confirmed. If a hypothesis requires further pinpointing, leave 'confirmed_hypothesis' as null and just update probabilities.
 - Probabilities of non-eliminated hypotheses must sum to 1.0
-- IMPORTANT: Review the REMAINING TEST PLAN. Determine which test points are no longer necessary given this result (e.g. if a downstream point works, upstream points also work) and REMOVE them. Return the updated test plan list. Do NOT add new points.
+- IMPORTANT: Review the REMAINING TEST PLAN. First, REMOVE any test points that are no longer necessary (e.g. if a downstream point works, upstream points also work). Second, REORDER the remaining list so that the most diagnostically valuable test point for the MOST LIKELY active hypothesis is positioned first. Do NOT add new points not in the original list.
 
 Return ONLY valid JSON:
 {{

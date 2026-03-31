@@ -255,6 +255,15 @@ class RobustStabilizer:
         for i in range(len(values) - self.MIN_CLUSTER_SIZE + 1):
             cluster = values[i:i + self.MIN_CLUSTER_SIZE]
             
+            # If all are infinite (e.g., OL readings), it is perfectly stable
+            if all(math.isinf(v) for v in cluster):
+                clusters.append((i, i + self.MIN_CLUSTER_SIZE, math.inf, 0.0))
+                continue
+            
+            # If mixed infinite and finite, skip
+            if any(math.isinf(v) for v in cluster):
+                continue
+                
             # Skip if cluster contains outliers
             cluster_median = self._calculate_median(cluster)
             cluster_mad = self._calculate_mad(cluster)
@@ -405,7 +414,14 @@ class RobustStabilizer:
         self._stable_sample_count = len(sorted_cluster)
         self._stable_cluster_values = sorted_cluster.copy()
         
-        return statistics.mean(trimmed) if trimmed else median_val
+        if not trimmed:
+            return median_val
+        
+        # Return inf if the trimmed items are infinite
+        if all(math.isinf(v) for v in trimmed):
+            return math.inf
+            
+        return sum(trimmed) / len(trimmed)
     
     def get_stable_result(self) -> Optional[dict]:
         """
@@ -425,9 +441,9 @@ class RobustStabilizer:
             return None
         
         return {
-            "value": round(value, 2),
-            "min": round(self._stable_min, 2) if self._stable_min is not None else None,
-            "max": round(self._stable_max, 2) if self._stable_max is not None else None,
+            "value": round(value, 2) if math.isfinite(value) else value,
+            "min": round(self._stable_min, 2) if self._stable_min is not None and math.isfinite(self._stable_min) else self._stable_min,
+            "max": round(self._stable_max, 2) if self._stable_max is not None and math.isfinite(self._stable_max) else self._stable_max,
             "samples": self._stable_sample_count,
             "method": "trimmed_mean"
         }
