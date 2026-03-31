@@ -144,7 +144,7 @@ signals:
       Set meter to DC Voltage, 20V range.
       RED probe on J1 or positive terminal of any output capacitor or output terminal block.
       BLACK probe on output ground.
-    image_url: "https://raw.githubusercontent.com/Michael-Gichamu/biomed-troubleshooter/main/data/equipment/cctv-psu-24w-v1-test-points/main_capacitor_test_point.png"
+    image_url: "https://raw.githubusercontent.com/Michael-Gichamu/biomed-troubleshooter/main/data/equipment/cctv-psu-24w-v1-test-points/12V_dc_output_capacitor_test_point.png"
     diagnostic_meaning: >
       The engineer's observation of output state is the starting point for fault categorisation.
       Zero output + zero DC bus = primary input failure (bridge, MOV, C1, or upstream).
@@ -216,7 +216,7 @@ signals:
       Replace if reading is more than 20% below rated value, reads OL (open), or
       resistance mode reads less than 10Ω (shorted).
     safety_warning: "Power off. Discharge each capacitor (100ohm resistor briefly across leads) before measurement."
-    image_url: "https://raw.githubusercontent.com/Michael-Gichamu/biomed-troubleshooter/main/data/equipment/cctv-psu-24w-v1-test-points/main_capacitor_test_point.png"
+    image_url: "https://raw.githubusercontent.com/Michael-Gichamu/biomed-troubleshooter/main/data/equipment/cctv-psu-24w-v1-test-points/12V_dc_output_capacitor_test_point.png"
     diagnostic_meaning: >
       Degraded output capacitors cause voltage droop under load, excessive ripple,
       and can trigger overcurrent protection causing hiccup mode.
