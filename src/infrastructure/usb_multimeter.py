@@ -799,11 +799,14 @@ class USBMultimeterClient:
             # Timeout - no valid frame received
             return None
             
-        except PermissionError as e:
+        except (PermissionError, serial.SerialException) as e:
             # Windows ClearCommError(13) = COM port truly gone (USB
             # disconnect, device sleep, another process grabbed port).
-            print(f"[USB] Port lost: {e}")
-            self._connected = False
+            if "PermissionError" in str(e) or "Access is denied" in str(e) or isinstance(e, PermissionError):
+                print(f"[USB] Port lost (Access Denied / Disconnected): {e}")
+                self._connected = False
+                return None
+            print(f"[USB] Read error (SerialException): {e}")
             return None
         except Exception as e:
             print(f"[USB] Read error: {e}")

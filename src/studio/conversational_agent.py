@@ -258,6 +258,17 @@ def rag_node(state: ConversationalAgentState):
             ]
             config_result["test_points"] = config_result["signals"]
         
+        # Get signal dependencies
+        if hasattr(config, "signal_dependencies") and config.signal_dependencies:
+            config_result["signal_dependencies"] = [
+                {
+                    "upstream": d.upstream,
+                    "downstream": d.downstream,
+                    "relationship": d.relationship
+                }
+                for d in config.signal_dependencies
+            ]
+        
         # Get thresholds from config (thresholds is a Dict[str, ThresholdConfig])
         if config.thresholds:
             for signal_id, threshold_data in config.thresholds.items():
@@ -625,8 +636,11 @@ def step_node(state: ConversationalAgentState):
     # ── Evaluate ──────────────────────────────────────────────────────────────
     evaluation = "normal"
     if status == "success" and meas_value is not None:
-        min_v, max_v = expected.get("min", 0), expected.get("max", 999_999)
-        if not (min_v <= meas_value <= max_v):
+        min_v = expected.get("min")
+        max_v = expected.get("max")
+        min_v = 0 if min_v is None else float(min_v)
+        max_v = 999_999 if max_v is None else float(max_v)
+        if not (min_v <= float(meas_value) <= max_v):
             evaluation = "fault"
     elif status in ("timeout", "error", "timeout_unstable"):
         evaluation = "measurement_unavailable"
@@ -805,15 +819,32 @@ def reason_node(state: ConversationalAgentState):
 
     expected = state.expected_values.get(tp_id, {"min": 0, "max": 999_999, "unit": "V"})
 
+    # ── Resolve signal definition ─────────────────────────────────────────────
+    signal_def: dict = {}
+    for sig in state.equipment_config.get("signals", []):
+        if sig.get("signal_id") == tp_id:
+            signal_def = sig
+            break
+
     hyp_lines = "\n".join(
         f"- {h.get('id','')}: {h.get('description','')} "
         f"(P={state.hypothesis_probabilities.get(h.get('id'), 0):.2f})"
         for h in state.hypotheses
     )
 
+    remaining_tp = state.test_point_rankings[state.current_step + 1:]
+    remaining_tp_str = ", ".join(remaining_tp) if remaining_tp else "None"
+
+    dependencies_def = state.equipment_config.get("signal_dependencies", [])
+    dependencies_str = "\n".join(
+        f"- Upstream: {d.get('upstream')} -> Downstream: {d.get('downstream')}. Relationship: {d.get('relationship')}"
+        for d in dependencies_def
+    ) if dependencies_def else "None provided"
+
     prompt = f"""Update hypothesis probabilities based on this measurement.
 
 TEST POINT: {tp_id} ({signal_name})
+DIAGNOSTIC MEANING: {signal_def.get("diagnostic_meaning", "Not provided")}
 MEASURED:   {meas_value} {meas_unit}
 EXPECTED:   {expected.get('min',0)} – {expected.get('max',999_999)} {meas_unit}
 RESULT:     {evaluation.upper()}
@@ -821,19 +852,29 @@ RESULT:     {evaluation.upper()}
 HYPOTHESES:
 {hyp_lines}
 
+SIGNAL TOPOLOGY DEPENDENCIES:
+{dependencies_str}
+
+REMAINING TEST PLAN:
+{remaining_tp_str}
+
 Rules:
 - A FAULT result supports hypotheses that predict failure at this point; contradicts those that do not
 - A NORMAL result contradicts hypotheses that require this point to be faulty
+- **Use the SIGNAL TOPOLOGY DEPENDENCIES** to determine logical eliminations. If a measurement confirms a downstream point works, ALL upstream components must be working. Eliminate hypotheses blaming upstream components.
 - Set probability to 0 only when a hypothesis is definitively disproved
 - A hypothesis is CONFIRMED when its probability exceeds 0.90 and no other active hypothesis is plausible
+- **CRITICAL**: Do NOT confirm a broad hypothesis (like a stage failure) until the specific root component (e.g. Q1, D3) is measured and confirmed. If a hypothesis requires further pinpointing, leave 'confirmed_hypothesis' as null and just update probabilities.
 - Probabilities of non-eliminated hypotheses must sum to 1.0
+- IMPORTANT: Review the REMAINING TEST PLAN. Determine which test points are no longer necessary given this result (e.g. if a downstream point works, upstream points also work) and REMOVE them. Return the updated test plan list. Do NOT add new points.
 
 Return ONLY valid JSON:
 {{
   "reasoning": "one-sentence explanation",
   "probability_updates": {{"HYPOTHESIS_1": 0.8, "HYPOTHESIS_2": 0.0, ...}},
   "eliminated_faults": ["HYPOTHESIS_2"],
-  "confirmed_hypothesis": "HYPOTHESIS_1" or null
+  "confirmed_hypothesis": "HYPOTHESIS_1" or null,
+  "updated_remaining_test_plan": ["test_point_1", "test_point_2"]
 }}"""
 
     # ── LLM call ──────────────────────────────────────────────────────────────
@@ -841,6 +882,7 @@ Return ONLY valid JSON:
     eliminated           = list(state.eliminated_faults)
     updated_probs        = dict(state.hypothesis_probabilities)
     confirmed_hypothesis = None
+    updated_test_plan    = list(remaining_tp)
 
     try:
         response = invoke_with_retry([{"role": "user", "content": prompt}])
@@ -857,8 +899,16 @@ Return ONLY valid JSON:
                 if e not in eliminated:
                     eliminated.append(e)
             confirmed_hypothesis = data.get("confirmed_hypothesis") or None
+            
+            if "updated_remaining_test_plan" in data:
+                updated_test_plan = [
+                    tp for tp in data["updated_remaining_test_plan"]
+                    if tp in remaining_tp
+                ]
     except Exception:
         reasoning = "Analysis inconclusive -- carrying forward current probabilities."
+
+    new_rankings = state.test_point_rankings[:state.current_step + 1] + updated_test_plan
 
     # ── Normalise active probabilities ────────────────────────────────────────
     active = {h: p for h, p in updated_probs.items() if h not in eliminated}
@@ -920,8 +970,8 @@ Return ONLY valid JSON:
     )
 
     next_tp = (
-        state.test_point_rankings[state.current_step + 1]
-        if state.current_step + 1 < len(state.test_point_rankings)
+        new_rankings[state.current_step + 1]
+        if state.current_step + 1 < len(new_rankings)
         else None
     )
 
@@ -929,6 +979,7 @@ Return ONLY valid JSON:
         "hypothesis_probabilities": updated_probs,
         "eliminated_faults":        eliminated,
         "current_hypothesis":       new_current,
+        "test_point_rankings":      new_rankings,
         "diagnostic_reasoning":     reasoning_chain,
         "step_result": {
             "measurement":    last,

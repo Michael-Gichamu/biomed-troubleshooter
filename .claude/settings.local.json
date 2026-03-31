@@ -16,7 +16,8 @@
       "Read(//c/Users/Tech/AppData/Local/Temp/**)",
       "Read(//c/tmp/**)",
       "Bash(mkdir -p \"C:/Users/Tech/AppData/Local/Temp/docx_build\")",
-      "Bash(cp \"C:/Users/Tech/AppData/Local/Temp/docx_build/package.json\" \"C:/Users/Tech/AppData/Local/Temp/docx_build/\")"
+      "Bash(cp \"C:/Users/Tech/AppData/Local/Temp/docx_build/package.json\" \"C:/Users/Tech/AppData/Local/Temp/docx_build/\")",
+      "Bash(node build_report.js)"
     ]
   }
 }

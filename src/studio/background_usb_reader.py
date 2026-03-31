@@ -778,18 +778,17 @@ class BackgroundReader:
                 and self._thread.is_alive())
 
 
-# Global singleton instance
-_background_reader: Optional[BackgroundReader] = None
+import sys
+
+# Global singleton lock
 _reader_lock = threading.Lock()
 
-
 def get_background_reader() -> BackgroundReader:
-    """Get the global background reader instance."""
-    global _background_reader
+    """Get the global background reader instance (survives hot-reloads)."""
     with _reader_lock:
-        if _background_reader is None:
-            _background_reader = BackgroundReader()
-        return _background_reader
+        if not hasattr(sys, "_bg_reader_singleton"):
+            sys._bg_reader_singleton = BackgroundReader()
+        return sys._bg_reader_singleton
 
 
 def ensure_reader_running() -> bool:

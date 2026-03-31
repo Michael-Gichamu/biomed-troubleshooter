@@ -241,6 +241,22 @@ class EquipmentMetadata:
 
 
 @dataclass
+class SignalDependency:
+    """Dependency relationship between two signals."""
+    upstream: str
+    downstream: str
+    relationship: str
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "SignalDependency":
+        return cls(
+            upstream=data["upstream"],
+            downstream=data["downstream"],
+            relationship=data["relationship"]
+        )
+
+
+@dataclass
 class EquipmentConfig:
     """
     Complete equipment configuration.
@@ -253,6 +269,7 @@ class EquipmentConfig:
     thresholds: Dict[str, ThresholdConfig] = field(default_factory=dict)
     faults: Dict[str, FaultConfig] = field(default_factory=dict)
     images: Dict[str, ImageConfig] = field(default_factory=dict)
+    signal_dependencies: List[SignalDependency] = field(default_factory=list)
 
     @classmethod
     def from_file(cls, file_path: str) -> "EquipmentConfig":
@@ -303,12 +320,17 @@ class EquipmentConfig:
                 image = ImageConfig.from_dict(i)
                 images[image.image_id] = image
 
+        signal_dependencies = []
+        for d in data.get("signal_dependencies", []):
+            signal_dependencies.append(SignalDependency.from_dict(d))
+
         return cls(
             metadata=metadata,
             signals=signals,
             thresholds=thresholds,
             faults=faults,
-            images=images
+            images=images,
+            signal_dependencies=signal_dependencies
         )
 
     def get_signal(self, signal_id: str) -> Optional[SignalConfig]:
