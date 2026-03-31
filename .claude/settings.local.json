@@ -20,7 +20,10 @@
       "Bash(node build_report.js)",
       "Bash(python -c \"import ast; ast.parse\\(open\\(''src/studio/background_usb_reader.py''\\).read\\(\\)\\); print\\(''Syntax OK''\\)\")",
       "Bash(python test_mm.py)",
-      "Bash(python -c \":*)"
+      "Bash(python -c \":*)",
+      "Bash(pip install:*)",
+      "Bash(python -m pip install pdfplumber pypdf)",
+      "Bash(node build_pptx.js)"
     ]
   }
 }
