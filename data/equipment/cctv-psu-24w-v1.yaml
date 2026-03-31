@@ -26,9 +26,7 @@ signals:
     unit: "V"
     measurability: "live_only"
     physical_description: >
-      AC input connector at the input end of the board. Live and Neutral terminals.
-      Fuse F1 (T5A/250V), RT1 (NTC 5D-11 thermistor), and MOV varistor are all
-      in-line in this input section.
+      AC input connector at the board input end. Live and Neutral terminals, with F1 fuse, RT1 thermistor and MOV varistor in-line.
     probe_placement: >
       Set meter to AC Voltage, 300V range.
       Probe between Live and Neutral at input connector.
@@ -48,17 +46,16 @@ signals:
     name: "Input Fuse F1 -- T5A/250V"
     test_point: "F1"
     parameter: "resistance"
-    unit: "Ω"
+    unit: "ohm"
     measurability: "power_off_only"
     fuse_specification: "T5A/250V -- time-delay (slow-blow), 5 Ampere, 250 Volt"
     physical_description: >
-      Cylindrical fuse body in PCB clip holder, input section of board near RT1 (NTC 5D-11)
-      and CX1. The fuse rating T5A/250V is marked on the PCB silkscreen adjacent to the holder.
+      Cylindrical fuse in PCB clip holder, input section near RT1 and CX1. Rating T5A/250V is marked on the PCB silkscreen.
     probe_placement: >
       DISCONNECT AC POWER COMPLETELY before measuring.
-      Set meter to resistance (Ω), lowest range.
+      Set meter to resistance (ohm), lowest range.
       Probe across both metal end-caps of fuse body.
-      Less than 0.1Ω = intact. OL = blown.
+      Less than 0.1 ohm = intact. OL = blown.
     safety_warning: "Disconnect AC power before measuring. Verify power off at input terminals."
     image_url: "https://raw.githubusercontent.com/Michael-Gichamu/biomed-troubleshooter/main/data/equipment/cctv-psu-24w-v1-test-points/fuse_test_point.png"
     diagnostic_meaning: >
@@ -78,24 +75,16 @@ signals:
     parameter: "voltage_dc"
     unit: "V"
     measurability: "live_only"
-    component_confirmed: "Dongbaohe 450V 68μF 105°C -- label confirmed from capacitor body"
+    component_confirmed: "Dongbaohe 450V"
     physical_description: >
-      C1 is the large electrolytic capacitor on the PRIMARY side of the board -- the half
-      containing Q1 (MOSFET), U3 (M5579P PWM controller), and TR1 (flyback transformer).
-      C1 is rated 450V, which is printed on its body. The positive terminal polarity is
-      marked on the PCB. C1 is the largest capacitor on the primary half.
-      The secondary output capacitors C8, C10, and C14 are on the opposite side of the
-      board and rated approximately 16–25V. They are completely separate components.
+      C1 is the largest capacitor on the primary side (Q1/U3/TR1 half), rated 450V printed on its body. Positive terminal is marked on the PCB. Do not confuse with C8/C10/C14 on the secondary side (~16-25V rated).
     probe_placement: >
-      Unit POWERED ON.
-      Set meter to DC Voltage, 750V range.
+      Unit POWERED ON. Set meter to DC Voltage, 750V range.
       RED probe on '+' terminal of C1 (primary side, 450V-rated).
       BLACK probe on C1 negative terminal or primary ground.
-      Expected: approximately 220 - 230 VDC for 230VAC mains supply.
     safety_warning: >
-      LETHAL -- C1 stores approximately 220 - 230VDC. This charge is retained after AC is
-      disconnected. Discharge procedure: connect 10kΩ 2W resistor across C1 terminals
-      for 30 seconds, then verify less than 10V with meter. CAT III 600V probes required.
+      LETHAL -- C1 stores approximately 220 - 230VDC retained after AC is disconnected.
+      Discharge: connect 10kohm 2W resistor across C1 for 30 seconds, then verify less than 10V. CAT III 600V probes required.
     image_url: "https://raw.githubusercontent.com/Michael-Gichamu/biomed-troubleshooter/main/data/equipment/cctv-psu-24w-v1-test-points/main_capacitor_test_point.png"
     diagnostic_meaning: >
       Single highest-value diagnostic test. Splits fault space in half.
@@ -107,42 +96,39 @@ signals:
       These are physically different components on opposite halves of the board.
     expected_behavior: "215–340V DC for 230VAC supply; 140–175V DC for 115VAC supply"
     pro_tips:
-      - "C1 is Dongbaohe 450V 68μF 105°C -- primary side only"
+      - "C1 is Dongbaohe 450V -- primary side only"
       - "C8/C10/C14 are secondary output caps (~16-25V rated) -- they read ~12V, not 310V"
       - "A healthy reading here confirms the entire input stage is functional"
-      - "Discharge C1 via 10kΩ 2W resistor for 30s before any power-off work"
+      - "Discharge C1 via 10kohm 2W resistor for 30s before any power-off work"
 
   - signal_id: "primary_mosfet"
-    name: "Primary Switching MOSFET Q1 -- Drain-Source Resistance"
+    name: "Primary Switching MOSFET Q1 -- Drain-Source Continuity"
     test_point: "Q1_DS"
-    parameter: "resistance"
-    unit: "Ω"
+    parameter: "continuity"
+    unit: "ohm"
     measurability: "power_off_only"
     physical_description: >
-      Q1 is labeled on the primary side of the board, adjacent to U3 (M5579P PWM controller)
-      and TR1 (flyback transformer). Read the part number from the Q1 body to confirm
-      Gate/Drain/Source pin orientation.
+      Q1 is on the primary side, next to U3 (PWM controller) and TR1 (flyback transformer). Check the part number on the Q1 body for Gate/Drain/Source pin orientation.
     probe_placement: >
-      POWER OFF. Discharge C1 (10kΩ 2W resistor for 30 seconds). Verify less than 10V.
-      Set meter to resistance (Ω).
-      Probe Q1 Drain and Source pins in BOTH probe orientations.
-      Healthy: greater than 100kΩ in both directions.
-      Shorted: less than 10Ω in both directions.
-      Also test in diode mode: body diode reads 0.5–0.7V one direction, OL reversed.
+      POWER OFF. Discharge C1 via 10kohm 2W resistor for 30s. Verify less than 10V at C1.
+      Set meter to continuity mode (beeper).
+      Probe Q1 Drain and Source -- test BOTH probe orientations.
+      Healthy: no beep in either direction (open drain-source).
+      Faulty: beep in any orientation (drain-source shorted).
     safety_warning: >
-      POWER OFF. Discharge C1 before testing: 10kΩ 2W resistor across C1 for 30 seconds.
+      POWER OFF. Discharge C1 via 10kohm 2W resistor for 30 seconds.
       Verify less than 10V at C1 before touching primary side.
     image_url: "https://raw.githubusercontent.com/Michael-Gichamu/biomed-troubleshooter/main/data/equipment/cctv-psu-24w-v1-test-points/mosfet_transistor.png"
     diagnostic_meaning: >
-      Most common cause of blown F1 (T5A/250V). Q1 D-S less than 10Ω = shorted.
-      Also test D3 after finding a shorted Q1 -- D3 short is the most frequent root cause
-      of Q1 failure (D3 shorts → secondary is shorted → primary current spike → Q1 overstress).
-      Replace both Q1 and D3 if both are found failed.
-    expected_behavior: "Greater than 100kΩ drain-to-source in both probe orientations"
+      Most common cause of blown F1. A beep between Drain and Source = Q1 shorted -- replace Q1.
+      Always test D3 after finding a shorted Q1 -- a shorted D3 is the most frequent root cause
+      (D3 shorts → secondary short → primary current spike → Q1 overstress).
+      Replace both Q1 and D3 if both fail.
+    expected_behavior: "No beep drain-to-source in both probe orientations = healthy"
     pro_tips:
       - "Most common cause of blown fuse F1"
       - "Always test D3 after finding a shorted Q1"
-      - "Discharge C1 (450V 68μF) fully before touching -- stored charge is lethal"
+      - "Discharge C1 (450V) fully before touching -- stored charge is lethal"
 
   # ── SECONDARY / OUTPUT SIDE ─────────────────────────────────────────────────
 
@@ -153,10 +139,7 @@ signals:
     unit: "V"
     measurability: "live_only"
     physical_description: >
-      J1 is a test point on the secondary/output side of the board, adjacent to D3
-      (the white-body TO-220 output Schottky rectifier). Alternatively probe the positive
-      terminal of C8, C10, or C14 (output filter capacitors, secondary side), or the
-      positive terminal of the amber multi-way screw terminal block. All are safe 12V points.
+      J1 test point on the secondary side, adjacent to D3. Also valid: positive terminal of C8, C10, C14, or the amber output terminal block -- all are 12V points.
     probe_placement: >
       Unit POWERED ON.
       Set meter to DC Voltage, 20V range.
@@ -183,10 +166,7 @@ signals:
     unit: "V"
     measurability: "power_off_only"
     physical_description: >
-      D3 is a white-body TO-220 package (3 pins) on the secondary/output side of the board,
-      adjacent to J1 test point. D3 carries the full combined output current for all camera
-      channels and is mounted with a heatsink for thermal management.
-      Read the part number from the D3 body to confirm anode/cathode pin orientation.
+      D3 is a white-body TO-220 on the secondary side, adjacent to J1, with a heatsink. Check the part number on the D3 body for anode/cathode pin orientation.
     probe_placement: >
       POWER OFF.
       Set meter to DIODE TEST mode.
@@ -214,12 +194,10 @@ signals:
     name: "Output Filter Capacitors -- C8, C10, C14 (Visual + Capacitance Assessment)"
     test_point: "C8_C10_C14"
     parameter: "resistance"
-    unit: "Ω"
+    unit: "ohm"
     measurability: "power_off_only"
     physical_description: >
-      Three output filter capacitors -- C8, C10, and C14 -- on the secondary/output side
-      of the board. All are 105°C grade (-40°C to +105°C operating range).
-      Capacitance values are printed on the top of each capacitor body.
+      C8, C10, and C14 are on the secondary side. Capacitance values are printed on each body.
     probe_placement: >
       POWER OFF. Discharge each capacitor individually (100Ω resistor briefly).
       TWO-STEP ASSESSMENT -- both required:
@@ -237,7 +215,7 @@ signals:
       Connect probes to capacitor leads. Compare reading to rated value on capacitor body.
       Replace if reading is more than 20% below rated value, reads OL (open), or
       resistance mode reads less than 10Ω (shorted).
-    safety_warning: "Power off. Discharge each capacitor (100Ω resistor briefly across leads) before measurement."
+    safety_warning: "Power off. Discharge each capacitor (100ohm resistor briefly across leads) before measurement."
     image_url: "https://raw.githubusercontent.com/Michael-Gichamu/biomed-troubleshooter/main/data/equipment/cctv-psu-24w-v1-test-points/main_capacitor_test_point.png"
     diagnostic_meaning: >
       Degraded output capacitors cause voltage droop under load, excessive ripple,
@@ -262,9 +240,7 @@ signals:
     unit: "V"
     measurability: "live_only"
     physical_description: >
-      TL431 shunt regulator: 3-pin TO-92 package (similar appearance to a small transistor)
-      on the secondary side of the board near R2 and R2A. Body marked "TL431" or "431".
-      The REF pin is the feedback sense input -- probe this pin for the reference voltage.
+      TL431 is a 3-pin TO-92 package on the secondary side near R2 and R2A, marked "TL431" or "431". Probe the REF pin.
     probe_placement: >
       Unit POWERED ON.
       Set meter to DC Voltage, 5V range.
@@ -274,45 +250,40 @@ signals:
     diagnostic_meaning: >
       TL431 internal reference voltage = 2.495V (TI TL431 datasheet).
       Approximately 2.495V with output high → optocoupler CTR has degraded.
-      Greater than 2.6V with output high → R2 (240kΩ) has drifted or failed open.
+      Greater than 2.6V with output high → R2 (240kohm) has drifted or failed open.
       Less than 2.2V → R2/R2A divider values have changed or TL431 has failed.
       Zero volts → secondary side is dead, no power at feedback network.
     expected_behavior: "2.44–2.55V DC when feedback loop is actively regulating"
     pro_tips:
       - "TL431 internal reference is 2.495V -- this is the target REF pin voltage"
       - "REF ≈ 2.495V AND output high points to optocoupler, not divider resistors"
-      - "REF > 2.6V AND output high points to R2 (240kΩ) open or drifted"
+      - "REF > 2.6V AND output high points to R2 (240kohm) open or drifted"
 
   - signal_id: "feedback_resistor"
     name: "Feedback Divider Resistors R2 and R2A"
     test_point: "R2_R2A"
     parameter: "resistance"
-    unit: "Ω"
+    unit: "ohm"
     measurability: "power_off_only"
     physical_description: >
-      R2 and R2A are both labeled on the PCB, secondary side, near TL431.
-      R2 is the upper divider resistor (240kΩ, Red-Yellow-Yellow-Gold colour bands).
-      R2A is the lower divider resistor (approximately 62kΩ).
-      Together they set the 12V output regulation point via the TL431 reference.
+      R2 and R2A are on the secondary side near TL431. R2 (upper, 240kohm, Red-Yellow-Yellow-Gold bands) and R2A (lower, ~62kohm) form the 12V feedback divider.
     probe_placement: >
-      POWER OFF.
-      Desolder one end of each resistor for accurate out-of-circuit measurement.
-      Set meter to appropriate resistance range.
-      R2 expected: approximately 240kΩ.
-      R2A expected: approximately 62kΩ.
-      Verify: Vout = 2.495 × (1 + R2/R2A) = 12V → ratio R2/R2A ≈ 3.81
+      POWER OFF. Desolder one end of each resistor before measuring.
+      Set meter to resistance mode.
+      R2 expected: approximately 240kohm.
+      R2A expected: approximately 62kohm.
     safety_warning: "Power off before measuring."
     image_url: "https://raw.githubusercontent.com/Michael-Gichamu/biomed-troubleshooter/main/data/equipment/cctv-psu-24w-v1-test-points/resistor_1.png"
     diagnostic_meaning: >
       R2 failed open causes feedback reference to rise above 2.495V, driving output to maximum.
       R2 drifted high shifts output voltage proportionally upward.
       If output is high and TL431 REF is above 2.6V, measure R2 out-of-circuit.
-      Replace with 240kΩ ±1% metal film resistor.
+      Replace with 240kohm ±1% metal film resistor.
     expected_behavior: "R2 approximately 240kΩ; R2A approximately 240kΩ; ratio satisfies 12V = 2.495 × (1 + R2/R2A)"
     pro_tips:
       - "Measure R2 with a multimeter -- do not rely on colour band reading alone"
       - "R2 open is the primary cause of output overvoltage when TL431 REF > 2.6V"
-      - "Replace with 240kΩ ±1% metal film resistor if found open or significantly drifted"
+      - "Replace with 240kohm ±1% metal film resistor if found open or significantly drifted"
 
   - signal_id: "output_current"
     name: "Total Output Current"
@@ -321,9 +292,7 @@ signals:
     unit: "A"
     measurability: "live_only"
     physical_description: >
-      Measure in series with the positive output conductor between the PSU output
-      terminal and the camera load. Use a DC clamp meter or break the output wire
-      and insert a multimeter in series.
+      Series measurement in the positive output conductor between PSU and camera load. Use a DC clamp meter or break the wire to insert the multimeter in series.
     probe_placement: >
       Set meter to DC current (A), 10A range.
       Insert meter in series with positive output conductor, or use DC clamp meter.
@@ -396,17 +365,17 @@ thresholds:
   primary_mosfet:
     states:
       normal:
-        min: 100000
+        min: 50
         max: 999999
-        description: "Q1 healthy -- high D-S resistance in both probe orientations"
+        description: "Q1 healthy -- no beep (open drain-source). Continuity meter shows OL."
       shorted:
         min: 0
-        max: 10
-        description: "Q1 failed D-S short. Most common cause of blown F1. Also test D3."
+        max: 50
+        description: "Q1 failed D-S short -- beep in continuity mode. Most common cause of blown F1. Also test D3."
       degraded:
         min: 10
-        max: 10000
-        description: "Q1 partially degraded -- higher on-resistance, may cause thermal issues"
+        max: 100
+        description: "Q1 partially degraded -- intermittent or weak beep; elevated on-resistance may cause thermal issues."
 
   output_12v:
     states:
@@ -483,11 +452,11 @@ thresholds:
       normal:
         min: 220000
         max: 264000
-        description: "R2 within 240kΩ ±10% -- acceptable range"
+        description: "R2 within 240kohm ±10% -- acceptable range"
       open:
         min: 1000000
         max: 999999999
-        description: "R2 failed open -- causes output overvoltage. Replace with 240kΩ ±1% metal film."
+        description: "R2 failed open -- causes output overvoltage. Replace with 240kohm ±1% metal film."
       drifted:
         min: 264000
         max: 1000000

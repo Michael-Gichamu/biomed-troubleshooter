@@ -1,7 +1,7 @@
 """
 Mode Router
 
-Routes signal input based on current mode (mock/usb).
+Routes signal input based on current mode (usb).
 Implements the Strategy pattern for signal sources.
 """
 
@@ -33,128 +33,6 @@ class SignalSource(ABC):
     def disconnect(self) -> None:
         """Clean up connection."""
         pass
-
-
-class MockSignalSource(SignalSource):
-    """Mock signal source using predefined scenarios."""
-
-    SCENARIO_PATH = Path("data/mock_signals")
-
-    # Predefined scenarios with their descriptions
-    SCENARIOS = {
-        "cctv-psu-output-rail": "CCTV PSU Output Rail Collapse - Output voltage dropped to 12V from 24V",
-        "cctv-psu-overvoltage": "CCTV PSU Overvoltage - Output voltage rose to 28V",
-        "cctv-psu-ripple": "CCTV PSU Ripple and Noise - Excessive ripple on output",
-        "cctv-psu-thermal": "CCTV PSU Thermal Shutdown - Device entering thermal protection",
-        "cctv-psu-normal": "CCTV PSU Normal Operation - All readings within spec"
-    }
-
-    def __init__(self, scenario_name: str = "cctv-psu-output-rail"):
-        self.scenario_name = scenario_name
-
-    def connect(self) -> bool:
-        """Check if scenario file exists."""
-        scenario_file = self.SCENARIO_PATH / f"{self.scenario_name}.json"
-        return scenario_file.exists()
-
-    def disconnect(self) -> None:
-        """No connection to close."""
-        pass
-
-    def receive_signals(self, equipment_id: str) -> Optional[SignalBatch]:
-        """Load mock signals from scenario file."""
-        scenario_file = self.SCENARIO_PATH / f"{self.scenario_name}.json"
-
-        if scenario_file.exists():
-            with open(scenario_file, 'r') as f:
-                data = json.load(f)
-            return SignalBatch.from_dict(data)
-
-        # Fallback: Generate from built-in defaults
-        return self._generate_builtin_scenario(equipment_id)
-
-    def _generate_builtin_scenario(self, equipment_id: str) -> SignalBatch:
-        """Generate builtin scenario when file not found."""
-        timestamp = datetime.utcnow().isoformat()
-
-        if self.scenario_name == "cctv-psu-output-rail":
-            signals = [
-                Signal(
-                    test_point=TestPoint(id="TP1", name="Primary Input", location="AC mains input"),
-                    value=230.0,
-                    unit="V",
-                    accuracy=0.5,
-                    measurement_type="voltage",
-                    timestamp=timestamp
-                ),
-                Signal(
-                    test_point=TestPoint(id="TP2", name="Output Rail", location="24V DC output"),
-                    value=12.3,  # Collapsed from 24V
-                    unit="V",
-                    accuracy=0.1,
-                    measurement_type="voltage",
-                    timestamp=timestamp,
-                    anomaly="collapsed_output"
-                ),
-                Signal(
-                    test_point=TestPoint(id="TP3", name="Output Current", location="Load current"),
-                    value=0.52,
-                    unit="A",
-                    accuracy=0.01,
-                    measurement_type="current",
-                    timestamp=timestamp
-                )
-            ]
-        elif self.scenario_name == "cctv-psu-overvoltage":
-            signals = [
-                Signal(
-                    test_point=TestPoint(id="TP1", name="Primary Input", location="AC mains input"),
-                    value=230.0,
-                    unit="V",
-                    accuracy=0.5,
-                    measurement_type="voltage",
-                    timestamp=timestamp
-                ),
-                Signal(
-                    test_point=TestPoint(id="TP2", name="Output Rail", location="24V DC output"),
-                    value=28.5,  # Overvoltage
-                    unit="V",
-                    accuracy=0.1,
-                    measurement_type="voltage",
-                    timestamp=timestamp,
-                    anomaly="overvoltage"
-                )
-            ]
-        else:
-            # Default: Normal operation
-            signals = [
-                Signal(
-                    test_point=TestPoint(id="TP1", name="Primary Input", location="AC mains input"),
-                    value=230.0,
-                    unit="V",
-                    accuracy=0.5,
-                    measurement_type="voltage",
-                    timestamp=timestamp
-                ),
-                Signal(
-                    test_point=TestPoint(id="TP2", name="Output Rail", location="24V DC output"),
-                    value=24.0,
-                    unit="V",
-                    accuracy=0.1,
-                    measurement_type="voltage",
-                    timestamp=timestamp
-                )
-            ]
-
-        return SignalBatch(
-            timestamp=timestamp,
-            equipment_id=equipment_id,
-            signals=signals
-        )
-
-    def list_scenarios(self) -> Dict[str, str]:
-        """List available scenarios."""
-        return self.SCENARIOS.copy()
 
 
 class USBMultimeterSource(SignalSource):
@@ -257,8 +135,7 @@ class ModeRouter:
     def _load_config(self) -> Dict[str, Any]:
         """Load mode configuration from environment."""
         return {
-            "mode": os.getenv("APP_MODE", "mock").lower(),
-            "mock_scenario": os.getenv("MOCK_SCENARIO", "cctv-psu-output-rail"),
+            "mode": os.getenv("APP_MODE", "usb").lower(),
             "usb_port": os.getenv("USB_PORT", None),  # Auto-detect if None
         }
 
@@ -266,13 +143,11 @@ class ModeRouter:
     def source(self) -> SignalSource:
         """Get the active signal source (lazy initialization)."""
         if self._source is None:
-            if self.config["mode"] == "mock":
-                self._source = MockSignalSource(self.config["mock_scenario"])
-            elif self.config["mode"] == "usb":
+            if self.config["mode"] == "usb":
                 self._source = USBMultimeterSource(self.config["usb_port"])
             else:
-                # Default to mock
-                self._source = MockSignalSource()
+                # Default to USB
+                self._source = USBMultimeterSource(self.config.get("usb_port"))
         return self._source
 
     def get_mode(self) -> str:
@@ -294,23 +169,17 @@ class ModeRouter:
 
     def get_mode_info(self) -> Dict[str, Any]:
         """Get information about current mode."""
-        info = {
+        return {
             "mode": self.config["mode"],
-            "mock_scenario": self.config["mock_scenario"],
             "usb_port": self.config["usb_port"] or "auto-detect"
         }
-
-        if self.config["mode"] == "mock":
-            info["available_scenarios"] = list(MockSignalSource.SCENARIOS.keys())
-
-        return info
 
     def switch_mode(self, new_mode: str) -> None:
         """
         Switch to a different mode.
         
         Args:
-            new_mode: "mock" or "usb"
+            new_mode: "usb"
         """
         if self._source:
             self._source.disconnect()
@@ -330,18 +199,16 @@ def create_signal_source(mode: str = None, **kwargs) -> SignalSource:
     Factory function to create a signal source.
     
     Args:
-        mode: "mock" or "usb". Uses APP_MODE env var if None.
+        mode: "usb". Uses APP_MODE env var if None.
         **kwargs: Additional arguments for the source
         
     Returns:
         SignalSource instance
     """
     if mode is None:
-        mode = os.getenv("APP_MODE", "mock").lower()
+        mode = os.getenv("APP_MODE", "usb").lower()
     
-    if mode == "mock":
-        return MockSignalSource(kwargs.get("scenario", "cctv-psu-output-rail"))
-    elif mode == "usb":
+    if mode == "usb":
         return USBMultimeterSource(kwargs.get("port"))
     else:
         raise ValueError(f"Unknown mode: {mode}")

@@ -545,9 +545,12 @@ class BackgroundReader:
                             if value < threshold:
                                 continue
 
-                            # Skip non-finite values (multimeter OL/overload display)
+                            # Handle non-finite values (OL / overload from multimeter).
                             if not math.isfinite(value):
-                                continue
+                                if reading.measurement_type == "CONTINUITY":
+                                    value = 999_999.0   # OL sentinel: open circuit
+                                else:
+                                    continue
 
                             # Set measurement type for threshold calculation
                             self._stabilizer.set_measurement_type(reading.measurement_type)
@@ -601,7 +604,7 @@ class BackgroundReader:
         finally:
             self._is_running = False
             print("[BACKGROUND_READER] Read loop exited")
-    
+
     def get_latest_reading(self) -> Optional[MultimeterReading]:
         """Get the latest raw reading."""
         with self._lock:

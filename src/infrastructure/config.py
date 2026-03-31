@@ -82,18 +82,6 @@ class USBConfig:
 
 
 @dataclass
-class MockConfig:
-    """Mock mode configuration."""
-    scenario: str = "cctv-psu-output-rail"
-    
-    @classmethod
-    def from_env(cls) -> "MockConfig":
-        return cls(
-            scenario=os.getenv("MOCK_SCENARIO", "cctv-psu-output-rail")
-        )
-
-
-@dataclass
 class ImageConfig:
     """Image server configuration."""
     base_url: str = ""  # Default to empty - use full URLs from YAML
@@ -108,7 +96,7 @@ class ImageConfig:
 @dataclass
 class AppConfig:
     """Main application configuration."""
-    mode: str = "mock"  # "mock" or "usb"
+    mode: str = "usb"  # "usb" (USB multimeter mode)
     debug: bool = False
     log_level: str = "INFO"
     
@@ -117,7 +105,6 @@ class AppConfig:
     embedding: EmbeddingConfig = field(default_factory=EmbeddingConfig.from_env)
     chromadb: ChromaDBConfig = field(default_factory=ChromaDBConfig.from_env)
     usb: USBConfig = field(default_factory=USBConfig.from_env)
-    mock: MockConfig = field(default_factory=MockConfig.from_env)
     image: ImageConfig = field(default_factory=ImageConfig.from_env)
     
     # Paths
@@ -127,20 +114,15 @@ class AppConfig:
     @classmethod
     def from_env(cls) -> "AppConfig":
         return cls(
-            mode=os.getenv("APP_MODE", "mock").lower(),
+            mode=os.getenv("APP_MODE", "usb").lower(),
             debug=os.getenv("DEBUG", "false").lower() == "true",
             log_level=os.getenv("LOG_LEVEL", "INFO"),
             llm=LLMConfig.from_env(),
             embedding=EmbeddingConfig.from_env(),
             chromadb=ChromaDBConfig.from_env(),
             usb=USBConfig.from_env(),
-            mock=MockConfig.from_env(),
             image=ImageConfig.from_env()
         )
-    
-    def is_mock_mode(self) -> bool:
-        """Check if running in mock mode."""
-        return self.mode == "mock"
     
     def is_usb_mode(self) -> bool:
         """Check if running in USB mode."""
