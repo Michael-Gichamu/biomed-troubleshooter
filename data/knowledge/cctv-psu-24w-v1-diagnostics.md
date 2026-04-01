@@ -419,11 +419,17 @@ D3 shorted → TR1 secondary short → primary current spike
 **Critical rule:** Never replace F1 without first testing Q1. If Q1 is shorted, a new T5A/250V fuse blows immediately. Always test D3 after finding a shorted Q1 -- D3 failure is the most common root cause.
 
 **Required test sequence before replacing F1:**
-1. Q1 D-S resistance -- less than 10Ω = shorted
-2. D3 diode test -- approximately 0V both orientations = shorted
+1. Q1 D-S resistance (continuity mode, power off, C1 discharged) -- beep = shorted
+2. D3 diode test (power off) -- approximately 0V in both orientations = shorted
 3. Bridge rectifier diodes -- any reading OL in forward direction = open diode
-4. Replace all shorted semiconductors
+4. Replace all shorted semiconductors found
 5. Verify no shorts remain before installing new F1 (T5A/250V)
+
+**D3 re-verification after Q1 replacement (mandatory):**
+Even when D3 tested healthy during the diagnostic phase, re-test D3 after replacing Q1 and before installing a new fuse. A Q1 that fails violently can thermally stress D3 without fully shorting it — a marginal D3 (Vf > 0.5V) will fail early under load and blow the new fuse within minutes. If there is any doubt, replace D3 as a precaution. D3 is an inexpensive Schottky rectifier; a repeat repair call costs far more.
+
+**Bridge rectifier verification after any fuse-blow event:**
+Whenever F1 blew as part of the fault sequence (Q1 shorted, D3 shorted, or cascade), verify the bridge rectifier diodes (D1–D4) before installing the replacement fuse. The T5A time-delay fuse allows fault current to flow through the bridge for up to several seconds before opening. Individual diodes may have shorted or degraded forward voltage (Vf > 0.7V). A shorted bridge diode with a fresh fuse installed will cause immediate F1 re-blow on AC connection. Set meter to DIODE TEST mode and test each junction: forward 0.4–0.7V, reverse OL = healthy. Replace the entire bridge package if any junction fails — the bridge is typically a low-cost single 4-pin KBP package.
 
 ---
 

@@ -114,9 +114,8 @@ signals:
       Probe Q1 Drain and Source -- test BOTH probe orientations.
       Healthy: no beep in either direction (open drain-source).
       Faulty: beep in any orientation (drain-source shorted).
-    safety_warning: >
-      POWER OFF. Discharge C1 via 10kohm 2W resistor for 30 seconds.
-      Verify less than 10V at C1 before touching primary side.
+    safety_warning: "POWER OFF AND DISCHARGE C1 BEFORE TOUCHING. Connect 10kΩ 2W resistor across C1 for 30 seconds. Verify less than 10V at C1 with meter before proceeding. Primary side carries lethal stored voltage even after AC disconnect."
+    display_expected: "Continuity mode — no beep in either probe orientation = healthy (open D-S). Any beep in any orientation = shorted (failed)."
     image_url: "https://raw.githubusercontent.com/Michael-Gichamu/biomed-troubleshooter/main/data/equipment/cctv-psu-24w-v1-test-points/mosfet_transistor.png"
     diagnostic_meaning: >
       Most common cause of blown F1. A beep between Drain and Source = Q1 shorted -- replace Q1.
@@ -162,19 +161,25 @@ signals:
   - signal_id: "schottky_diode"
     name: "Output Schottky Rectifier D3"
     test_point: "D3"
-    parameter: "voltage_forward"
-    unit: "V"
+    parameter: "continuity"
+    unit: "ohm"
     measurability: "power_off_only"
     physical_description: >
       D3 is a white-body TO-220 on the secondary side, adjacent to J1, with a heatsink. Check the part number on the D3 body for anode/cathode pin orientation.
     probe_placement: >
-      POWER OFF.
-      Set meter to DIODE TEST mode.
-      RED probe on anode, BLACK probe on cathode (verify from D3 datasheet).
-      Healthy Schottky: 0.15–0.45V forward; OL reverse.
-      Shorted: approximately 0V in both orientations.
-      Open: OL in both orientations.
-    safety_warning: "Power off only for diode testing."
+      POWER OFF. Set meter to CONTINUITY mode (beeper).
+
+      STEP 1 — Reverse bias test (RED probe on cathode, BLACK probe on anode):
+        Healthy: NO BEEP — D3 blocks reverse current as expected.
+        BEEP in reverse → D3 is SHORTED (failed). Type 'shorted'.
+
+      STEP 2 — Forward bias check (RED probe on anode, BLACK probe on cathode):
+        Healthy: BEEP — Schottky forward voltage (0.15–0.45V) is below the continuity beeper threshold.
+        NO BEEP forward → D3 is OPEN (dead, failed open). Type 'open'.
+
+      After both steps: type 'D3 ok' if Step 1 gave NO BEEP and Step 2 gave BEEP (fully healthy).
+    display_expected: "Continuity mode — STEP 1 reverse (red→cathode): NO BEEP = healthy. BEEP = shorted (fault). STEP 2 forward (red→anode): BEEP = healthy. NO BEEP = open/dead (fault). Type 'D3 ok', 'shorted', or 'open'."
+    safety_warning: "POWER OFF before testing D3. Confirm AC mains is fully disconnected before touching any PCB component, including secondary-side parts."
     image_url: "https://raw.githubusercontent.com/Michael-Gichamu/biomed-troubleshooter/main/data/equipment/cctv-psu-24w-v1-test-points/high_speed_rectifier.png"
     diagnostic_meaning: >
       D3 shorted causes a cascade: secondary short → primary current spike → Q1 overstress
@@ -184,7 +189,7 @@ signals:
       DC bus is present and Q1 is switching normally.
       D3 must be replaced only with fast-recovery Schottky type -- standard silicon
       rectifiers (1N400x series) are incompatible with flyback switching frequencies.
-    expected_behavior: "0.15–0.45V forward voltage; OL reverse"
+    expected_behavior: "Continuity mode: NO BEEP reverse (blocks) + BEEP forward (conducts) = healthy Schottky"
     pro_tips:
       - "Always test D3 after finding a shorted Q1 -- D3 short is often the root cause"
       - "Replace only with fast-recovery Schottky, same Vrrm and current rating as original"
@@ -407,17 +412,17 @@ thresholds:
   schottky_diode:
     states:
       normal:
-        min: 0.15
-        max: 0.45
-        description: "D3 healthy Schottky forward voltage"
+        min: 50
+        max: 900
+        description: "D3 healthy — no beep reverse (blocks), beep forward (conducts). 'D3 ok' sentinel = 500 ohm (within range)."
       shorted:
         min: 0
-        max: 0.1
-        description: "D3 failed shorted. Causes Q1 cascade failure. Replace D3 and Q1."
+        max: 50
+        description: "D3 failed shorted — beeps in reverse direction. Causes Q1 cascade failure. Replace D3 and Q1."
       open:
         min: 999
         max: 999999
-        description: "D3 failed open. No secondary rectification path. Output = 0V."
+        description: "D3 failed open — no beep in either direction. No secondary rectification path. Output = 0V."
 
   output_capacitor_esr:
     states:
@@ -637,6 +642,26 @@ faults:
         target: "All identified failed components"
         instruction: "Replace Q1 and/or D3 as identified. If both Q1 and D3 are shorted, replace both -- D3 short caused Q1 failure. Replace startup resistor if open."
         verification: "output_12v = 11.4–12.6V after repair"
+      - step: 6
+        action: "verify"
+        target: "Bridge rectifier D1–D4 — required if Q1 was shorted and fuse blew"
+        instruction: >
+          If Q1 was found shorted and the input fuse had blown, the bridge rectifier
+          diodes (D1–D4) were exposed to fault current before the fuse opened. With AC
+          disconnected and C1 discharged, set meter to DIODE TEST mode. Test each of the
+          four bridge diodes: forward voltage 0.4–0.7V, OL reverse = healthy. Approximately
+          0V in both directions = shorted diode. OL in both directions = open diode.
+          Replace any failed diode. The bridge may be a single 4-pin package (KBP or
+          similar) — test all four junctions before proceeding.
+        verification: "All four bridge diodes read 0.4–0.7V forward, OL reverse"
+      - step: 7
+        action: "replace"
+        target: "F1 (T5A/250V time-delay) — if fuse was blown"
+        instruction: >
+          If the input fuse F1 was blown at the start of diagnosis, install a new T5A/250V
+          time-delay fuse only after Q1 replacement, D3 re-verification, and bridge
+          rectifier check all pass. Power on briefly with nominal load connected.
+        verification: "F1 remains intact. output_12v = 11.4–12.6V under load."
 
   - fault_id: "fuse_cascade_failure"
     name: "Blown Fuse F1 -- D3-Q1 Cascade"
@@ -687,9 +712,25 @@ faults:
         target: "All shorted semiconductors"
         instruction: "Replace Q1 if shorted. Replace D3 if shorted. Verify no remaining less than 10Ω readings between any semiconductor pins."
       - step: 5
+        action: "verify"
+        target: "D3 diode re-test — mandatory before installing new F1"
+        instruction: "After replacing Q1, re-test D3 in diode mode even if D3 measured healthy during diagnosis. A Q1 that fails violently can stress D3 without fully shorting it. If D3 Vf > 0.5V or reads shorted in either direction, replace D3 now. Do not install new fuse until D3 passes."
+        verification: "D3 reads 0.15–0.45V forward voltage, OL reverse"
+      - step: 6
+        action: "verify"
+        target: "Bridge rectifier D1–D4 — mandatory after cascade short + fuse blow"
+        instruction: >
+          A D3-Q1 cascade short event drives high fault current through the bridge
+          rectifier before F1 opens. With AC disconnected and C1 discharged, set meter to
+          DIODE TEST mode. Test each of the four bridge diodes: forward 0.4–0.7V, OL
+          reverse = healthy. Approximately 0V both directions = shorted. OL both = open.
+          Replace any failed diode before installing new fuse. The bridge may be a single
+          4-pin package (KBP or similar) — test all four junctions.
+        verification: "All four bridge diodes read 0.4–0.7V forward, OL reverse"
+      - step: 7
         action: "replace"
         target: "F1 (T5A/250V time-delay)"
-        instruction: "Install new T5A/250V time-delay fuse. Power on briefly with load connected."
+        instruction: "Install new T5A/250V time-delay fuse only after all semiconductor and bridge rectifier checks pass. Power on briefly with load connected."
         verification: "F1 remains intact. output_12v = 11.4–12.7V."
 
   - fault_id: "low_output_voltage"

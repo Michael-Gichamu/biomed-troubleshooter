@@ -699,7 +699,7 @@ def step_node(state: ConversationalAgentState):
                 "equipment_model": state.equipment_model,
                 "test_point": test_point_id,
                 "measurement_type": measurement_type,
-                "max_duration": 60.0
+                "max_duration": 15.0
             })
         except Exception as e:
             result = {"status": "error", "error": str(e), "test_point": test_point_id, "value": None}
@@ -707,6 +707,15 @@ def step_node(state: ConversationalAgentState):
     meas_value  = result.get("value", None)
     meas_unit   = result.get("unit", expected.get("unit", "V"))
     status      = result.get("status", "unknown")
+
+    # ── Human-readable display for continuity OL sentinel ─────────────────────
+    _raw_meas_type = (result.get("measurement_type") or measurement_type or "").upper()
+    _is_continuity = _raw_meas_type == "CONTINUITY"
+    try:
+        _is_ol = _is_continuity and meas_value is not None and float(meas_value) >= 999_000
+    except (ValueError, TypeError):
+        _is_ol = False
+    display_value = "OL (open — no beep)" if _is_ol else meas_value
 
     # ── Build unit label that includes AC/DC qualifier ─────────────────────────
     meas_type_display = {
@@ -747,7 +756,7 @@ def step_node(state: ConversationalAgentState):
 
     if evaluation == "fault":
         parts.append(f"### ⚠️ FAULT -- {signal_name}")
-        parts.append(f"**Measured:** {meas_value} {meas_type_display}")
+        parts.append(f"**Measured:** {display_value} {'' if _is_ol else meas_type_display}".rstrip())
         parts.append(f"**Expected:** {expected['min']} -- {expected['max']} {meas_type_display}")
         diag = signal_def.get("diagnostic_meaning", "")
         if diag:
@@ -756,7 +765,7 @@ def step_node(state: ConversationalAgentState):
     elif evaluation == "measurement_unavailable":
         parts.append(f"### ⚠️ READING UNAVAILABLE -- {signal_name}")
         if meas_value is not None:
-            parts.append(f"**Best-effort reading:** {meas_value} {meas_type_display}")
+            parts.append(f"**Best-effort reading:** {display_value} {'' if _is_ol else meas_type_display}".rstrip())
         parts.append(f"**Expected:** {expected['min']} -- {expected['max']} {meas_type_display}")
         reason = result.get("message", "Could not obtain a stable reading.")
         parts.append(f"**Reason:** {reason}")
@@ -767,7 +776,7 @@ def step_node(state: ConversationalAgentState):
 
     else:  # normal
         parts.append(f"### ✓ NORMAL -- {signal_name}")
-        parts.append(f"**Measured:** {meas_value} {meas_type_display}")
+        parts.append(f"**Measured:** {display_value} {'' if _is_ol else meas_type_display}".rstrip())
         parts.append(f"**Expected:** {expected['min']} -- {expected['max']} {meas_type_display}")
         diag = signal_def.get("diagnostic_meaning", "")
         if diag:
@@ -969,22 +978,65 @@ Rules:
 - A NORMAL result contradicts hypotheses that require this point to be faulty
 - Use the SIGNAL TOPOLOGY DEPENDENCIES to determine logical eliminations. If a downstream point works, all upstream components must be working — eliminate hypotheses blaming upstream.
 
-CONFIRMATION RULE (two independent paths — either is sufficient):
-  PATH 1 — Definitive component test: A power-off resistance or diode test returns an unambiguous physical result that directly identifies the failed component (e.g. Q1 D-S = 0 ohm = hard short; D3 forward = OL = open; bridge diode = 0 ohm = shorted). This IS confirmation of that component's failure. Do not withhold confirmed_hypothesis waiting for probability to climb — the measurement itself is the evidence.
-  PATH 2 — Probability convergence: All active hypotheses have been evaluated and one exceeds 0.85 with no remaining plausible alternative.
-  In both cases: set confirmed_hypothesis to the hypothesis ID that best matches the finding.
+CONFIRMATION RULE — Q1 and D3 are always measured as a paired unit before confirming:
 
-- Do NOT require additional measurements if a definitive component test has already directly identified the failed part. Continuing to measure after this point is wasted time.
-- Do NOT confirm a stage-level hypothesis (e.g. "primary input failure") without first identifying the specific component within that stage that failed.
+  When primary_mosfet (Q1) is found SHORTED (0 ohm / beep):
+    - Q1 failure is confirmed as a physical fact.
+    - Do NOT set confirmed_hypothesis yet.
+    - Check ALL MEASUREMENTS SO FAR: has schottky_diode (D3) already been measured this session?
+      YES → proceed to confirmation below (both measured).
+      NO  → set updated_remaining_test_plan = ["schottky_diode"] only. Prune everything else.
+             D3 must be measured next — it determines if D3 caused Q1's failure.
 
-PRUNING RULE — After each measurement, aggressively remove from the remaining test plan:
-  1. Any live powered-on voltage test (bridge_output, output_12v, feedback_ref) when a short circuit has been confirmed or when the input fuse is known to be blown — powered-on tests are uninformative and potentially misleading with a known open fuse or shorted component.
-  2. Any test for a component that topology confirms is irrelevant given the current measurement outcome.
-  3. Any test that was only needed to distinguish between hypotheses that are now eliminated.
-  4. Any test that duplicates information the engineer already provided in their symptom report (e.g. input_fuse test when user has already stated the fuse blew).
+  When schottky_diode (D3) is found SHORTED (~0V forward in both orientations):
+    - D3 failure is confirmed as a physical fact.
+    - Do NOT set confirmed_hypothesis yet.
+    - Check ALL MEASUREMENTS SO FAR: has primary_mosfet (Q1) already been measured this session?
+      YES → proceed to confirmation below (both measured).
+      NO  → set updated_remaining_test_plan = ["primary_mosfet"] only. Prune everything else.
+             Q1 must be measured next — a shorted D3 frequently causes Q1 overstress.
+
+  After BOTH primary_mosfet and schottky_diode have been measured (regardless of outcome):
+
+  Classify the D3 result before applying the table:
+    D3 SHORTED: measured value ~0–0.05V in either/both probe orientations = junction shorted
+    D3 OPEN:    measured OL / 999999 / no forward voltage in diode mode = diode burned open
+    D3 FAULT:   either SHORTED or OPEN — both represent a failed D3, only the failure mode differs
+    D3 NORMAL:  Vf 0.15–0.45V forward, OL reverse = healthy Schottky diode
+
+  Apply this decision table:
+    Q1 shorted + D3 FAULT (shorted OR open) → confirmed_hypothesis = cascade failure hypothesis.
+      Both Q1 and D3 must be replaced. The fuse blew from this cascade.
+    Q1 shorted + D3 NORMAL (Vf 0.15–0.45V forward) → confirmed_hypothesis = Q1 failed independently.
+      Replace Q1 only. Re-verify D3 before powering on (borderline D3 can pass but fail under load).
+    Q1 normal  + D3 FAULT (shorted OR open) → confirmed_hypothesis = D3 failed (no output rectification path).
+      Replace D3. Verify Q1 is still healthy after replacement.
+    Q1 normal  + D3 NORMAL → do NOT confirm. Continue diagnosis (startup circuit, U3, or bridge).
+
+  PATH 2 — Probability convergence: one hypothesis exceeds 0.85 with no plausible alternative.
+  Do NOT confirm a stage-level hypothesis without the specific component identified.
+
+SPECIFIC PRUNING RULES — apply after EVERY measurement, before reordering:
+  After primary_mosfet found SHORTED: remove from remaining plan:
+    output_capacitor_esr, feedback_ref, feedback_resistor, output_current, output_12v, bridge_output, input_fuse
+    Keep ONLY: schottky_diode (if not yet measured in this session).
+
+  After input fuse known blown (engineer report or measurement):
+    Remove: bridge_output, output_12v, feedback_ref, output_current
+    (live voltage tests with blown fuse return 0V and carry no diagnostic information).
+
+  After bridge_output = 0V (primary input stage failed):
+    Remove: primary_mosfet, schottky_diode, output_capacitor_esr, feedback_ref, feedback_resistor, output_12v
+    Keep: bridge rectifier diode test, MOV resistance test (if in plan).
+
+  After bridge_output = 280–340V (primary confirmed working), output = 0V:
+    Remove: output_capacitor_esr, feedback_ref, feedback_resistor, output_current
+    Keep: primary_mosfet, schottky_diode (these are the active fault candidates).
+
+  Always remove any test already confirmed by the engineer's symptom report.
 
 - Probabilities of non-eliminated hypotheses must sum to 1.0
-- Review the REMAINING TEST PLAN after every measurement. Remove irrelevant tests first, then reorder survivors so the most discriminating test for the leading hypothesis comes first. Do NOT add test points not in the original list.
+- After removing irrelevant tests, reorder remaining list: most discriminating test for leading hypothesis comes first. Do NOT add test points not in the original list.
 
 Return ONLY valid JSON:
 {{
@@ -1172,13 +1224,37 @@ def decision_node(state: ConversationalAgentState):
         }
 
     if state.current_step >= len(state.test_point_rankings):
+        # Find the best active hypothesis probability
+        best_id, best_prob = "", -1.0
+        for h in state.hypotheses:
+            h_id = h.get("id", "")
+            if h_id not in state.eliminated_faults:
+                p = state.hypothesis_probabilities.get(h_id, 0)
+                if p > best_prob:
+                    best_prob, best_id = p, h_id
+
+        if best_prob >= 0.85 and best_id:
+            # High enough confidence — confirm and route to repair
+            return {
+                "next_node": "repair",
+                "current_hypothesis": best_id,
+                "diagnosis_status": "confirmed_by_probability",
+                "messages": [AIMessage(content=(
+                    f"## Diagnosis Complete — High Confidence\n\n"
+                    f"All planned tests exhausted. "
+                    f"**{_top_hypothesis_desc(state)}** confirmed at {best_prob:.0%} probability. "
+                    f"Proceeding to repair."
+                ))]
+            }
+
+        # No dominant hypothesis — inconclusive
         return {
             "next_node": "end",
             "diagnosis_status": "no_more_tests",
             "diagnosis_complete": True,
             "messages": [AIMessage(content=(
-                "## Diagnosis Complete -- All Tests Exhausted\n\n"
-                "No further test points available. "
+                "## Diagnosis Complete — All Tests Exhausted\n\n"
+                "No further test points available and no dominant hypothesis. "
                 f"Most likely candidate: **{_top_hypothesis_desc(state)}**."
             ))]
         }
@@ -1345,6 +1421,12 @@ def repair_node(state: ConversationalAgentState):
         val  = m.get("value", "?")
         unit = m.get("unit", "")
         ev   = m.get("evaluation", "").replace("_", " ").title()
+        # Display OL sentinel as human-readable for continuity measurements
+        try:
+            if m.get("measurement_type", "").upper() == "CONTINUITY" and float(val) >= 999_000:
+                val, unit = "OL (open)", ""
+        except (ValueError, TypeError):
+            pass
         evidence_rows.append(
             f"| {m.get('signal_name', m.get('test_point','?'))} "
             f"| {val} {unit} | {icon} {ev} |"
@@ -1399,7 +1481,17 @@ def repair_node(state: ConversationalAgentState):
     ]
     if hyp_mechanism:
         msg_parts.append(f"**Mechanism:** {hyp_mechanism}")
-    msg_parts.append(f"**Confirmed by:** {last_tp} = {last_val} {last_unit}{sec_line}\n")
+    # Build "Confirmed by" from actual fault measurements (evaluation == "fault")
+    fault_meas = [m for m in state.measurements if m.get("evaluation") == "fault"]
+    if fault_meas:
+        confirmed_by_parts = [
+            f"{m.get('signal_name', m.get('test_point','?'))} = {m.get('value','?')} {m.get('unit','')}"
+            for m in fault_meas
+        ]
+        confirmed_by_str = "; ".join(confirmed_by_parts)
+    else:
+        confirmed_by_str = f"{last_tp} = {last_val} {last_unit}"
+    msg_parts.append(f"**Confirmed by:** {confirmed_by_str}{sec_line}\n")
     msg_parts.append("### Evidence Summary\n")
     msg_parts.append(evidence_table)
     msg_parts.append(f"\n### Repair Steps -- *{fault_name}*")
@@ -1472,14 +1564,22 @@ def instruction_node(state: ConversationalAgentState):
             tip_lines = "\n".join(f"- {t}" for t in tips)
             parts.append(f"**💡 Pro tips:**\n{tip_lines}")
 
+        # Safety warning — rendered prominently BEFORE probe placement
+        safety = current_signal.get("safety_warning", "")
+        if safety:
+            parts.append(f"**⚠️ Safety:**\n{safety}")
+
         # Probe placement & multimeter mode (from YAML probe_placement field)
         probe_placement = current_signal.get("probe_placement", "")
         if probe_placement:
             parts.append(f"**🔧 Probe placement & meter setting:**\n{probe_placement.strip()}")
 
-        # Expected reading
+        # Expected reading — use display_expected if defined, else numeric range
+        disp_exp = current_signal.get("display_expected", "")
         exp = state.expected_values.get(current_signal_id, {})
-        if exp:
+        if disp_exp:
+            parts.append(f"**Expected reading:** {disp_exp}")
+        elif exp:
             parts.append(
                 f"**Expected reading:** {exp['min']} – {exp['max']} {exp.get('unit','V')}"
             )
@@ -1493,20 +1593,24 @@ def instruction_node(state: ConversationalAgentState):
         if hyp_desc:
             parts.append(f"*Testing hypothesis: {hyp_desc}*")
 
-        if probe_placement:
-            parts.append(
-                "\n_Follow the instructions above, then:_\n"
-                "- _Press **Resume** to auto-read from USB multimeter, **or**_\n"
-                "- _Type your reading (e.g. `280 V DC` · `12.5 V` · `0.5 ohm` · `OL`) "
-                "and press **Enter** to enter it manually._"
-            )
+        # Manual reading hint — mode-aware, with D3-specific vocabulary
+        param = current_signal.get("parameter", "")
+        if param == "continuity":
+            if current_signal_id == "schottky_diode":
+                manual_hint = ("- _Type your result (`D3 ok` · `shorted` · `open`) "
+                               "and press **Enter** to enter it manually._")
+            else:
+                manual_hint = ("- _Type your result (e.g. `no beep`, `beeped`, `OL`) "
+                               "and press **Enter** to enter it manually._")
         else:
-            parts.append(
-                "\n_Place probes at the test point above, then:_\n"
-                "- _Press **Resume** to auto-read from USB multimeter, **or**_\n"
-                "- _Type your reading (e.g. `280 V DC` · `12.5 V` · `0.5 ohm` · `OL`) "
-                "and press **Enter** to enter it manually._"
-            )
+            manual_hint = ("- _Type your reading (e.g. `280 V DC` · `12.5 V` · `0.5 ohm` · `OL`) "
+                           "and press **Enter** to enter it manually._")
+
+        parts.append(
+            "\n_Follow the instructions above, then:_\n"
+            "- _Press **Resume** to auto-read from USB multimeter, **or**_\n"
+            f"{manual_hint}"
+        )
 
     else:
         parts.append("## All measurements complete -- proceeding to analysis.")
@@ -1523,10 +1627,12 @@ def _parse_manual_reading(text) -> Optional[dict]:
     Parse a free-text manual reading entered by the engineer.
 
     Accepted formats (case-insensitive):
-      "280 V DC"   "12.5V"   "0.5 ohm"   "OL"   "open"   "1.2 kohm"
+      Numeric:      "280 V DC"  "12.5V"  "0.5 ohm"  "1.2 kohm"
+      OL sentinel:  "OL"  "open"  "open circuit"
+      Natural lang: "no beep"  "it beeped"  "shorted"  "healthy"  etc.
 
-    Returns a dict {"value": float, "unit": str} or None if the text does
-    not look like a measurement value (e.g. plain "resume", empty string).
+    Returns a dict {"value": float, "unit": str, "measurement_type": str}
+    or None if the text does not look like a measurement (e.g. plain "resume").
     """
     if not text or not isinstance(text, str):
         return None
@@ -1534,11 +1640,45 @@ def _parse_manual_reading(text) -> Optional[dict]:
     if not text:
         return None
 
-    # Open-circuit / OL sentinel (continuity mode)
+    lower = text.lower()
+
+    # ── Open-circuit / OL sentinel (exact keywords) ───────────────────────────
     if text.upper() in ("OL", "OPEN", "OPEN CIRCUIT", "OPEN-CIRCUIT"):
         return {"value": 999_999.0, "unit": "ohm", "measurement_type": "CONTINUITY"}
 
-    # Numeric value optionally followed by a unit string
+    # ── Natural language: component healthy (diode/continuity mid-range sentinel) ─
+    # Maps to 500 ohm — within D3 continuity normal range (50–900) and Q1 normal
+    # range (50–999999). Separate from "no beep"/OL so D3 open (999999) stays FAULT.
+    _healthy_phrases = (
+        "d3 ok", "d3 good", "diode ok", "diode good", "d3 healthy", "diode healthy",
+        "beep forward", "forward beep", "forward only", "conducts forward",
+    )
+    if any(p in lower for p in _healthy_phrases):
+        return {"value": 500.0, "unit": "ohm", "measurement_type": "CONTINUITY"}
+
+    # ── Natural language: continuity OPEN / no beep (OL sentinel = 999999) ──────
+    _open_phrases = (
+        "no beep", "didn't beep", "did not beep", "not beeping", "doesnt beep",
+        "does not beep", "silent", "no continuity", "open circuit",
+        "good condition", "healthy", "working", "intact", "passing", "passed",
+        "no short", "not shorted", "mosfet good", "mosfet ok", "q1 good", "q1 ok",
+        "fuse good", "fuse ok", "fuse intact",
+    )
+    if any(p in lower for p in _open_phrases):
+        return {"value": 999_999.0, "unit": "ohm", "measurement_type": "CONTINUITY"}
+
+    # ── Natural language: continuity SHORTED / failed (beep) ─────────────────
+    _short_phrases = (
+        "beeped", "it beeped", "beeping", "continuous beep", "beep",
+        "shorted", "short circuit", "short", "failed", "faulty",
+        "bad condition", "broken", "damaged",
+        "mosfet bad", "mosfet shorted", "q1 bad", "q1 shorted",
+        "d3 shorted", "d3 bad", "diode shorted",
+    )
+    if any(p in lower for p in _short_phrases):
+        return {"value": 0.0, "unit": "ohm", "measurement_type": "CONTINUITY"}
+
+    # ── Numeric value optionally followed by a unit string ────────────────────
     m = re.match(r'^([+-]?\d+\.?\d*(?:[eE][+-]?\d+)?)\s*([A-Za-z°Ω%/][A-Za-z°Ω%/ ]*)?\s*$', text)
     if m:
         try:
