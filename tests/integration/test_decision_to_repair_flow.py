@@ -15,7 +15,6 @@ from src.graph.nodes.decision import decision_node
 from src.graph.nodes.reason import reason_node
 from src.graph.nodes.repair import repair_node
 
-
 pytestmark = pytest.mark.integration
 
 

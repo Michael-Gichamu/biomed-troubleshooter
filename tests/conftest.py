@@ -13,10 +13,11 @@ Conventions:
 from __future__ import annotations
 
 import os
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 import pytest
-from langchain_core.messages import AIMessage, HumanMessage
+from langchain_core.messages import HumanMessage
 
 # Ensure LLMManager initialisation never blows up due to missing env. Tests
 # themselves mock out the invoke path, so these values are never used for I/O.
@@ -29,7 +30,6 @@ os.environ.setdefault("LLM_MODELS", "llama-3.3-70b-versatile")
 os.environ.setdefault("ANTHROPIC_API_KEY", "test-anthropic-key-not-real")
 
 from src.graph.state import ConversationalAgentState  # noqa: E402
-
 
 # ---------------------------------------------------------------------------
 # Equipment fixtures

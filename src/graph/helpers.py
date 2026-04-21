@@ -1,10 +1,9 @@
 """Shared helpers for graph nodes."""
 
 import re
-from typing import Optional
 
 
-def _parse_manual_reading(text) -> Optional[dict]:
+def _parse_manual_reading(text) -> dict | None:
     """Parse a free-text manual reading entered by the engineer.
 
     Accepted formats (case-insensitive):

@@ -20,20 +20,20 @@ working unchanged.
 
 from __future__ import annotations
 
-import os
-import time
 import json
-import re
 import logging
+import os
+import re
 import threading
-from typing import List, Optional, Dict, Any
+import time
 from dataclasses import dataclass, field
+from typing import Any
 
 from dotenv import load_dotenv
 from langchain_groq import ChatGroq
 from langchain_openai import ChatOpenAI
 
-from src.infrastructure.log_parser import LogParser, ErrorContext
+from src.infrastructure.log_parser import LogParser
 
 # Load environment variables
 load_dotenv()
@@ -53,8 +53,8 @@ logger = logging.getLogger(__name__)
 class ProviderSlot:
     """Keys + models + cursor state for a single provider."""
     name: str                        # "anthropic" | "groq" | "openai"
-    api_keys: List[str] = field(default_factory=list)
-    models: List[str] = field(default_factory=list)
+    api_keys: list[str] = field(default_factory=list)
+    models: list[str] = field(default_factory=list)
     key_index: int = 0
     model_index: int = 0
 
@@ -101,7 +101,7 @@ class LLMManager:
     the current provider, then switches providers when that slot is exhausted.
     """
 
-    _instance: Optional['LLMManager'] = None
+    _instance: LLMManager | None = None
     _initialized: bool = False
     _lock: threading.RLock = threading.RLock()
 
@@ -136,7 +136,7 @@ class LLMManager:
         primary_name = (os.getenv("PRIMARY_LLM_PROVIDER", "anthropic") or "").strip().lower()
         fallback_name = (os.getenv("FALLBACK_LLM_PROVIDER", "groq") or "").strip().lower()
 
-        self._slots: Dict[str, ProviderSlot] = {}
+        self._slots: dict[str, ProviderSlot] = {}
 
         # Anthropic slot
         anthropic_slot = self._build_anthropic_slot()
@@ -184,7 +184,7 @@ class LLMManager:
         self.model_retry_count = 0
 
         # Active LLM instance (lazy)
-        self._current_llm: Optional[Any] = None
+        self._current_llm: Any | None = None
 
         logger.info(
             "LLMManager initialized: primary=%s, fallback=%s, configured=%s",
@@ -194,7 +194,7 @@ class LLMManager:
             logger.info("  %s: %d key(s), models=%s", name, len(slot.api_keys), slot.models)
 
     @staticmethod
-    def _split_env_list(value: str) -> List[str]:
+    def _split_env_list(value: str) -> list[str]:
         return [v.strip() for v in (value or "").split(",") if v.strip()]
 
     def _build_anthropic_slot(self) -> ProviderSlot:
@@ -313,11 +313,11 @@ class LLMManager:
 
     # Back-compat shim — a handful of older modules read these directly.
     @property
-    def api_keys(self) -> List[str]:
+    def api_keys(self) -> list[str]:
         return self._slots[self._active_provider].api_keys
 
     @property
-    def models(self) -> List[str]:
+    def models(self) -> list[str]:
         return self._slots[self._active_provider].models
 
     @property
@@ -329,7 +329,7 @@ class LLMManager:
         return self._slots[self._active_provider].model_index
 
     @property
-    def status(self) -> Dict[str, Any]:
+    def status(self) -> dict[str, Any]:
         return {
             "active_provider": self._active_provider,
             "active_model": self.active_model,
@@ -432,7 +432,7 @@ class LLMManager:
 # Singleton accessor
 # ---------------------------------------------------------------------------
 
-_llm_manager: Optional[LLMManager] = None
+_llm_manager: LLMManager | None = None
 _llm_manager_lock = threading.Lock()
 
 
@@ -454,7 +454,7 @@ def get_active_llm() -> Any:
 # Invocation helpers with retry + rotation
 # ---------------------------------------------------------------------------
 
-def invoke_with_retry(messages: List[Dict[str, str]], max_full_retries: int = 3) -> Any:
+def invoke_with_retry(messages: list[dict[str, str]], max_full_retries: int = 3) -> Any:
     """Invoke the active LLM with automatic retry and rotation."""
     manager = get_llm_manager()
 
@@ -478,7 +478,7 @@ def invoke_with_retry(messages: List[Dict[str, str]], max_full_retries: int = 3)
             raise
 
 
-def invoke_with_tools_and_retry(messages: List[Any], tools: List[Any], max_full_retries: int = 3) -> Any:
+def invoke_with_tools_and_retry(messages: list[Any], tools: list[Any], max_full_retries: int = 3) -> Any:
     """Invoke LLM with tools bound, with automatic retry and rotation."""
     manager = get_llm_manager()
 
@@ -523,9 +523,9 @@ class LLMConfig:
 class LLMClient:
     """LLM client for diagnostic reasoning, backed by the self-healing manager."""
 
-    def __init__(self, config: Optional[LLMConfig] = None):
+    def __init__(self, config: LLMConfig | None = None):
         self.config = config or self._load_config()
-        self._manager: Optional[LLMManager] = None
+        self._manager: LLMManager | None = None
 
     def _load_config(self) -> LLMConfig:
         return LLMConfig(
@@ -628,5 +628,5 @@ Return ONLY the JSON, no other text."""
         return "\n".join(lines) if lines else "No measurements available"
 
 
-def create_llm_client(config: Optional[LLMConfig] = None) -> LLMClient:
+def create_llm_client(config: LLMConfig | None = None) -> LLMClient:
     return LLMClient(config)

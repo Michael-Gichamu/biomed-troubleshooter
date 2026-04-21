@@ -7,11 +7,9 @@ in the unit tests; here we only prove the wiring is intact.
 """
 
 import pytest
-from langchain_core.messages import HumanMessage
 
 from src.graph import create_conversational_graph
 from src.graph.state import ConversationalAgentState
-
 
 pytestmark = pytest.mark.integration
 

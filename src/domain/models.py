@@ -8,9 +8,7 @@ NOTHING equipment-specific should exist in this file.
 
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Optional
-import uuid
-
+from typing import Any
 
 # =============================================================================
 # ENUMS - Generic only, no equipment-specific values
@@ -41,8 +39,8 @@ class TestPoint:
     """
     id: str
     name: str
-    location: Optional[str] = None
-    component_id: Optional[str] = None
+    location: str | None = None
+    component_id: str | None = None
 
     def __post_init__(self):
         if not self.id or not self.id.strip():
@@ -62,15 +60,15 @@ class Measurement:
     timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
     # Optional expected range from equipment config
-    nominal_value: Optional[float] = None
-    tolerance_percent: Optional[float] = None
+    nominal_value: float | None = None
+    tolerance_percent: float | None = None
 
     def __post_init__(self):
         if not self.unit or not self.unit.strip():
             raise ValueError("Unit cannot be empty")
 
     @property
-    def expected_range(self) -> tuple[Optional[float], Optional[float]]:
+    def expected_range(self) -> tuple[float | None, float | None]:
         """Calculate expected min/max based on nominal and tolerance."""
         if self.nominal_value is None or self.tolerance_percent is None:
             return (None, None)
@@ -89,7 +87,7 @@ class SignalState:
     measurement: Measurement
     state: str  # e.g., "normal", "missing", "over_voltage" - from config
     confidence: float = 1.0
-    deviation_percent: Optional[float] = None
+    deviation_percent: float | None = None
 
     def __post_init__(self):
         if not 0.0 <= self.confidence <= 1.0:
@@ -112,7 +110,7 @@ class EquipmentId:
     NOTE: Model names come from data files, not hard-coded here.
     """
     model: str
-    serial: Optional[str] = None
+    serial: str | None = None
 
     def __str__(self) -> str:
         return f"{self.model}" + (f"::{self.serial}" if self.serial else "")
@@ -138,7 +136,7 @@ class SignalCollection:
         """Add a measurement to the collection."""
         self.measurements.append(measurement)
 
-    def get_measurement(self, test_point_id: str) -> Optional[Measurement]:
+    def get_measurement(self, test_point_id: str) -> Measurement | None:
         """Get measurement by test point ID."""
         for m in self.measurements:
             if m.test_point.id == test_point_id:
@@ -162,9 +160,9 @@ class DiagnosticSession:
     signals: SignalCollection
     workflow_type: str
     started_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-    completed_at: Optional[datetime] = None
+    completed_at: datetime | None = None
 
-    hypothesis: Optional[dict] = None  # From equipment config fault definition
+    hypothesis: dict | None = None  # From equipment config fault definition
     reasoning_chain: list[dict] = field(default_factory=list)
     recommendations: list[dict] = field(default_factory=list)
 
@@ -274,7 +272,7 @@ class SignalInterpreter:
 
         return states, status
 
-    def _calculate_deviation(self, measurement: Measurement, threshold) -> Optional[float]:
+    def _calculate_deviation(self, measurement: Measurement, threshold) -> float | None:
         """Calculate percentage deviation from nominal."""
         nominal = getattr(threshold, 'nominal_value', None) or measurement.nominal_value
         if nominal is None or nominal == 0:
@@ -298,7 +296,7 @@ class FaultMatcher:
         """
         self.fault_configs = fault_configs
 
-    def find_matching_fault(self, signal_states: dict) -> Optional[dict]:
+    def find_matching_fault(self, signal_states: dict) -> dict | None:
         """
         Find a fault that matches the observed signal states.
 
@@ -447,7 +445,7 @@ class HypothesisGenerator:
             "fault_id": fault.get("fault_id")
         }
 
-    def _find_matching_fault(self, signal_states: dict) -> Optional[dict]:
+    def _find_matching_fault(self, signal_states: dict) -> dict | None:
         """Find fault matching observed signal states."""
         matcher = FaultMatcher(self.fault_configs)
         return matcher.find_matching_fault(signal_states)
@@ -466,7 +464,7 @@ class Signal:
     measurement_type: str = "voltage"
     accuracy: float = 0.1
     timestamp: str = ""
-    anomaly: Optional[dict] = None
+    anomaly: dict | None = None
 
     def to_dict(self) -> dict:
         """Convert to dictionary."""
@@ -542,10 +540,10 @@ class DiagnosticStep:
     image_url: str = ""
     expected_value: str = ""
     hypothesis_being_tested: str = ""
-    measurement_result: Optional[dict] = None
+    measurement_result: dict | None = None
     is_completed: bool = False
     is_fault_confirmed: bool = False
-    signal_id: Optional[str] = None
+    signal_id: str | None = None
 
     def to_dict(self) -> dict:
         return {
@@ -578,10 +576,10 @@ class DiagnosticState:
     tested_points: list[str] = field(default_factory=list)
     eliminated_faults: list[str] = field(default_factory=list)
     retrieved_context: dict[str, Any] = field(default_factory=dict)
-    session_id: Optional[str] = None
+    session_id: str | None = None
     symptoms: str = ""
-    started_at: Optional[datetime] = None
-    completed_at: Optional[datetime] = None
+    started_at: datetime | None = None
+    completed_at: datetime | None = None
 
     def to_dict(self) -> dict:
         data = {k: v for k, v in self.__dict__.items()}
@@ -607,7 +605,7 @@ class DiagnosticEngine:
         self,
         equipment_config_loader=None,
         rag_repository=None,
-        state: Optional[DiagnosticState] = None
+        state: DiagnosticState | None = None
     ):
         self._config_loader = equipment_config_loader
         self._rag_repo = rag_repository
@@ -695,7 +693,7 @@ class DiagnosticEngine:
                 return f"{signal.get('unit', '')} (min: {normal.get('min')}, max: {normal.get('max')})"
         return signal.get("unit", "")
 
-    def get_current_step(self) -> Optional[DiagnosticStep]:
+    def get_current_step(self) -> DiagnosticStep | None:
         if 0 <= self._state.current_step < len(self._steps):
             return self._steps[self._state.current_step]
         return None

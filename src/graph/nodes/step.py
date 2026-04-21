@@ -99,10 +99,6 @@ def step_node(state: ConversationalAgentState):
     elif status in ("timeout", "error", "timeout_unstable"):
         evaluation = "measurement_unavailable"
 
-    param_label = ""
-    if measurement_type:
-        param_label = f" ({measurement_type.replace('_', ' ').title()})"
-
     step_num  = state.current_step + 1
     total_num = len(state.test_point_rankings)
 

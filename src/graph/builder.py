@@ -1,23 +1,23 @@
 """Graph construction and the LangGraph Studio factory entry point."""
 
-from langgraph.graph import StateGraph, START, END
 from langgraph.checkpoint.memory import MemorySaver
+from langgraph.graph import END, START, StateGraph
 
-from src.studio.tools import get_tools  # noqa -- keeps tool registration alive
-from src.graph.state import ConversationalAgentState
 from src.graph.nodes import (
-    rag_node,
+    decision_node,
     hypotheses_node,
     instruction_node,
-    probe_wait_node,
-    step_node,
-    reason_node,
-    decision_node,
-    repair_node,
     interrupt_node,
+    probe_wait_node,
+    rag_node,
+    reason_node,
+    repair_node,
     resume_node,
+    step_node,
 )
 from src.graph.routing import route_from_decision, route_from_resume
+from src.graph.state import ConversationalAgentState
+from src.studio.tools import get_tools  # noqa -- keeps tool registration alive
 
 
 def create_conversational_graph():

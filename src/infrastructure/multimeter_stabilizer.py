@@ -7,7 +7,6 @@ and cluster detection.
 """
 
 import time
-from typing import Optional
 
 # Try to use numpy for statistical calculations, fall back to statistics module
 try:
@@ -59,7 +58,7 @@ class MultimeterStabilizer:
         # Sample storage
         self._samples: list[tuple[float, float]] = []  # (value, timestamp)
         
-    def add_sample(self, value: float, timestamp: Optional[float] = None) -> dict:
+    def add_sample(self, value: float, timestamp: float | None = None) -> dict:
         """
         Add a new sample and return current stabilization status.
         

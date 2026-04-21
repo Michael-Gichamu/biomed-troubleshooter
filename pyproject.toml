@@ -97,6 +97,16 @@ ignore = [
 
 [tool.ruff.lint.per-file-ignores]
 "tests/*" = ["E402"]
+# Legacy modules predating the graph refactor — deliberate lazy imports and
+# compact one-liner guards. Cleanup is tracked separately; do not gate CI on
+# these until that refactor lands.
+"src/interfaces/cli.py" = ["E402"]
+"src/studio/conversational_agent.py" = ["E402"]
+"src/studio/langgraph_studio.py" = ["E402"]
+"src/studio/tools.py" = ["E402", "B007"]
+"src/studio/background_usb_reader.py" = ["E402"]
+"src/domain/models.py" = ["E701"]
+"src/infrastructure/usb_multimeter.py" = ["E701"]
 
 [tool.mypy]
 python_version = "3.10"

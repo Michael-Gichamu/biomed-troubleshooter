@@ -6,7 +6,6 @@ Centralized configuration management for the AI Agent.
 
 import os
 from dataclasses import dataclass, field
-from typing import Optional, List
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -20,7 +19,7 @@ class LLMConfig:
     """LLM provider configuration."""
     provider: str = "groq"
     model: str = "llama-3.3-70b-versatile"
-    api_key: Optional[str] = None
+    api_key: str | None = None
     temperature: float = 0.1
     max_tokens: int = 2048
     
@@ -68,7 +67,7 @@ class ChromaDBConfig:
 @dataclass
 class USBConfig:
     """USB Multimeter configuration."""
-    port: Optional[str] = None  # Auto-detect if None
+    port: str | None = None  # Auto-detect if None
     baud_rate: int = 2400
     timeout: float = 2.0
     
@@ -130,7 +129,7 @@ class AppConfig:
 
 
 # Global configuration instance
-_config: Optional[AppConfig] = None
+_config: AppConfig | None = None
 
 
 def get_config() -> AppConfig:

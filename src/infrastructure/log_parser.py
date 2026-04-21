@@ -6,7 +6,6 @@ error signals such as over capacity, rate limits, and timeouts.
 """
 
 import logging
-from typing import Optional
 from dataclasses import dataclass
 
 # Configure logging
@@ -18,7 +17,7 @@ class ErrorContext:
     error_type: str
     message: str
     retryable: bool
-    status_code: Optional[int] = None
+    status_code: int | None = None
 
 class LogParser:
     """
@@ -112,7 +111,7 @@ class LogParser:
         )
     
     @staticmethod
-    def _extract_status_code(exception: Exception) -> Optional[int]:
+    def _extract_status_code(exception: Exception) -> int | None:
         """Extract HTTP status code from exception if available."""
         error_str = str(exception)
         

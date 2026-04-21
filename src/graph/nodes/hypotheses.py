@@ -2,7 +2,7 @@
 
 import json
 
-from langchain_core.messages import HumanMessage, AIMessage
+from langchain_core.messages import AIMessage, HumanMessage
 
 from src.graph.state import ConversationalAgentState, _text
 

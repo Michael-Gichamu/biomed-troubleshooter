@@ -6,8 +6,8 @@ Public entry points:
   * :class:`ConversationalAgentState` — state schema passed between nodes.
 """
 
-from src.graph.state import ConversationalAgentState, _text
 from src.graph.builder import create_conversational_graph, graph
+from src.graph.state import ConversationalAgentState, _text
 
 __all__ = [
     "ConversationalAgentState",

@@ -6,21 +6,18 @@ Implements the Strategy pattern for signal sources.
 """
 
 import os
-import json
-import threading
 from abc import ABC, abstractmethod
-from typing import Optional, Dict, Any, List
-from pathlib import Path
 from datetime import datetime
+from typing import Any
 
-from src.domain.models import SignalCollection, SignalBatch, Signal, TestPoint, Measurement
+from src.domain.models import Signal, SignalBatch, TestPoint
 
 
 class SignalSource(ABC):
     """Abstract base class for signal sources."""
 
     @abstractmethod
-    def receive_signals(self, equipment_id: str) -> Optional[SignalBatch]:
+    def receive_signals(self, equipment_id: str) -> SignalBatch | None:
         """Receive signals for equipment."""
         pass
 
@@ -38,7 +35,7 @@ class SignalSource(ABC):
 class USBMultimeterSource(SignalSource):
     """USB Multimeter signal source for Mastech MS8250D."""
 
-    def __init__(self, port: Optional[str] = None):
+    def __init__(self, port: str | None = None):
         """
         Initialize USB multimeter source.
         
@@ -48,7 +45,7 @@ class USBMultimeterSource(SignalSource):
         self.port = port
         self._client = None
         self._connected = False
-        self._readings: List[Signal] = []
+        self._readings: list[Signal] = []
         self._reading_count = 0
         self._max_readings = 10  # Collect up to 10 readings
 
@@ -75,7 +72,7 @@ class USBMultimeterSource(SignalSource):
             self._client.disconnect()
         self._connected = False
 
-    def receive_signals(self, equipment_id: str) -> Optional[SignalBatch]:
+    def receive_signals(self, equipment_id: str) -> SignalBatch | None:
         """
         Collect readings from multimeter.
         
@@ -130,9 +127,9 @@ class ModeRouter:
 
     def __init__(self):
         self.config = self._load_config()
-        self._source: Optional[SignalSource] = None
+        self._source: SignalSource | None = None
 
-    def _load_config(self) -> Dict[str, Any]:
+    def _load_config(self) -> dict[str, Any]:
         """Load mode configuration from environment."""
         return {
             "mode": os.getenv("APP_MODE", "usb").lower(),
@@ -163,11 +160,11 @@ class ModeRouter:
         if self._source:
             self._source.disconnect()
 
-    def receive_signals(self, equipment_id: str) -> Optional[SignalBatch]:
+    def receive_signals(self, equipment_id: str) -> SignalBatch | None:
         """Receive signals from active source."""
         return self.source.receive_signals(equipment_id)
 
-    def get_mode_info(self) -> Dict[str, Any]:
+    def get_mode_info(self) -> dict[str, Any]:
         """Get information about current mode."""
         return {
             "mode": self.config["mode"],

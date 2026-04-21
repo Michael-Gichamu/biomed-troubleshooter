@@ -2,9 +2,6 @@
 
 from unittest.mock import patch
 
-import pytest
-from langchain_core.messages import AIMessage
-
 from src.graph.nodes.instruction import instruction_node
 from src.graph.nodes.resume import resume_node
 

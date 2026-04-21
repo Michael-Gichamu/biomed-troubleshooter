@@ -8,8 +8,9 @@ Usage with LangGraph Studio:
     langgraph dev
 """
 
-from dotenv import load_dotenv
 from pathlib import Path
+
+from dotenv import load_dotenv
 from langgraph.graph import START, StateGraph
 
 # Load environment variables at module level (before async context)
@@ -18,13 +19,13 @@ _env_path = Path(__file__).parent.parent.parent / '.env'
 load_dotenv(dotenv_path=_env_path)
 
 from src.application.agent import (
-    validate_input,
-    interpret_signals,
-    retrieve_evidence,
+    AgentState,
     analyze_fault,
     generate_recommendations,
     generate_response,
-    AgentState
+    interpret_signals,
+    retrieve_evidence,
+    validate_input,
 )
 
 

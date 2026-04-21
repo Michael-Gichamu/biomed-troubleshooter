@@ -5,10 +5,13 @@ Evidence retrieval from ChromaDB.
 Strictly limited to evidence retrieval - no freeform reasoning.
 """
 
-from dataclasses import dataclass
-from typing import Optional
 import json
+from dataclasses import dataclass
 from pathlib import Path
+from typing import TYPE_CHECKING, Optional
+
+if TYPE_CHECKING:
+    from src.infrastructure.chromadb_client import ChromaDBClient
 
 
 @dataclass
@@ -16,7 +19,7 @@ class DocumentSnippet:
     """A retrieved document snippet."""
     doc_id: str
     title: str
-    section: Optional[str]
+    section: str | None
     content: str
     relevance_score: float
 
@@ -71,7 +74,7 @@ class RAGRepository:
         self,
         content: str,
         metadata: dict,
-        doc_id: Optional[str] = None
+        doc_id: str | None = None
     ) -> str:
         """
         Add a document to the knowledge base.
@@ -171,9 +174,9 @@ class StaticRuleRepository:
     Provides deterministic rule-based fallback.
     """
 
-    def __init__(self, rules_path: Optional[str] = None):
+    def __init__(self, rules_path: str | None = None):
         self.rules_path = rules_path or self._default_rules_path()
-        self._rules_cache: Optional[list[dict]] = None
+        self._rules_cache: list[dict] | None = None
 
     def _default_rules_path(self) -> str:
         """Get default rules file path."""
@@ -196,7 +199,7 @@ class StaticRuleRepository:
     def _load_rules(self) -> list[dict]:
         """Load rules from JSON file."""
         try:
-            with open(self.rules_path, 'r') as f:
+            with open(self.rules_path) as f:
                 return json.load(f)
         except FileNotFoundError:
             return []

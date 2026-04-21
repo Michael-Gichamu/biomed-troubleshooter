@@ -8,23 +8,24 @@ Prefer importing from :mod:`src.graph` in new code.
 """
 
 from dotenv import load_dotenv
+
 load_dotenv()
 
 from src.graph import ConversationalAgentState, _text, create_conversational_graph, graph
 from src.graph.helpers import _parse_manual_reading
-from src.graph.routing import route_from_decision, route_from_resume
 from src.graph.nodes import (
-    rag_node,
+    decision_node,
     hypotheses_node,
     instruction_node,
-    probe_wait_node,
-    step_node,
-    reason_node,
-    decision_node,
-    repair_node,
     interrupt_node,
+    probe_wait_node,
+    rag_node,
+    reason_node,
+    repair_node,
     resume_node,
+    step_node,
 )
+from src.graph.routing import route_from_decision, route_from_resume
 
 __all__ = [
     "ConversationalAgentState",

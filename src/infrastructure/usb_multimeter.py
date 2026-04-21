@@ -1,11 +1,12 @@
+import re
+import threading
+import time
+from collections.abc import Callable
+from dataclasses import dataclass
+from datetime import datetime
+
 import serial
 import serial.tools.list_ports
-from dataclasses import dataclass
-from typing import Optional, List, Callable, Dict
-from datetime import datetime
-import threading
-import re
-import time
 
 
 @dataclass
@@ -17,8 +18,8 @@ class MultimeterReading:
     measurement_type: str   # DC, AC, OHM, CONT, DIODE, etc.
     timestamp: str          # ISO timestamp
     test_point_id: str = "" # Optional test point identifier
-    secondary_value: Optional[float] = None
-    secondary_unit: Optional[str] = None
+    secondary_value: float | None = None
+    secondary_unit: str | None = None
     
     def to_dict(self) -> dict:
         """Convert to dictionary for agent consumption."""
@@ -137,7 +138,7 @@ class MastechMS8250DParser:
         return True
 
     @classmethod
-    def parse_frame(cls, buf: bytes) -> Optional[MultimeterReading]:
+    def parse_frame(cls, buf: bytes) -> MultimeterReading | None:
         if len(buf) != 18:
             return None
 
@@ -302,10 +303,10 @@ class USBMultimeterClient:
     
     def __init__(
         self,
-        port: Optional[str] = None,
+        port: str | None = None,
         baud_rate: int = 2400,
         timeout: float = 1.0,
-        on_reading_callback: Optional[Callable[[MultimeterReading], None]] = None
+        on_reading_callback: Callable[[MultimeterReading], None] | None = None
     ):
         """
         Initialize USB multimeter client.
@@ -322,14 +323,14 @@ class USBMultimeterClient:
         self.timeout = timeout
         self.on_reading_callback = on_reading_callback
         
-        self._serial: Optional[serial.Serial] = None
+        self._serial: serial.Serial | None = None
         self._connected = False
-        self._reading_thread: Optional[threading.Thread] = None
+        self._reading_thread: threading.Thread | None = None
         self._stop_event = threading.Event()
-        self._last_reading: Optional[MultimeterReading] = None
+        self._last_reading: MultimeterReading | None = None
         
     @staticmethod
-    def list_available_ports() -> List[str]:
+    def list_available_ports() -> list[str]:
         """
         List all available COM ports.
         
@@ -340,7 +341,7 @@ class USBMultimeterClient:
         return [port.device for port in ports]
     
     @staticmethod
-    def detect_multimeter() -> Optional[str]:
+    def detect_multimeter() -> str | None:
         """
         Auto-detect the multimeter port.
         
@@ -465,7 +466,7 @@ class USBMultimeterClient:
         # Re-use existing connect() which handles auto-detect + baud cycling
         return self.connect()
     
-    def _parse_reading(self, raw_data: str) -> Optional[MultimeterReading]:
+    def _parse_reading(self, raw_data: str) -> MultimeterReading | None:
         """
         Parse raw data string into a reading.
         
@@ -547,7 +548,7 @@ class USBMultimeterClient:
         
         return None
     
-    def _parse_binary_frame(self, raw_bytes: bytes) -> Optional[MultimeterReading]:
+    def _parse_binary_frame(self, raw_bytes: bytes) -> MultimeterReading | None:
         """
         Parse binary frame from MS8250D multimeter.
 
@@ -572,7 +573,7 @@ class USBMultimeterClient:
                 return reading
 
         return None
-    def _parse_new_frame_format(self, frame: bytes) -> Optional[MultimeterReading]:
+    def _parse_new_frame_format(self, frame: bytes) -> MultimeterReading | None:
         """
         Parse the new MS8250D frame format (C8FEEC or C8EECC).
         
@@ -656,7 +657,7 @@ class USBMultimeterClient:
         
         return None
 
-    def _parse_um24c_frame(self, frame: bytes) -> Optional[MultimeterReading]:
+    def _parse_um24c_frame(self, frame: bytes) -> MultimeterReading | None:
         """
         Parse MS8250D style binary frame (older format).
         Format example: 0x44 0x22 0x03 0x00 0x00 0x30 0x35 0x04 0x03 0x10
@@ -720,7 +721,7 @@ class USBMultimeterClient:
                     # Mode 0x75 with unit 0x53 appears to be a valid DC voltage reading
                     if mode_byte == 0x75:
                         # Unknown mode - default to DC voltage but log for investigation
-                        print(f"[DEBUG] Unknown mode 0x75 detected - defaulting to DC_VOLTAGE")
+                        print("[DEBUG] Unknown mode 0x75 detected - defaulting to DC_VOLTAGE")
                         unit = "V"
                         measurement_type = "DC_VOLTAGE"
                     elif mode_byte == 0x03 and unit_byte == 0x00:
@@ -759,7 +760,7 @@ class USBMultimeterClient:
         
         return None
     
-    def read_measurement(self, timeout: float = 2.0) -> Optional[MultimeterReading]:
+    def read_measurement(self, timeout: float = 2.0) -> MultimeterReading | None:
         """
         Read a single measurement from the multimeter.
         
@@ -834,7 +835,7 @@ class USBMultimeterClient:
             if reading and self.on_reading_callback:
                 self.on_reading_callback(reading)
     
-    def get_last_reading(self) -> Optional[MultimeterReading]:
+    def get_last_reading(self) -> MultimeterReading | None:
         """Get the most recent reading."""
         return self._last_reading
 
@@ -844,8 +845,8 @@ class USBMultimeterClient:
 # =============================================================================
 
 def create_multimeter_client(
-    port: Optional[str] = None,
-    on_reading_callback: Optional[Callable[[MultimeterReading], None]] = None
+    port: str | None = None,
+    on_reading_callback: Callable[[MultimeterReading], None] | None = None
 ) -> USBMultimeterClient:
     """
     Create a multimeter client with auto-detection.
@@ -863,7 +864,7 @@ def create_multimeter_client(
     )
 
 
-def quick_read(port: Optional[str] = None) -> Optional[MultimeterReading]:
+def quick_read(port: str | None = None) -> MultimeterReading | None:
     """
     Quick one-time read from multimeter.
     

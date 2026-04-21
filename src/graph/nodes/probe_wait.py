@@ -2,8 +2,8 @@
 
 from langgraph.types import interrupt
 
-from src.graph.state import ConversationalAgentState
 from src.graph.helpers import _parse_manual_reading
+from src.graph.state import ConversationalAgentState
 
 
 def probe_wait_node(state: ConversationalAgentState) -> dict:

@@ -18,14 +18,13 @@ Stabilization States:
 import math
 import threading
 import time
-import statistics
-from datetime import datetime
-from typing import ClassVar, Optional, List, Tuple
-from dataclasses import dataclass, field
 from collections import deque
+from dataclasses import dataclass, field
+from datetime import datetime
 from enum import Enum
+from typing import ClassVar
 
-from src.infrastructure.usb_multimeter import USBMultimeterClient, MultimeterReading
+from src.infrastructure.usb_multimeter import MultimeterReading, USBMultimeterClient
 
 
 class MeasurementPhase(Enum):
@@ -86,11 +85,11 @@ class RobustStabilizer:
     
     # Dwell tracking
     _consecutive_stable_count: int = 0
-    _last_stable_value: Optional[float] = None
+    _last_stable_value: float | None = None
     
     # Stable cluster tracking (for trimmed mean calculation)
-    _stable_min: Optional[float] = None
-    _stable_max: Optional[float] = None
+    _stable_min: float | None = None
+    _stable_max: float | None = None
     _stable_sample_count: int = 0
     _stable_cluster_values: list = field(default_factory=list)
     
@@ -239,7 +238,7 @@ class RobustStabilizer:
         modified_z = 0.6745 * abs(value - center) / mad
         return modified_z > threshold_multiplier
     
-    def _find_stable_clusters(self, values: list) -> List[Tuple[int, int, float, float]]:
+    def _find_stable_clusters(self, values: list) -> list[tuple[int, int, float, float]]:
         """
         Find stable clusters in the readings.
         
@@ -289,7 +288,7 @@ class RobustStabilizer:
         
         return clusters
     
-    def _prefer_newest_cluster(self, clusters: List[Tuple[int, int, float, float]]) -> Optional[Tuple[float, float]]:
+    def _prefer_newest_cluster(self, clusters: list[tuple[int, int, float, float]]) -> tuple[float, float] | None:
         """
         Prefer the newest stable cluster (highest start index).
         
@@ -361,7 +360,7 @@ class RobustStabilizer:
         
         return False
     
-    def get_stable_reading(self) -> Optional[float]:
+    def get_stable_reading(self) -> float | None:
         """
         Get the stable reading value using trimmed mean.
         
@@ -423,7 +422,7 @@ class RobustStabilizer:
             
         return sum(trimmed) / len(trimmed)
     
-    def get_stable_result(self) -> Optional[dict]:
+    def get_stable_result(self) -> dict | None:
         """
         Get the final structured result with trimmed mean and stability info.
         
@@ -478,11 +477,11 @@ class BackgroundReader:
     _RECONNECT_BACKOFF_MIN: ClassVar[float] = 1.0
     _RECONNECT_BACKOFF_MAX: ClassVar[float] = 30.0
     
-    client: Optional[USBMultimeterClient] = None
-    _thread: Optional[threading.Thread] = None
+    client: USBMultimeterClient | None = None
+    _thread: threading.Thread | None = None
     _stop_event: threading.Event = field(default_factory=threading.Event)
-    _latest_reading: Optional[MultimeterReading] = None
-    _stable_reading: Optional[MultimeterReading] = None
+    _latest_reading: MultimeterReading | None = None
+    _stable_reading: MultimeterReading | None = None
     _lock: threading.Lock = field(default_factory=threading.Lock)
     _is_running: bool = False
     
@@ -490,7 +489,7 @@ class BackgroundReader:
     _stabilizer: RobustStabilizer = field(default_factory=RobustStabilizer)
     _last_probe_time: float = 0.0
     _regime_change_count: int = 0  # consecutive readings far from current stable
-    _last_printed_stable: Optional[float] = None  # for change-only terminal output
+    _last_printed_stable: float | None = None  # for change-only terminal output
     _reconnect_backoff: float = 1.0  # current backoff delay (seconds)
     _last_loop_error: str = ""  # for change-only error logging in _read_loop
     
@@ -631,12 +630,12 @@ class BackgroundReader:
             self._is_running = False
             print("[BACKGROUND_READER] Read loop exited")
 
-    def get_latest_reading(self) -> Optional[MultimeterReading]:
+    def get_latest_reading(self) -> MultimeterReading | None:
         """Get the latest raw reading."""
         with self._lock:
             return self._latest_reading
     
-    def get_stable_reading(self) -> Optional[MultimeterReading]:
+    def get_stable_reading(self) -> MultimeterReading | None:
         """Get the stable averaged reading (if available)."""
         with self._lock:
             return self._stable_reading
@@ -645,7 +644,7 @@ class BackgroundReader:
         self, 
         timeout: float = 10.0, 
         measurement_type: str = "DC_VOLTAGE"
-    ) -> Optional[MultimeterReading]:
+    ) -> MultimeterReading | None:
         """
         Wait for stable reading with robust MAD-based stabilization.
         
@@ -770,7 +769,7 @@ class BackgroundReader:
                 print(f"[DEBUG] Timeout, returning latest: {self._latest_reading.value}")
                 return self._latest_reading
 
-        print(f"[DEBUG] Complete timeout - no readings")
+        print("[DEBUG] Complete timeout - no readings")
         return None
     
     def get_sample_count(self) -> int:
@@ -783,7 +782,7 @@ class BackgroundReader:
         with self._lock:
             return self._stabilizer.get_statistics()
     
-    def get_stable_result(self) -> Optional[dict]:
+    def get_stable_result(self) -> dict | None:
         """
         Get the structured stable result with trimmed mean and stability info.
         
@@ -828,9 +827,9 @@ def ensure_reader_running() -> bool:
     """Ensure the background reader is running."""
     reader = get_background_reader()
     if not reader.is_connected():
-        print(f"[DEBUG] Background reader not connected, attempting to start...")
+        print("[DEBUG] Background reader not connected, attempting to start...")
         result = reader.start()
         print(f"[DEBUG] Background reader start result: {result}")
         return result
-    print(f"[DEBUG] Background reader already connected")
+    print("[DEBUG] Background reader already connected")
     return True

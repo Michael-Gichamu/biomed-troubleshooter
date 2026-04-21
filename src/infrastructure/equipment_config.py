@@ -5,15 +5,15 @@ Loads and manages equipment-specific configurations from YAML files.
 All equipment knowledge lives in data files - NO hard-coded logic.
 """
 
-from dataclasses import dataclass, field
-from typing import Optional, Dict, List, Any
-from pathlib import Path
 import re
 import threading
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Any
+
 import yaml
 
 from src.infrastructure.config import get_image_base_url
-
 
 # Equipment IDs are slugs: lowercase letters, digits, and hyphens.
 # Enforced length cap protects against oversized LLM-extracted inputs.
@@ -80,10 +80,10 @@ class SignalConfig:
     parameter: str
     unit: str
     measurability: str = "internal"
-    physical_description: Optional[str] = ""
-    image_url: Optional[str] = ""
-    pro_tips: List[str] = field(default_factory=list)
-    probe_placement: Optional[str] = ""
+    physical_description: str | None = ""
+    image_url: str | None = ""
+    pro_tips: list[str] = field(default_factory=list)
+    probe_placement: str | None = ""
 
     @classmethod
     def from_dict(cls, data: dict) -> "SignalConfig":
@@ -105,8 +105,8 @@ class SignalConfig:
 class ThresholdState:
     """A semantic state with numerical boundaries."""
     name: str
-    min_value: Optional[float] = None
-    max_value: Optional[float] = None
+    min_value: float | None = None
+    max_value: float | None = None
     description: str = ""
 
     @classmethod
@@ -123,7 +123,7 @@ class ThresholdState:
 class ThresholdConfig:
     """Threshold configuration for a signal."""
     signal_id: str
-    states: Dict[str, ThresholdState] = field(default_factory=dict)
+    states: dict[str, ThresholdState] = field(default_factory=dict)
 
     @classmethod
     def from_dict(cls, data: dict) -> "ThresholdConfig":
@@ -132,7 +132,7 @@ class ThresholdConfig:
             states[name] = ThresholdState.from_dict(name, value)
         return cls(signal_id=data["signal_id"], states=states)
 
-    def get_state(self, value: float) -> Optional[str]:
+    def get_state(self, value: float) -> str | None:
         """Determine semantic state from raw value."""
         for name, state in self.states.items():
             if state.min_value is not None and value < state.min_value:
@@ -154,7 +154,7 @@ class RecoveryStep:
     safety: str = ""
     estimated_time: str = ""
     difficulty: str = ""
-    tools: List[str] = field(default_factory=list)
+    tools: list[str] = field(default_factory=list)
 
     @classmethod
     def from_dict(cls, data: dict) -> "RecoveryStep":
@@ -198,9 +198,9 @@ class FaultConfig:
     name: str
     description: str
     priority: int = 999  # Lower number = higher priority
-    signatures: List[Dict[str, Any]] = field(default_factory=list)
-    hypotheses: List[FaultHypothesis] = field(default_factory=list)
-    recovery: List[RecoveryStep] = field(default_factory=list)
+    signatures: list[dict[str, Any]] = field(default_factory=list)
+    hypotheses: list[FaultHypothesis] = field(default_factory=list)
+    recovery: list[RecoveryStep] = field(default_factory=list)
 
     @classmethod
     def from_dict(cls, data: dict) -> "FaultConfig":
@@ -216,7 +216,7 @@ class FaultConfig:
             recovery=recovery
         )
 
-    def get_best_hypothesis(self) -> Optional[FaultHypothesis]:
+    def get_best_hypothesis(self) -> FaultHypothesis | None:
         """Get the highest-ranked hypothesis."""
         if not self.hypotheses:
             return None
@@ -229,8 +229,8 @@ class ImageConfig:
     image_id: str
     filename: str
     description: str
-    test_points: List[str] = field(default_factory=list)
-    annotations: List[Dict[str, str]] = field(default_factory=list)
+    test_points: list[str] = field(default_factory=list)
+    annotations: list[dict[str, str]] = field(default_factory=list)
 
     @classmethod
     def from_dict(cls, data: dict) -> "ImageConfig":
@@ -242,7 +242,7 @@ class ImageConfig:
             annotations=data.get("annotations", [])
         )
 
-    def get_annotation(self, test_point: str) -> Optional[Dict[str, str]]:
+    def get_annotation(self, test_point: str) -> dict[str, str] | None:
         """Get annotation for a specific test point."""
         for ann in self.annotations:
             if ann.get("target") == test_point:
@@ -297,16 +297,16 @@ class EquipmentConfig:
     NO hard-coded logic should exist in the agent code.
     """
     metadata: EquipmentMetadata
-    signals: Dict[str, SignalConfig] = field(default_factory=dict)
-    thresholds: Dict[str, ThresholdConfig] = field(default_factory=dict)
-    faults: Dict[str, FaultConfig] = field(default_factory=dict)
-    images: Dict[str, ImageConfig] = field(default_factory=dict)
-    signal_dependencies: List[SignalDependency] = field(default_factory=list)
+    signals: dict[str, SignalConfig] = field(default_factory=dict)
+    thresholds: dict[str, ThresholdConfig] = field(default_factory=dict)
+    faults: dict[str, FaultConfig] = field(default_factory=dict)
+    images: dict[str, ImageConfig] = field(default_factory=dict)
+    signal_dependencies: list[SignalDependency] = field(default_factory=list)
 
     @classmethod
     def from_file(cls, file_path: str) -> "EquipmentConfig":
         """Load equipment config from YAML file."""
-        with open(file_path, 'r') as f:
+        with open(file_path) as f:
             data = yaml.safe_load(f)
 
         metadata = EquipmentMetadata.from_dict(data["metadata"])
@@ -365,22 +365,22 @@ class EquipmentConfig:
             signal_dependencies=signal_dependencies
         )
 
-    def get_signal(self, signal_id: str) -> Optional[SignalConfig]:
+    def get_signal(self, signal_id: str) -> SignalConfig | None:
         """Get signal configuration by ID."""
         return self.signals.get(signal_id)
 
-    def get_threshold(self, signal_id: str) -> Optional[ThresholdConfig]:
+    def get_threshold(self, signal_id: str) -> ThresholdConfig | None:
         """Get threshold configuration by signal ID."""
         return self.thresholds.get(signal_id)
 
-    def interpret_signal(self, signal_id: str, value: float) -> Optional[str]:
+    def interpret_signal(self, signal_id: str, value: float) -> str | None:
         """Interpret a signal value to get semantic state."""
         threshold = self.get_threshold(signal_id)
         if threshold:
             return threshold.get_state(value)
         return None
 
-    def find_fault(self, signal_states: Dict[str, str]) -> Optional[FaultConfig]:
+    def find_fault(self, signal_states: dict[str, str]) -> FaultConfig | None:
         """
         Find matching fault based on observed signal states.
 
@@ -391,7 +391,7 @@ class EquipmentConfig:
                 return fault
         return None
 
-    def _matches_fault(self, fault: FaultConfig, signal_states: Dict[str, str]) -> bool:
+    def _matches_fault(self, fault: FaultConfig, signal_states: dict[str, str]) -> bool:
         """Check if fault signatures match observed signal states."""
         for sig in fault.signatures:
             sig_signal_id = sig.get("signal_id")
@@ -401,11 +401,11 @@ class EquipmentConfig:
                 return False
         return True
 
-    def get_image(self, image_id: str) -> Optional[ImageConfig]:
+    def get_image(self, image_id: str) -> ImageConfig | None:
         """Get image configuration by ID."""
         return self.images.get(image_id)
 
-    def get_image_for_test_point(self, test_point: str) -> Optional[ImageConfig]:
+    def get_image_for_test_point(self, test_point: str) -> ImageConfig | None:
         """Get an image that shows a specific test point."""
         for image in self.images.values():
             if test_point in image.test_points:
@@ -426,7 +426,7 @@ class EquipmentConfig:
             return ""
         return get_full_image_url(image.filename)
 
-    def get_test_point_guidance(self, tp_id: str) -> Dict[str, Any]:
+    def get_test_point_guidance(self, tp_id: str) -> dict[str, Any]:
         """
         Get consolidated guidance for a test point, including a base64 image.
         """
@@ -465,7 +465,7 @@ class EquipmentConfigLoader:
 
     def __init__(self, config_dir: str = "data/equipment"):
         self.config_dir = Path(config_dir)
-        self._cache: Dict[str, EquipmentConfig] = {}
+        self._cache: dict[str, EquipmentConfig] = {}
         self._cache_lock = threading.Lock()
 
     def load(self, equipment_id: str) -> EquipmentConfig:
@@ -511,13 +511,13 @@ class EquipmentConfigLoader:
             self._cache.setdefault(equipment_id, config)
             return self._cache[equipment_id]
 
-    def list_available(self) -> List[str]:
+    def list_available(self) -> list[str]:
         """Return sorted list of equipment IDs with YAML config files on disk."""
         if not self.config_dir.exists():
             return []
         return sorted(p.stem for p in self.config_dir.glob("*.yaml"))
 
-    def load_all(self) -> Dict[str, EquipmentConfig]:
+    def load_all(self) -> dict[str, EquipmentConfig]:
         """Load all equipment configurations from the config directory."""
         configs = {}
         for file_path in self.config_dir.glob("*.yaml"):
@@ -531,7 +531,7 @@ class EquipmentConfigLoader:
 
 
 # Singleton loader instance
-_loader: Optional[EquipmentConfigLoader] = None
+_loader: EquipmentConfigLoader | None = None
 _loader_lock = threading.Lock()
 
 

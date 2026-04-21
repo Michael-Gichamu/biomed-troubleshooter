@@ -42,7 +42,7 @@ import logging
 import os
 import uuid
 from contextlib import asynccontextmanager
-from typing import Any, Optional
+from typing import Any
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -114,21 +114,21 @@ class RunAgentRequest(BaseModel):
         min_length=1,
         max_length=8000,
     )
-    equipment_model: Optional[str] = Field(
+    equipment_model: str | None = Field(
         default=None,
         description="Equipment identifier, e.g. 'mastech-ms8250d'. Optional if the "
                     "message mentions one.",
     )
-    session_id: Optional[str] = Field(
+    session_id: str | None = Field(
         default=None,
         description="Stable ID to thread multi-turn sessions. A new one is created "
                     "if omitted.",
     )
-    thread_id: Optional[str] = Field(
+    thread_id: str | None = Field(
         default=None,
         description="Alias for session_id (accepted for convenience).",
     )
-    manual_reading: Optional[str] = Field(
+    manual_reading: str | None = Field(
         default=None,
         description="Raw multimeter reading when resuming after a probe-wait.",
     )
@@ -143,8 +143,8 @@ class RunAgentResponse(BaseModel):
     session_id: str
     messages: list[AssistantMessage]
     diagnosis_complete: bool = False
-    confirmed_fault: Optional[str] = None
-    next_node: Optional[str] = None
+    confirmed_fault: str | None = None
+    next_node: str | None = None
     status: str = "ok"
 
 
@@ -181,7 +181,7 @@ def readyz():
         return {"status": "ready"}
     except Exception as exc:
         logger.exception("Readiness check failed")
-        raise HTTPException(status_code=503, detail=f"not ready: {exc}")
+        raise HTTPException(status_code=503, detail=f"not ready: {exc}") from exc
 
 
 @app.post("/run-agent", response_model=RunAgentResponse)
@@ -217,7 +217,7 @@ def run_agent(req: RunAgentRequest):
         result = graph.invoke(graph_input, config=config)
     except Exception as exc:
         logger.exception("Agent invocation failed for session %s", session_id)
-        raise HTTPException(status_code=500, detail=f"agent error: {exc}")
+        raise HTTPException(status_code=500, detail=f"agent error: {exc}") from exc
 
     messages = _extract_assistant_messages(result)
     if not messages:

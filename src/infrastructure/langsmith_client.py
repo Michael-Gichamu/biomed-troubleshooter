@@ -6,14 +6,14 @@ Supports free LangSmith tier with offline/local development.
 """
 
 import os
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Optional, Callable
 
 
 @dataclass
 class LangSmithConfig:
     """Configuration for LangSmith."""
-    api_key: Optional[str] = None
+    api_key: str | None = None
     project_name: str = "biomed-troubleshooter"
     endpoint: str = "https://api.smith.langchain.com"
     enabled: bool = True
@@ -31,7 +31,7 @@ class LangSmithClient:
     - Minimal overhead in production
     """
 
-    def __init__(self, config: Optional[LangSmithConfig] = None):
+    def __init__(self, config: LangSmithConfig | None = None):
         self.config = config or LangSmithConfig()
         self._initialized = False
 
@@ -72,8 +72,8 @@ class LangSmithClient:
         name: str,
         run_type: str,
         inputs: dict,
-        extra: Optional[dict] = None
-    ) -> Optional[str]:
+        extra: dict | None = None
+    ) -> str | None:
         """
         Create a trace run.
 
@@ -100,7 +100,7 @@ class LangSmithClient:
         self,
         run_id: str,
         outputs: dict,
-        error: Optional[str] = None
+        error: str | None = None
     ) -> None:
         """End a trace run."""
         if not self.is_enabled():
@@ -136,7 +136,7 @@ class LangSmithClient:
 
 
 # Global client instance
-_langsmith_client: Optional[LangSmithClient] = None
+_langsmith_client: LangSmithClient | None = None
 
 
 def get_langsmith_client() -> LangSmithClient:
@@ -148,7 +148,7 @@ def get_langsmith_client() -> LangSmithClient:
 
 
 def configure_langsmith(
-    api_key: Optional[str] = None,
+    api_key: str | None = None,
     project_name: str = "biomed-troubleshooter",
     enabled: bool = True
 ) -> LangSmithClient:

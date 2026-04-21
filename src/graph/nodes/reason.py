@@ -2,10 +2,10 @@
 
 import json
 
-from langchain_core.messages import HumanMessage, AIMessage
+from langchain_core.messages import AIMessage, HumanMessage
 
-from src.graph.state import ConversationalAgentState, _text
 from src.graph.nodes.hypotheses import _extract_confirmed_findings
+from src.graph.state import ConversationalAgentState, _text
 
 
 def reason_node(state: ConversationalAgentState):

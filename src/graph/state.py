@@ -1,10 +1,10 @@
 """State schema and small helpers shared by every node."""
 
 from dataclasses import dataclass, field
-from typing import Annotated, Optional
+from typing import Annotated
 
-from langgraph.graph.message import add_messages
 from langchain_core.messages import BaseMessage
+from langgraph.graph.message import add_messages
 
 from src.infrastructure.input_sanitizer import normalise_user_text
 
@@ -85,7 +85,7 @@ class ConversationalAgentState:
     consecutive_failures: int = 0   # resets to 0 on any successful/fault reading
 
     # ── Manual reading entered by engineer at probe interrupt ────────────────
-    pending_manual_reading: Optional[dict] = None
+    pending_manual_reading: dict | None = None
 
     # ── Routing (set by decision_node) ───────────────────────────────────────
     next_node: str = ""

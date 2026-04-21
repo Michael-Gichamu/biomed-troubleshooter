@@ -2,10 +2,10 @@
 
 import re
 
-from langchain_core.messages import HumanMessage, AIMessage
+from langchain_core.messages import AIMessage, HumanMessage
 
-from src.graph.state import ConversationalAgentState, _text
 from src.graph.rag_cache import _get_cached_rag_knowledge
+from src.graph.state import ConversationalAgentState, _text
 
 
 def rag_node(state: ConversationalAgentState):

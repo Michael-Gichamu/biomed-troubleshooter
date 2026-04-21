@@ -5,10 +5,8 @@ Manages the ChromaDB vector store for troubleshooting documentation.
 Follows infrastructure layer patterns.
 """
 
-import json
-from pathlib import Path
-from typing import Optional
 from dataclasses import dataclass
+from pathlib import Path
 
 # Lazy import for sentence-transformers to avoid import errors
 _embedding_function = None
@@ -41,7 +39,7 @@ class ChromaDBClient:
     - Safe fallback to in-memory
     """
 
-    def __init__(self, config: Optional[ChromaDBConfig] = None):
+    def __init__(self, config: ChromaDBConfig | None = None):
         self.config = config or ChromaDBConfig()
         self._client = None
         self._collection = None
@@ -54,7 +52,6 @@ class ChromaDBClient:
     def initialize(self) -> None:
         """Initialize ChromaDB client and collection."""
         # Create persistence directory
-        import os
         Path(self.config.persist_directory).mkdir(parents=True, exist_ok=True)
         
         # Try local PersistentClient first (no Docker needed!)
@@ -74,7 +71,7 @@ class ChromaDBClient:
                 self._client = chromadb.EphemeralClient()
                 print("[ChromaDB] Using in-memory client")
             except OSError as ephemeral_err:
-                raise RuntimeError(f"ChromaDB unavailable: {ephemeral_err}")
+                raise RuntimeError(f"ChromaDB unavailable: {ephemeral_err}") from ephemeral_err
 
         # Get or create collection
         self._collection = self._client.get_or_create_collection(
@@ -123,7 +120,7 @@ class ChromaDBClient:
         self,
         query_texts: list[str],
         n_results: int = 5,
-        where: Optional[dict] = None
+        where: dict | None = None
     ) -> dict:
         """
         Query the collection.

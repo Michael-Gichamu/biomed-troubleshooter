@@ -10,8 +10,9 @@ This module defines the tools that the conversational agent uses to:
 All guidance MUST come from RAG to prevent hallucination.
 """
 
-from typing import Optional, Any, Dict, List
 import time
+from typing import Any
+
 from langchain_core.tools import tool
 
 # Lazy imports to avoid DLL loading issues on Windows
@@ -158,7 +159,7 @@ def _get_diagnostic_engine():
 def query_diagnostic_knowledge(
     query: str,
     equipment_model: str,
-    category: Optional[str] = None,
+    category: str | None = None,
     top_k: int = 5
 ) -> dict:
     """
@@ -503,7 +504,7 @@ def read_multimeter(
 
 @tool
 def get_diagnostic_step(
-    current_state: Dict[str, Any],
+    current_state: dict[str, Any],
     equipment_model: str = "cctv-psu-24w-v1"
 ) -> dict:
     """
@@ -602,8 +603,8 @@ def get_diagnostic_step(
 @tool
 def record_measurement(
     test_point: str,
-    measurement_result: Dict[str, Any],
-    current_state: Dict[str, Any],
+    measurement_result: dict[str, Any],
+    current_state: dict[str, Any],
     equipment_model: str = "cctv-psu-24w-v1"
 ) -> dict:
     """
@@ -673,9 +674,9 @@ def record_measurement(
 
 @tool
 def evaluate_measurement(
-    measurement_result: Dict[str, Any],
+    measurement_result: dict[str, Any],
     expected_value: str,
-    current_state: Dict[str, Any],
+    current_state: dict[str, Any],
     equipment_model: str = "cctv-psu-24w-v1"
 ) -> dict:
     """
@@ -714,7 +715,6 @@ def evaluate_measurement(
             "is_within_threshold": True
         }
     """
-    from src.domain.models import DiagnosticEngine, DiagnosticState
     
     try:
         # Get measured value
@@ -785,9 +785,9 @@ def evaluate_measurement(
 
 @tool
 def check_fault_confirmed(
-    current_measurements: Dict[str, Any],
+    current_measurements: dict[str, Any],
     hypothesis: str,
-    current_state: Dict[str, Any],
+    current_state: dict[str, Any],
     equipment_model: str = "cctv-psu-24w-v1"
 ) -> dict:
     """
@@ -900,7 +900,7 @@ def wait_for_multimeter_reading(
     Returns:
         Dict with status ("success" or "timeout") and the reading data if successful.
     """
-    from src.studio.background_usb_reader import get_background_reader, ensure_reader_running
+    from src.studio.background_usb_reader import ensure_reader_running, get_background_reader
     
     if not ensure_reader_running():
         return {
@@ -968,7 +968,9 @@ def enter_manual_reading(
         returns: {"test_point": "TP2", "value": 12.5, "unit": "V", "status": "recorded"}
     """
     from datetime import datetime
-    
+
+    from src.infrastructure.usb_multimeter import MultimeterReading
+
     reading = MultimeterReading(
         raw_value=f"{value}{unit}",
         value=value,
@@ -1029,6 +1031,7 @@ def get_tools() -> list:
 # before the first interrupt/step cycle.
 
 import threading as _threading
+
 
 def _prewarm_rag() -> None:
     """Load ChromaDB + sentence-transformers model in the background."""

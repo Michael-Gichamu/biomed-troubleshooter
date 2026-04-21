@@ -6,23 +6,23 @@ Supports interactive mode and USB multimeter mode.
 """
 
 import os
+
 # Load environment variables FIRST, before any LangChain imports
 from dotenv import load_dotenv
+
 load_dotenv(dotenv_path=os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".env"))
 
 # Verify LangChain project is set
 langchain_project = os.getenv("LANGCHAIN_PROJECT", "biomed-troubleshooter")
 print(f"LangChain Project: {langchain_project}")
 
-import json
 import argparse
+import json
 import time
 from pathlib import Path
-from typing import Optional
 
 from src.application.agent import run_diagnostic
 from src.interfaces.mode_router import ModeRouter
-from src.domain.models import SignalBatch
 
 
 def parse_measurement(arg: str) -> dict:
@@ -43,7 +43,7 @@ def load_scenario(scenario_file: str) -> dict:
     if not path.exists():
         raise argparse.ArgumentTypeError(f"Scenario file not found: {scenario_file}")
 
-    with open(path, 'r') as f:
+    with open(path) as f:
         data = json.load(f)
 
     return data
@@ -96,7 +96,7 @@ def run_usb_mode(equipment_id: str, timeout: int = 60) -> None:
         print("  3. Try specifying port: --usb COM3")
         return
 
-    print(f"Connected to multimeter!")
+    print("Connected to multimeter!")
     print("\nTaking measurements with agent guidance...")
     print("After each measurement, the agent will analyze it and guide your next step.")
     print()
@@ -106,9 +106,6 @@ def run_usb_mode(equipment_id: str, timeout: int = 60) -> None:
     print("Ready to take measurements...")
     print("The agent will guide you after each measurement you take.")
     print("="*60 + "\n")
-    
-    # Store initial recommendations for display
-    initial_recommendations = []
     
     # Initialize measurement tracking
     measurements = []
@@ -160,7 +157,7 @@ def run_usb_mode(equipment_id: str, timeout: int = 60) -> None:
                             print(f"  [Averaged] {avg_value:.2f} {reading.unit} (from {len(stable_values)}/{len(values)} samples)")
                             final_value = avg_value
                         else:
-                            print(f"\n  [WARN] Readings too unstable - using first value")
+                            print("\n  [WARN] Readings too unstable - using first value")
                             final_value = reading.value
                             stable_values = [reading.value]
                     else:
