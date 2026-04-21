@@ -14,27 +14,45 @@ authors = [
 ]
 keywords = ["ai", "langgraph", "biomedical", "troubleshooting", "rag"]
 classifiers = [
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
 ]
 
+# Kept in sync with requirements.txt. Floor versions only — tighter bounds live
+# in a lock file (see constraints.txt, generated with `pip freeze`).
 dependencies = [
-    "langgraph>=0.0.20",
-    "langchain>=0.1.0",
-    "chromadb>=0.4.0",
+    "langgraph>=0.4.10",
+    "langchain-core>=0.3.0",
+    "langchain-community>=0.3.0",
+    "langchain-anthropic>=0.2.0",
+    "langchain-groq>=0.2.0",
+    "langchain-openai>=0.2.0",
+    "sentence-transformers>=2.2.0",
+    "chromadb>=0.5.0",
+    "pyserial>=3.5",
+    "pypdf>=4.0.0",
+    "langsmith>=0.1.0",
+    "python-dotenv>=1.0.0",
     "pydantic>=2.0.0",
+    "pyyaml>=6.0",
+    "colorama>=0.4.6",
     "click>=8.0.0",
     "python-dateutil>=2.8.0",
+    "fastapi>=0.110.0",
+    "uvicorn[standard]>=0.27.0",
 ]
 
 [project.optional-dependencies]
 dev = [
-    "pytest>=7.0.0",
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.23.0",
+    "pytest-mock>=3.12.0",
     "pytest-cov>=4.0.0",
     "black>=23.0.0",
     "mypy>=1.0.0",
@@ -44,16 +62,41 @@ dev = [
 biomed-troubleshoot = "src.interfaces.cli:main"
 
 [tool.setuptools.packages.find]
-where = ["src"]
+where = ["."]
+include = ["src*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_functions = ["test_*"]
+addopts = "-ra --strict-markers"
+markers = [
+    "integration: tests that exercise the full compiled graph (slower, LLM mocked)",
+    "unit: fast, isolated, no I/O",
+]
 
 [tool.black]
 line-length = 100
 target-version = ["py310"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+extend-exclude = ["venv", ".venv", "build", "dist"]
+
+[tool.ruff.lint]
+# Keep the ruleset deliberately narrow — pyflakes + pycodestyle essentials +
+# import order. Anything stricter would require a dedicated cleanup pass on
+# the pre-existing codebase.
+select = ["E", "F", "I", "B", "UP"]
+ignore = [
+    "E501",   # line-too-long — black owns formatting
+    "B008",   # function calls in default args (FastAPI-style)
+    "UP007",  # PEP 604 unions are a churny refactor
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["E402"]
 
 [tool.mypy]
 python_version = "3.10"

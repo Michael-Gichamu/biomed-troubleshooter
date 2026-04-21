@@ -1,0 +1,43 @@
+# =============================================================================
+# Keep the build context small. If a file isn't needed at runtime, exclude it.
+# =============================================================================
+
+# Version control
+.git
+.gitattributes
+.gitignore
+
+# Virtual environments / caches
+venv
+.venv
+env
+.pytest_cache
+.mypy_cache
+.ruff_cache
+__pycache__
+*.py[cod]
+*.egg-info
+
+# Local LangGraph / IDE
+.langgraph_api
+.vscode
+.idea
+*.code-workspace
+
+# Tests & dev scaffolding (not needed in prod image)
+tests
+raw_dump.py
+test_mm.py
+test_raw_serial.py
+start.bat
+
+# Env files — NEVER bake credentials into an image
+.env
+.env.*
+!.env.example
+
+# Build artefacts
+dist
+build
+*.log
+*.tmp
