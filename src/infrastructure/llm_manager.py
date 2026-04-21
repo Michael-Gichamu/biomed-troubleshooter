@@ -18,6 +18,7 @@ import time
 import json
 import re
 import logging
+import threading
 from typing import List, Optional, Dict, Any
 from dataclasses import dataclass, field
 
@@ -51,14 +52,22 @@ class LLMManager:
     
     _instance: Optional['LLMManager'] = None
     _initialized: bool = False
-    
+    _lock: threading.RLock = threading.RLock()
+
     def __new__(cls):
+        # Double-checked locking: fast path avoids the lock once created.
         if cls._instance is None:
-            cls._instance = super().__new__(cls)
+            with cls._lock:
+                if cls._instance is None:
+                    cls._instance = super().__new__(cls)
         return cls._instance
-    
+
     def __init__(self):
-        if not LLMManager._initialized:
+        if LLMManager._initialized:
+            return
+        with LLMManager._lock:
+            if LLMManager._initialized:
+                return
             self._load_config()
             self._initialize_llm()
             LLMManager._initialized = True
@@ -244,13 +253,16 @@ class LLMManager:
 
 # Convenience function for getting the active LLM
 _llm_manager: Optional[LLMManager] = None
+_llm_manager_lock = threading.Lock()
 
 
 def get_llm_manager() -> LLMManager:
-    """Get the singleton LLMManager instance."""
+    """Get the singleton LLMManager instance (thread-safe)."""
     global _llm_manager
     if _llm_manager is None:
-        _llm_manager = LLMManager()
+        with _llm_manager_lock:
+            if _llm_manager is None:
+                _llm_manager = LLMManager()
     return _llm_manager
 
 

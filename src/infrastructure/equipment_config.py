@@ -8,9 +8,41 @@ All equipment knowledge lives in data files - NO hard-coded logic.
 from dataclasses import dataclass, field
 from typing import Optional, Dict, List, Any
 from pathlib import Path
+import re
+import threading
 import yaml
 
 from src.infrastructure.config import get_image_base_url
+
+
+# Equipment IDs are slugs: lowercase letters, digits, and hyphens.
+# Enforced length cap protects against oversized LLM-extracted inputs.
+_EQUIPMENT_ID_PATTERN = re.compile(r"^[a-z][a-z0-9]*(?:-[a-z0-9]+)+$")
+_EQUIPMENT_ID_MAX_LEN = 64
+
+
+class InvalidEquipmentIdError(ValueError):
+    """Raised when an equipment_id fails validation before any file I/O."""
+
+
+def _validate_equipment_id(equipment_id: str) -> str:
+    """Reject malformed or dangerous equipment IDs before touching the filesystem.
+
+    Raises InvalidEquipmentIdError for anything that is not a simple slug.
+    Prevents path traversal (``../``), absolute paths, null bytes, and
+    separator injection from user-controlled LLM extraction.
+    """
+    if not isinstance(equipment_id, str) or not equipment_id:
+        raise InvalidEquipmentIdError("equipment_id must be a non-empty string")
+    if len(equipment_id) > _EQUIPMENT_ID_MAX_LEN:
+        raise InvalidEquipmentIdError(
+            f"equipment_id exceeds {_EQUIPMENT_ID_MAX_LEN} chars"
+        )
+    if not _EQUIPMENT_ID_PATTERN.match(equipment_id):
+        raise InvalidEquipmentIdError(
+            f"equipment_id must match slug pattern (got: {equipment_id!r})"
+        )
+    return equipment_id
 
 
 def get_full_image_url(image_path: str) -> str:
@@ -434,6 +466,7 @@ class EquipmentConfigLoader:
     def __init__(self, config_dir: str = "data/equipment"):
         self.config_dir = Path(config_dir)
         self._cache: Dict[str, EquipmentConfig] = {}
+        self._cache_lock = threading.Lock()
 
     def load(self, equipment_id: str) -> EquipmentConfig:
         """
@@ -446,23 +479,43 @@ class EquipmentConfigLoader:
             EquipmentConfig object
 
         Raises:
-            FileNotFoundError: If equipment config file doesn't exist
+            InvalidEquipmentIdError: If equipment_id fails validation.
+            FileNotFoundError: If the validated config file does not exist
+                or resolves outside ``config_dir``.
         """
-        # Check cache first
-        if equipment_id in self._cache:
-            return self._cache[equipment_id]
+        equipment_id = _validate_equipment_id(equipment_id)
 
-        # Load from file
-        file_path = self.config_dir / f"{equipment_id}.yaml"
+        # Check cache first (lock-free fast path)
+        cached = self._cache.get(equipment_id)
+        if cached is not None:
+            return cached
+
+        # Build and verify the resolved path stays inside config_dir
+        # (defense in depth — slug validation already prevents traversal).
+        config_root = self.config_dir.resolve()
+        file_path = (self.config_dir / f"{equipment_id}.yaml").resolve()
+        try:
+            file_path.relative_to(config_root)
+        except ValueError as exc:
+            raise FileNotFoundError(
+                f"Equipment config path escapes config_dir: {file_path}"
+            ) from exc
+
         if not file_path.exists():
             raise FileNotFoundError(f"Equipment config not found: {file_path}")
 
         config = EquipmentConfig.from_file(str(file_path))
 
-        # Cache for future use
-        self._cache[equipment_id] = config
+        with self._cache_lock:
+            # Another thread may have populated between our check and the lock.
+            self._cache.setdefault(equipment_id, config)
+            return self._cache[equipment_id]
 
-        return config
+    def list_available(self) -> List[str]:
+        """Return sorted list of equipment IDs with YAML config files on disk."""
+        if not self.config_dir.exists():
+            return []
+        return sorted(p.stem for p in self.config_dir.glob("*.yaml"))
 
     def load_all(self) -> Dict[str, EquipmentConfig]:
         """Load all equipment configurations from the config directory."""
@@ -479,11 +532,22 @@ class EquipmentConfigLoader:
 
 # Singleton loader instance
 _loader: Optional[EquipmentConfigLoader] = None
+_loader_lock = threading.Lock()
+
+
+def get_equipment_loader() -> EquipmentConfigLoader:
+    """Get the singleton EquipmentConfigLoader instance (thread-safe)."""
+    global _loader
+    if _loader is None:
+        with _loader_lock:
+            if _loader is None:
+                _loader = EquipmentConfigLoader()
+    return _loader
 
 
 def get_equipment_config(equipment_id: str) -> EquipmentConfig:
-    """Get equipment configuration by ID."""
-    global _loader
-    if _loader is None:
-        _loader = EquipmentConfigLoader()
-    return _loader.load(equipment_id)
+    """Get equipment configuration by validated ID.
+
+    Raises InvalidEquipmentIdError if ``equipment_id`` is malformed.
+    """
+    return get_equipment_loader().load(equipment_id)

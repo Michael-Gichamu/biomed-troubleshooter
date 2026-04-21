@@ -250,7 +250,9 @@ def get_equipment_configuration(
     """
     try:
         config = _get_equipment_config()(equipment_model)
-    except FileNotFoundError:
+    except (FileNotFoundError, ValueError):
+        # ValueError covers InvalidEquipmentIdError (malformed slug).
+        # Treated identically to a missing file from the caller's POV.
         return {
             "error": f"Equipment configuration not found for {equipment_model}",
             "available_models": _get_available_models()
