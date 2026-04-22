@@ -1,0 +1,33 @@
+# Local-dev Postgres.
+#
+#   docker compose up -d        # start Postgres
+#   docker compose logs -f db   # follow logs
+#   docker compose down -v      # stop + wipe volume
+#
+# The matching DATABASE_URL lives in .env.example:
+#   DATABASE_URL=postgresql://biomed:biomed@localhost:5432/biomed
+#
+# Production uses Cloud SQL for Postgres — same major version (15) so SQL
+# parity holds between local and prod.
+
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: biomed-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: biomed
+      POSTGRES_PASSWORD: biomed
+      POSTGRES_DB: biomed
+    ports:
+      - "5432:5432"
+    volumes:
+      - biomed-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U biomed -d biomed"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  biomed-pgdata:

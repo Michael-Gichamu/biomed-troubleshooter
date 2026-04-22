@@ -35,9 +35,7 @@ def _validate_equipment_id(equipment_id: str) -> str:
     if not isinstance(equipment_id, str) or not equipment_id:
         raise InvalidEquipmentIdError("equipment_id must be a non-empty string")
     if len(equipment_id) > _EQUIPMENT_ID_MAX_LEN:
-        raise InvalidEquipmentIdError(
-            f"equipment_id exceeds {_EQUIPMENT_ID_MAX_LEN} chars"
-        )
+        raise InvalidEquipmentIdError(f"equipment_id exceeds {_EQUIPMENT_ID_MAX_LEN} chars")
     if not _EQUIPMENT_ID_PATTERN.match(equipment_id):
         raise InvalidEquipmentIdError(
             f"equipment_id must match slug pattern (got: {equipment_id!r})"
@@ -47,33 +45,34 @@ def _validate_equipment_id(equipment_id: str) -> str:
 
 def get_full_image_url(image_path: str) -> str:
     """Construct full image URL from relative path using configured IMAGE_BASE_URL.
-    
+
     Args:
         image_path: Relative path to image (e.g., "cctv-psu-24w-v1-test-points/image.png")
                     or full URL (which will be returned as-is)
-    
+
     Returns:
         Full URL - either the input URL if already complete, or with IMAGE_BASE_URL prepended
     """
     if not image_path:
         return ""
-    
+
     # If it's already a full URL (GitHub RAW, etc.), return as-is
-    if image_path.startswith('http://') or image_path.startswith('https://'):
+    if image_path.startswith("http://") or image_path.startswith("https://"):
         return image_path
-    
+
     # Otherwise, use the configured base URL
-    base_url = get_image_base_url().rstrip('/')
+    base_url = get_image_base_url().rstrip("/")
     if not base_url:
         # No base URL configured, return relative path as-is
         return image_path
-    
+
     return f"{base_url}/{image_path.lstrip('/')}"
 
 
 @dataclass
 class SignalConfig:
     """Configuration for a single signal."""
+
     signal_id: str
     name: str
     test_point: str
@@ -97,13 +96,14 @@ class SignalConfig:
             physical_description=data.get("physical_description", ""),
             image_url=data.get("image_url", ""),
             pro_tips=data.get("pro_tips", []),
-            probe_placement=data.get("probe_placement", "")
+            probe_placement=data.get("probe_placement", ""),
         )
 
 
 @dataclass
 class ThresholdState:
     """A semantic state with numerical boundaries."""
+
     name: str
     min_value: float | None = None
     max_value: float | None = None
@@ -115,13 +115,14 @@ class ThresholdState:
             name=name,
             min_value=data.get("min"),
             max_value=data.get("max"),
-            description=data.get("description", "")
+            description=data.get("description", ""),
         )
 
 
 @dataclass
 class ThresholdConfig:
     """Threshold configuration for a signal."""
+
     signal_id: str
     states: dict[str, ThresholdState] = field(default_factory=dict)
 
@@ -146,6 +147,7 @@ class ThresholdConfig:
 @dataclass
 class RecoveryStep:
     """A single recovery step."""
+
     step: int
     action: str
     target: str
@@ -167,13 +169,14 @@ class RecoveryStep:
             safety=data.get("safety", ""),
             estimated_time=data.get("estimated_time", ""),
             difficulty=data.get("difficulty", ""),
-            tools=data.get("tools", [])
+            tools=data.get("tools", []),
         )
 
 
 @dataclass
 class FaultHypothesis:
     """A hypothesis about the cause of a fault."""
+
     rank: int
     component: str
     failure_mode: str
@@ -187,13 +190,14 @@ class FaultHypothesis:
             component=data["component"],
             failure_mode=data["failure_mode"],
             cause=data["cause"],
-            confidence=data["confidence"]
+            confidence=data["confidence"],
         )
 
 
 @dataclass
 class FaultConfig:
     """Configuration for a fault."""
+
     fault_id: str
     name: str
     description: str
@@ -213,7 +217,7 @@ class FaultConfig:
             priority=data.get("priority", 999),
             signatures=data.get("signatures", []),
             hypotheses=hypotheses,
-            recovery=recovery
+            recovery=recovery,
         )
 
     def get_best_hypothesis(self) -> FaultHypothesis | None:
@@ -226,6 +230,7 @@ class FaultConfig:
 @dataclass
 class ImageConfig:
     """Configuration for a reference image."""
+
     image_id: str
     filename: str
     description: str
@@ -239,7 +244,7 @@ class ImageConfig:
             filename=data["filename"],
             description=data["description"],
             test_points=data.get("test_points", []),
-            annotations=data.get("annotations", [])
+            annotations=data.get("annotations", []),
         )
 
     def get_annotation(self, test_point: str) -> dict[str, str] | None:
@@ -253,6 +258,7 @@ class ImageConfig:
 @dataclass
 class EquipmentMetadata:
     """Equipment metadata."""
+
     equipment_id: str
     name: str
     category: str
@@ -268,13 +274,14 @@ class EquipmentMetadata:
             category=data["category"],
             manufacturer=data.get("manufacturer", ""),
             version=data["version"],
-            created=data["created"]
+            created=data["created"],
         )
 
 
 @dataclass
 class SignalDependency:
     """Dependency relationship between two signals."""
+
     upstream: str
     downstream: str
     relationship: str
@@ -284,7 +291,7 @@ class SignalDependency:
         return cls(
             upstream=data["upstream"],
             downstream=data["downstream"],
-            relationship=data["relationship"]
+            relationship=data["relationship"],
         )
 
 
@@ -296,6 +303,7 @@ class EquipmentConfig:
     All equipment-specific knowledge is loaded from this configuration.
     NO hard-coded logic should exist in the agent code.
     """
+
     metadata: EquipmentMetadata
     signals: dict[str, SignalConfig] = field(default_factory=dict)
     thresholds: dict[str, ThresholdConfig] = field(default_factory=dict)
@@ -362,7 +370,7 @@ class EquipmentConfig:
             thresholds=thresholds,
             faults=faults,
             images=images,
-            signal_dependencies=signal_dependencies
+            signal_dependencies=signal_dependencies,
         )
 
     def get_signal(self, signal_id: str) -> SignalConfig | None:
@@ -414,10 +422,10 @@ class EquipmentConfig:
 
     def get_image_url(self, image_id: str) -> str:
         """Get full URL for an image by ID using configured IMAGE_BASE_URL.
-        
+
         Args:
             image_id: The image ID
-            
+
         Returns:
             Full URL with IMAGE_BASE_URL prepended to the image filename
         """
@@ -450,23 +458,108 @@ class EquipmentConfig:
             "test_point": signal.test_point,
             "physical_description": signal.physical_description,
             "pro_tips": signal.pro_tips,
-            "image_url": full_image_url
+            "image_url": full_image_url,
         }
 
         return guidance
+
+
+def _config_from_dict(data: dict) -> "EquipmentConfig":
+    """Build an :class:`EquipmentConfig` from an already-parsed YAML dict.
+
+    Used by the Postgres backend to reuse the same parsing rules as
+    :meth:`EquipmentConfig.from_file`. Keeping this logic in one place avoids
+    subtle drift between YAML-on-disk and Postgres-JSONB parses.
+    """
+    metadata = EquipmentMetadata.from_dict(data["metadata"])
+
+    signals = {}
+    for s in data.get("signals", []):
+        signal = SignalConfig.from_dict(s)
+        signals[signal.signal_id] = signal
+
+    thresholds = {}
+    thresholds_data = data.get("thresholds", {})
+    if isinstance(thresholds_data, dict):
+        for signal_id, threshold_dict in thresholds_data.items():
+            threshold_dict_copy = dict(threshold_dict)
+            threshold_dict_copy["signal_id"] = signal_id
+            threshold = ThresholdConfig.from_dict(threshold_dict_copy)
+            thresholds[threshold.signal_id] = threshold
+    elif isinstance(thresholds_data, list):
+        for t in thresholds_data:
+            threshold = ThresholdConfig.from_dict(t)
+            thresholds[threshold.signal_id] = threshold
+
+    faults = {}
+    for f in data.get("faults", []):
+        fault = FaultConfig.from_dict(f)
+        faults[fault.fault_id] = fault
+
+    images = {}
+    images_data = data.get("images", {})
+    if isinstance(images_data, dict):
+        for image_id, image_dict in images_data.items():
+            image_dict_copy = dict(image_dict)
+            image_dict_copy["image_id"] = image_id
+            image = ImageConfig.from_dict(image_dict_copy)
+            images[image.image_id] = image
+    elif isinstance(images_data, list):
+        for i in images_data:
+            image = ImageConfig.from_dict(i)
+            images[image.image_id] = image
+
+    signal_dependencies = [
+        SignalDependency.from_dict(d) for d in data.get("signal_dependencies", [])
+    ]
+
+    return EquipmentConfig(
+        metadata=metadata,
+        signals=signals,
+        thresholds=thresholds,
+        faults=faults,
+        images=images,
+        signal_dependencies=signal_dependencies,
+    )
 
 
 class EquipmentConfigLoader:
     """
     Loader for equipment configurations.
 
-    Manages loading and caching of equipment configs.
+    Supports two backends — controlled by ``EQUIPMENT_STORE`` env var:
+      * ``"yaml"`` (default) — reads ``data/equipment/<id>.yaml`` from disk.
+      * ``"postgres"`` — reads the ``equipment`` row's ``raw_config`` JSONB.
+
+    The Postgres backend falls back to YAML if the row isn't in the catalogue
+    yet (e.g. between a YAML edit and a ``scripts/seed_equipment.py`` run).
     """
 
-    def __init__(self, config_dir: str = "data/equipment"):
+    def __init__(
+        self,
+        config_dir: str = "data/equipment",
+        backend: str | None = None,
+    ):
         self.config_dir = Path(config_dir)
         self._cache: dict[str, EquipmentConfig] = {}
         self._cache_lock = threading.Lock()
+        self._backend = (backend or self._resolve_backend()).lower()
+
+    @staticmethod
+    def _resolve_backend() -> str:
+        """Pick backend from :func:`get_equipment_store`, lazily (so tests can
+        override the env after import time).
+        """
+        try:
+            from src.infrastructure.config import get_equipment_store
+
+            return get_equipment_store()
+        except Exception:
+            return "yaml"
+
+    # ------------------------------------------------------------------
+    # Public API
+    # ------------------------------------------------------------------
 
     def load(self, equipment_id: str) -> EquipmentConfig:
         """
@@ -480,16 +573,65 @@ class EquipmentConfigLoader:
 
         Raises:
             InvalidEquipmentIdError: If equipment_id fails validation.
-            FileNotFoundError: If the validated config file does not exist
-                or resolves outside ``config_dir``.
+            FileNotFoundError: If both the Postgres catalogue (when active)
+                and the YAML fallback miss, or the validated path resolves
+                outside ``config_dir``.
         """
         equipment_id = _validate_equipment_id(equipment_id)
 
-        # Check cache first (lock-free fast path)
+        # Cache (lock-free fast path)
         cached = self._cache.get(equipment_id)
         if cached is not None:
             return cached
 
+        config: EquipmentConfig | None = None
+        if self._backend == "postgres":
+            config = self._load_from_postgres(equipment_id)
+        if config is None:
+            config = self._load_from_yaml(equipment_id)
+
+        with self._cache_lock:
+            self._cache.setdefault(equipment_id, config)
+            return self._cache[equipment_id]
+
+    def list_available(self) -> list[str]:
+        """Return sorted list of equipment IDs from the active backend.
+
+        Postgres backend returns IDs from the catalogue table, falling back
+        to YAML when the catalogue is empty. YAML backend scans ``config_dir``.
+        """
+        if self._backend == "postgres":
+            try:
+                from src.infrastructure.db.equipment_repository import (
+                    list_equipment_ids,
+                )
+
+                ids = list_equipment_ids()
+                if ids:
+                    return ids
+            except Exception:
+                pass  # fall through to YAML listing
+        if not self.config_dir.exists():
+            return []
+        return sorted(p.stem for p in self.config_dir.glob("*.yaml"))
+
+    def load_all(self) -> dict[str, EquipmentConfig]:
+        """Load every equipment config known to the active backend."""
+        configs: dict[str, EquipmentConfig] = {}
+        for eid in self.list_available():
+            configs[eid] = self.load(eid)
+        return configs
+
+    def clear_cache(self) -> None:
+        """Clear the configuration cache."""
+        self._cache.clear()
+
+    # ------------------------------------------------------------------
+    # Backends
+    # ------------------------------------------------------------------
+
+    def _load_from_yaml(self, equipment_id: str) -> EquipmentConfig:
+        """YAML-file backend (the original behaviour)."""
         # Build and verify the resolved path stays inside config_dir
         # (defense in depth — slug validation already prevents traversal).
         config_root = self.config_dir.resolve()
@@ -504,30 +646,21 @@ class EquipmentConfigLoader:
         if not file_path.exists():
             raise FileNotFoundError(f"Equipment config not found: {file_path}")
 
-        config = EquipmentConfig.from_file(str(file_path))
+        return EquipmentConfig.from_file(str(file_path))
 
-        with self._cache_lock:
-            # Another thread may have populated between our check and the lock.
-            self._cache.setdefault(equipment_id, config)
-            return self._cache[equipment_id]
+    def _load_from_postgres(self, equipment_id: str) -> EquipmentConfig | None:
+        """Postgres backend. Returns ``None`` on miss so ``load()`` can fall
+        back to YAML (useful before the seed script has run).
+        """
+        try:
+            from src.infrastructure.db.equipment_repository import load_equipment_raw
 
-    def list_available(self) -> list[str]:
-        """Return sorted list of equipment IDs with YAML config files on disk."""
-        if not self.config_dir.exists():
-            return []
-        return sorted(p.stem for p in self.config_dir.glob("*.yaml"))
-
-    def load_all(self) -> dict[str, EquipmentConfig]:
-        """Load all equipment configurations from the config directory."""
-        configs = {}
-        for file_path in self.config_dir.glob("*.yaml"):
-            equipment_id = file_path.stem
-            configs[equipment_id] = self.load(equipment_id)
-        return configs
-
-    def clear_cache(self) -> None:
-        """Clear the configuration cache."""
-        self._cache.clear()
+            raw = load_equipment_raw(equipment_id)
+        except Exception:
+            return None
+        if raw is None:
+            return None
+        return _config_from_dict(raw)
 
 
 # Singleton loader instance

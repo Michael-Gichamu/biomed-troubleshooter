@@ -22,9 +22,11 @@ scenarios when hardware is not available.
 5. [Environment Variables](#5-environment-variables)
 6. [Running Locally](#6-running-locally)
 7. [Testing](#7-testing)
-8. [Deployment](#8-deployment)
-9. [Observability](#9-observability)
-10. [Roadmap](#10-roadmap)
+8. [Database](#8-database)
+9. [Analytics](#9-analytics)
+10. [Deployment](#10-deployment)
+11. [Observability](#11-observability)
+12. [Roadmap](#12-roadmap)
 
 ---
 
@@ -79,7 +81,9 @@ endpoint (intended for Cloud Run).
                   ┌──────────────▼──────────────┐
                   │   Compiled LangGraph        │
                   │   (src/graph/builder.py)    │
-                  │   + MemorySaver checkpointer│
+                  │   + checkpointer            │
+                  │     Postgres if DATABASE_URL│
+                  │     else MemorySaver        │
                   └──────────────┬──────────────┘
                                  │
     ┌────────────────────────────┴──────────────────────────────┐
@@ -373,7 +377,117 @@ Current status: **128 tests, all passing, in ~11 s.**
 
 ---
 
-## 8. Deployment
+## 8. Database
+
+Postgres is optional for local dev (the agent runs happily on YAML + in-memory
+state) but required for any deployment where a single container instance isn't
+the whole fleet. Three things live in the DB:
+
+| Data | Written by | Read by |
+|---|---|---|
+| **LangGraph checkpoints** | `PostgresSaver` in `src/graph/builder.py` | The graph itself — resuming a `thread_id` across cold starts |
+| **Diagnostic cases + measurements** | `record_case()` in `src/infrastructure/db/cases_repository.py` | `src/analytics/queries.py` |
+| **Equipment knowledge base** (optional) | `scripts/seed_equipment.py` | `EquipmentConfigLoader(backend="postgres")` |
+
+### Local Postgres (Docker Compose)
+
+```bash
+docker compose up -d postgres    # postgres:15-alpine on localhost:5432
+```
+
+Then point the app at it:
+
+```bash
+# .env
+DATABASE_URL=postgresql://biomed:biomed@localhost:5432/biomed
+EQUIPMENT_STORE=yaml              # "postgres" to serve equipment from DB
+```
+
+With `DATABASE_URL` **unset or empty** the code falls back to:
+- `MemorySaver()` (in-process checkpoints — fine for Studio + unit tests)
+- no-op case writes
+- YAML-on-disk equipment loader
+
+This means unit tests stay hermetic (`tests/conftest.py` pins `DATABASE_URL=""`)
+and contributors don't need Docker to run the existing suite.
+
+### Schema & migrations
+
+Schema is managed via **Alembic** in `alembic/versions/`. The initial migration
+(`0001_init.py`) creates six tables:
+
+```
+diagnostic_cases     -- one row per completed graph run
+case_measurements    -- one row per multimeter reading
+equipment            -- name + JSONB raw_config (source of truth)
+signals              -- lightweight index on equipment.signals
+faults               -- lightweight index on equipment.faults
+signal_dependencies  -- edges in the signal dependency graph
+```
+
+The `equipment.raw_config` column is JSONB — we keep the authored YAML shape
+verbatim and materialise scalar columns + index tables for query speed. The
+YAML files under `data/equipment/` remain the authoring format; Postgres is the
+runtime format.
+
+Apply migrations:
+
+```bash
+alembic upgrade head
+```
+
+Seed equipment from YAML (idempotent — re-run after edits):
+
+```bash
+python scripts/seed_equipment.py
+# or just one:
+python scripts/seed_equipment.py --equipment-id test-psu-v1
+```
+
+### Why YAML stays
+
+YAML diffs well in PRs and is the lingua franca for engineers adding equipment.
+Postgres gives us queryable JSONB, atomic updates, and a consistent runtime
+image across replicas. `seed_equipment.py` is the one-way bridge from authoring
+format to runtime format — the same pattern Kubernetes uses (manifests → etcd).
+
+---
+
+## 9. Analytics
+
+`src/analytics/queries.py` exposes eight canonical SQL-backed queries as plain
+Python functions. Each returns a list of `@dataclass(frozen=True)` rows — no
+FastAPI surface, no dashboard; the agent writes, SQL reads.
+
+| Function | What it answers |
+|---|---|
+| `fault_frequency_by_equipment(equipment_id)` | Which signals fault most often on a given unit |
+| `mean_time_to_diagnosis(equipment_id, since)` | p50 / p95 wall-clock to a confirmed diagnosis |
+| `hypothesis_accuracy()` | % of resolved cases where the initial top-ranked hypothesis was the final diagnosis |
+| `token_cost_per_case(outcome)` | Input/output token cost distribution, grouped by outcome |
+| `measurement_reuse_rate()` | How often the same test-point appears across cases |
+| `outcome_distribution_by_model()` | Opus vs. Groq performance comparison |
+| `daily_case_volume(days=30)` | Time-series bucketed by day |
+| `most_informative_measurements()` | Test-points that most often confirm / eliminate hypotheses |
+
+Example:
+
+```python
+from src.analytics import queries as Q
+
+rows = Q.fault_frequency_by_equipment("test-psu-v1")
+for r in rows:
+    print(f"{r.test_point:<30} {r.fault_count:>3}/{r.total_observations:>3}  ({r.fault_rate:.1%})")
+```
+
+Queries work against both Postgres and SQLite (the test suite pumps fixture
+rows into an in-memory SQLite and exercises every query). `mean_time_to_diagnosis`
+uses `EXTRACT(EPOCH FROM …)` on Postgres and the equivalent `julianday()` math
+on SQLite.
+
+---
+
+## 10. Deployment
 
 ### Docker
 
@@ -389,32 +503,96 @@ docker run --rm -p 8080:8080 \
 The image is a slim Python 3.12 base, runs as a non-root user, and honours the
 platform-injected `PORT`. Health endpoint is `/healthz`.
 
-### Google Cloud Run
+### Google Cloud Run + Cloud SQL (end-to-end)
+
+This is the one-shot walkthrough for a fresh GCP project. Replace `$PROJECT_ID`
+with your project and adjust region if needed.
 
 ```bash
-# 1. Build & push
-gcloud auth configure-docker us-central1-docker.pkg.dev
-docker build -t us-central1-docker.pkg.dev/$PROJECT/agents/biomed-troubleshooter:latest .
-docker push     us-central1-docker.pkg.dev/$PROJECT/agents/biomed-troubleshooter:latest
+# 0. Prerequisites
+gcloud auth login
+gcloud config set project $PROJECT_ID
+gcloud services enable run.googleapis.com sqladmin.googleapis.com \
+    secretmanager.googleapis.com artifactregistry.googleapis.com cloudbuild.googleapis.com
 
-# 2. Deploy
-gcloud run deploy biomed-troubleshooter \
-  --image=us-central1-docker.pkg.dev/$PROJECT/agents/biomed-troubleshooter:latest \
-  --region=us-central1 \
-  --platform=managed \
-  --allow-unauthenticated \
-  --cpu=1 \
-  --memory=1Gi \
-  --min-instances=0 \
-  --max-instances=5 \
-  --timeout=300 \
-  --concurrency=10 \
-  --set-env-vars="PRIMARY_LLM_PROVIDER=anthropic,FALLBACK_LLM_PROVIDER=groq,APP_MODE=mock,LANGCHAIN_TRACING=true,LANGCHAIN_PROJECT=biomed-troubleshooter" \
-  --set-secrets="ANTHROPIC_API_KEY=anthropic-api-key:latest,GROQ_API_KEY=groq-api-key:latest,LANGCHAIN_API_KEY=langsmith-api-key:latest"
+# 1. Artifact Registry repo (one-time)
+gcloud artifacts repositories create biomed \
+    --repository-format=docker --location=us-central1
+
+# 2. Cloud SQL for Postgres (one-time) — db-f1-micro is ~$10/mo
+gcloud sql instances create biomed-db \
+    --database-version=POSTGRES_15 \
+    --tier=db-f1-micro \
+    --region=us-central1 \
+    --storage-auto-increase
+gcloud sql databases create biomed --instance=biomed-db
+gcloud sql users create biomed --instance=biomed-db --password='<generated-pw>'
+
+# 3. Secrets (one-time) — Unix socket form; Cloud Run attaches the socket at
+#    /cloudsql/<instance-connection-name>
+printf "postgresql://biomed:<pw>@/biomed?host=/cloudsql/$PROJECT_ID:us-central1:biomed-db" \
+    | gcloud secrets create database-url --data-file=-
+printf "$ANTHROPIC_API_KEY" | gcloud secrets create anthropic-api-key --data-file=-
+printf "$GROQ_API_KEY"      | gcloud secrets create groq-api-key      --data-file=-
+printf "$LANGSMITH_API_KEY" | gcloud secrets create langsmith-api-key --data-file=-
+
+# 4. Build + push via Cloud Build
+IMAGE=us-central1-docker.pkg.dev/$PROJECT_ID/biomed/api:$(git rev-parse --short HEAD)
+gcloud builds submit --tag $IMAGE
+
+# 5. Run schema migrations once (Cloud Run Job)
+gcloud run jobs create biomed-migrate \
+    --image $IMAGE \
+    --command python \
+    --args -m,alembic,upgrade,head \
+    --set-secrets DATABASE_URL=database-url:latest \
+    --add-cloudsql-instances $PROJECT_ID:us-central1:biomed-db \
+    --region us-central1 || true
+gcloud run jobs execute biomed-migrate --region us-central1 --wait
+
+# 6. Seed equipment (Cloud Run Job) — only needed if EQUIPMENT_STORE=postgres
+gcloud run jobs create biomed-seed \
+    --image $IMAGE \
+    --command python --args scripts/seed_equipment.py \
+    --set-secrets DATABASE_URL=database-url:latest \
+    --add-cloudsql-instances $PROJECT_ID:us-central1:biomed-db \
+    --region us-central1 || true
+gcloud run jobs execute biomed-seed --region us-central1 --wait
+
+# 7. Deploy the API
+gcloud run deploy biomed-api \
+    --image $IMAGE \
+    --region us-central1 \
+    --platform managed \
+    --allow-unauthenticated \
+    --add-cloudsql-instances $PROJECT_ID:us-central1:biomed-db \
+    --set-secrets DATABASE_URL=database-url:latest,ANTHROPIC_API_KEY=anthropic-api-key:latest,GROQ_API_KEY=groq-api-key:latest,LANGCHAIN_API_KEY=langsmith-api-key:latest \
+    --set-env-vars PRIMARY_LLM_PROVIDER=anthropic,FALLBACK_LLM_PROVIDER=groq,EQUIPMENT_STORE=postgres,LANGCHAIN_TRACING=true,LANGCHAIN_PROJECT=biomed-troubleshooter \
+    --cpu 1 --memory 1Gi \
+    --min-instances 0 --max-instances 5 \
+    --timeout 300 --concurrency 10
 ```
 
-Secrets should be stored in Secret Manager — never baked into the image or
-passed as `--set-env-vars`.
+Secrets are pulled from Secret Manager at cold-start; they're never baked into
+the image or passed as `--set-env-vars`. The Cloud SQL connector injects a Unix
+socket at `/cloudsql/<instance>` — the SQLAlchemy URL uses `host=/cloudsql/...`
+rather than a TCP address, which is why no VPC connector is required.
+
+### Verifying the deployment
+
+```bash
+# Health + readiness (readyz probes DB with SELECT 1)
+curl https://biomed-api-<hash>.run.app/healthz
+curl https://biomed-api-<hash>.run.app/readyz    # expects {"status":"ready","db":"ok"}
+
+# Run a case and confirm it persisted
+curl -X POST https://biomed-api-<hash>.run.app/run-agent \
+  -H "Content-Type: application/json" \
+  -d '{"message":"no output voltage","equipment_model":"test-psu-v1","session_id":"prod-smoke-1"}'
+
+gcloud sql connect biomed-db --user=biomed --database=biomed \
+  --quiet -- -c "SELECT outcome, measurement_count FROM diagnostic_cases ORDER BY completed_at DESC LIMIT 5;"
+```
 
 ### CI/CD
 
@@ -422,7 +600,10 @@ passed as `--set-env-vars`.
 
 1. Install deps on Python 3.11 and 3.12.
 2. `ruff check` + `black --check` + `mypy` (informational).
-3. `pytest` with coverage.
+3. `pytest` with coverage. A Postgres 15-alpine service container is provisioned
+   and exposed as `TEST_DATABASE_URL` for any `@pytest.mark.integration` tests;
+   the default unit run keeps `DATABASE_URL=""` (pinned in `conftest.py`) and
+   exercises the SQLAlchemy models against in-memory SQLite.
 4. `docker build` smoke test.
 
 `.pre-commit-config.yaml` provides local hooks:
@@ -438,7 +619,7 @@ secret scan**, black, ruff.
 
 ---
 
-## 9. Observability
+## 11. Observability
 
 ### LangSmith
 
@@ -475,16 +656,24 @@ Active LLM: provider=anthropic, model=claude-opus-4-6, key_index=0
 
 ### Checkpointer
 
-`MemorySaver` keeps per-`thread_id` state in-process. For multi-pod Cloud Run
-deployments replace it with a persistent checkpointer (Postgres / Redis) when
-cross-replica session continuity becomes a requirement.
+When `DATABASE_URL` is set, the graph compiles with `PostgresSaver`, backed by
+a `psycopg` connection pool created once per worker in the FastAPI lifespan.
+This means conversation state survives Cloud Run replica rotation, rolling
+deploys, and scale-to-zero cold starts — a user returning with the same
+`thread_id` resumes exactly where they left off. When `DATABASE_URL` is empty
+(Studio, unit tests, local prototyping) the graph silently falls back to
+`MemorySaver` so there is no DB dependency on the hot path for dev work.
 
 ---
 
-## 10. Roadmap
+## 12. Roadmap
 
-- [ ] **Persistent checkpointer** — swap `MemorySaver` for a Postgres-backed
-  one so Cloud Run replicas share session state.
+- [x] **Persistent checkpointer** — `PostgresSaver` is wired in; `MemorySaver`
+  remains the fallback when `DATABASE_URL` is empty.
+- [x] **Diagnostic-case analytics** — `diagnostic_cases` + `case_measurements`
+  tables populated per run; eight canonical queries in `src/analytics/queries.py`.
+- [x] **Equipment loader backend switch** — `EQUIPMENT_STORE=postgres` serves
+  equipment from JSONB; `yaml` remains the authoring format and default.
 - [ ] **Prompt caching on Anthropic calls** — apply `cache_control: ephemeral`
   to the large system prompt that carries equipment config, shaving latency
   and cost on multi-turn sessions.

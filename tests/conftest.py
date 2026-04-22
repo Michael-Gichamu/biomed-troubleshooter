@@ -29,11 +29,18 @@ os.environ.setdefault("GROQ_API_KEYS", "test-key-not-real")
 os.environ.setdefault("LLM_MODELS", "llama-3.3-70b-versatile")
 os.environ.setdefault("ANTHROPIC_API_KEY", "test-anthropic-key-not-real")
 
+# Database-dependent paths (Phase A PostgresSaver, Phase B/C Postgres stores)
+# must be OFF by default so unit tests stay hermetic and hardware-free. The
+# DB-integration suite sets DATABASE_URL explicitly via its own fixtures.
+os.environ["DATABASE_URL"] = ""
+os.environ["EQUIPMENT_STORE"] = "yaml"
+
 from src.graph.state import ConversationalAgentState  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Equipment fixtures
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture
 def sample_equipment_config() -> dict:
@@ -84,8 +91,11 @@ def sample_equipment_config() -> dict:
             }
         ],
         "signal_dependencies": [
-            {"upstream": "primary_mosfet", "downstream": "output_voltage",
-             "relationship": "switch_to_load"},
+            {
+                "upstream": "primary_mosfet",
+                "downstream": "output_voltage",
+                "relationship": "switch_to_load",
+            },
         ],
     }
 
@@ -106,10 +116,18 @@ def base_state(sample_equipment_config) -> ConversationalAgentState:
         },
         test_point_rankings=["primary_mosfet", "output_voltage"],
         hypotheses=[
-            {"id": "HYPOTHESIS_1", "fault_id": "F001",
-             "description": "Shorted primary MOSFET", "probability": 0.7},
-            {"id": "HYPOTHESIS_2", "fault_id": "",
-             "description": "Output capacitor ESR high", "probability": 0.3},
+            {
+                "id": "HYPOTHESIS_1",
+                "fault_id": "F001",
+                "description": "Shorted primary MOSFET",
+                "probability": 0.7,
+            },
+            {
+                "id": "HYPOTHESIS_2",
+                "fault_id": "",
+                "description": "Output capacitor ESR high",
+                "probability": 0.3,
+            },
         ],
         hypothesis_probabilities={"HYPOTHESIS_1": 0.7, "HYPOTHESIS_2": 0.3},
         current_hypothesis="HYPOTHESIS_1",
@@ -120,8 +138,10 @@ def base_state(sample_equipment_config) -> ConversationalAgentState:
 # LLM mocks
 # ---------------------------------------------------------------------------
 
+
 class _FakeLLMResponse:
     """Minimal stand-in for a langchain_core AIMessage-like response."""
+
     def __init__(self, content: str):
         self.content = content
 
@@ -130,8 +150,10 @@ class _FakeLLMResponse:
 def llm_stub() -> Callable[[str], Any]:
     """Factory that returns a callable suitable for monkeypatching
     ``invoke_with_retry``. Feed it the canned LLM output string."""
+
     def _make(content: str) -> Callable[..., Any]:
         return lambda *_args, **_kwargs: _FakeLLMResponse(content)
+
     return _make
 
 
@@ -143,11 +165,14 @@ def mock_llm(monkeypatch, llm_stub):
         def test_x(mock_llm):
             mock_llm('{"hypotheses": [...], "test_point_rankings": [...]}')
     """
+
     def _apply(content: str) -> None:
         stub = llm_stub(content)
         # Patch in every node module that imports invoke_with_retry lazily.
         import src.infrastructure.llm_manager as llm_mod
+
         monkeypatch.setattr(llm_mod, "invoke_with_retry", stub, raising=True)
+
     return _apply
 
 
@@ -155,12 +180,14 @@ def mock_llm(monkeypatch, llm_stub):
 # Hardware mocks
 # ---------------------------------------------------------------------------
 
+
 class _FakeTool:
     """Stand-in for a LangChain StructuredTool.
 
     LangChain's tool objects are pydantic models, so ``setattr`` on ``invoke``
     is blocked. We substitute the whole tool reference instead.
     """
+
     def __init__(self, result: dict):
         self._result = result
 
@@ -173,8 +200,10 @@ def mock_multimeter(monkeypatch):
     """Replace :data:`src.studio.tools.read_multimeter` with a stand-in whose
     ``.invoke()`` returns a canned measurement dict.
     """
+
     def _apply(result: dict) -> None:
         from src.studio import tools as tools_mod
-        monkeypatch.setattr(tools_mod, "read_multimeter", _FakeTool(result),
-                            raising=True)
+
+        monkeypatch.setattr(tools_mod, "read_multimeter", _FakeTool(result), raising=True)
+
     return _apply

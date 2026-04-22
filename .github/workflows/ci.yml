@@ -21,6 +21,25 @@ jobs:
       matrix:
         python-version: ["3.11", "3.12"]
 
+    # A Postgres service backs any DB-touching tests marked @pytest.mark.integration.
+    # The default unit suite keeps DATABASE_URL="" (pinned in tests/conftest.py) and
+    # uses in-memory SQLite, so this service is idle for the unit pass and only
+    # consumed by explicit integration tests.
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: biomed
+          POSTGRES_PASSWORD: biomed
+          POSTGRES_DB: biomed
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U biomed"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=10
+
     # Fake values for import-time env reads — no real keys are ever used in CI.
     env:
       PRIMARY_LLM_PROVIDER: groq
@@ -29,6 +48,8 @@ jobs:
       LLM_MODELS: llama-3.3-70b-versatile
       ANTHROPIC_API_KEY: test-anthropic-key-not-real
       LANGCHAIN_TRACING: "false"
+      # Available for integration tests; unit tests override to "" via conftest.
+      TEST_DATABASE_URL: postgresql://biomed:biomed@localhost:5432/biomed
 
     steps:
       - name: Checkout

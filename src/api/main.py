@@ -64,6 +64,7 @@ def _get_graph():
     global _graph
     if _graph is None:
         from src.graph import create_conversational_graph
+
         _graph = create_conversational_graph()
         logger.info("LangGraph compiled and ready to serve requests.")
     return _graph
@@ -73,6 +74,9 @@ def _get_graph():
 async def lifespan(app: FastAPI):
     """Pre-warm the graph and LLM on cold start for faster first request.
 
+    Also disposes the SQLAlchemy engine on shutdown so Cloud Run can drain the
+    pool cleanly during rolling deploys.
+
     Failures here are non-fatal — the service still boots; the first request
     just pays the latency.
     """
@@ -80,7 +84,15 @@ async def lifespan(app: FastAPI):
         _get_graph()
     except Exception as exc:  # pragma: no cover — we don't want to kill the pod
         logger.warning("Graph prewarm failed (will retry on first request): %s", exc)
-    yield
+    try:
+        yield
+    finally:
+        try:
+            from src.infrastructure.db import dispose as _dispose_db
+
+            _dispose_db()
+        except Exception as exc:  # pragma: no cover
+            logger.warning("DB engine dispose failed: %s", exc)
 
 
 app = FastAPI(
@@ -107,6 +119,7 @@ app.add_middleware(
 # Request / response schemas
 # ---------------------------------------------------------------------------
 
+
 class RunAgentRequest(BaseModel):
     message: str = Field(
         ...,
@@ -117,12 +130,11 @@ class RunAgentRequest(BaseModel):
     equipment_model: str | None = Field(
         default=None,
         description="Equipment identifier, e.g. 'mastech-ms8250d'. Optional if the "
-                    "message mentions one.",
+        "message mentions one.",
     )
     session_id: str | None = Field(
         default=None,
-        description="Stable ID to thread multi-turn sessions. A new one is created "
-                    "if omitted.",
+        description="Stable ID to thread multi-turn sessions. A new one is created " "if omitted.",
     )
     thread_id: str | None = Field(
         default=None,
@@ -152,6 +164,7 @@ class RunAgentResponse(BaseModel):
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _extract_assistant_messages(graph_output: dict[str, Any]) -> list[AssistantMessage]:
     """Pull out the assistant-visible messages from the graph's final state."""
     raw: list[BaseMessage] = graph_output.get("messages", []) or []
@@ -167,6 +180,7 @@ def _extract_assistant_messages(graph_output: dict[str, Any]) -> list[AssistantM
 # Routes
 # ---------------------------------------------------------------------------
 
+
 @app.get("/healthz")
 def healthz():
     """Liveness probe — returns 200 as long as the process is up."""
@@ -175,13 +189,37 @@ def healthz():
 
 @app.get("/readyz")
 def readyz():
-    """Readiness probe — ensures the graph compiles."""
+    """Readiness probe.
+
+    Verifies:
+      * the LangGraph graph compiles (same as before);
+      * the Postgres pool can serve ``SELECT 1`` when a DATABASE_URL is set.
+
+    When no DATABASE_URL is configured we report ``db="not-configured"`` rather
+    than failing — that's intentional for local dev / Studio / tests.
+    """
     try:
         _get_graph()
-        return {"status": "ready"}
     except Exception as exc:
-        logger.exception("Readiness check failed")
+        logger.exception("Readiness check failed — graph compile error")
         raise HTTPException(status_code=503, detail=f"not ready: {exc}") from exc
+
+    db_status = "not-configured"
+    try:
+        from sqlalchemy import text
+
+        from src.infrastructure.db import get_engine
+
+        engine = get_engine()
+        if engine is not None:
+            with engine.connect() as conn:
+                conn.execute(text("SELECT 1"))
+            db_status = "ok"
+    except Exception as exc:
+        logger.exception("Readiness check failed — database unreachable")
+        raise HTTPException(status_code=503, detail=f"db not ready: {exc}") from exc
+
+    return {"status": "ready", "db": db_status}
 
 
 @app.post("/run-agent", response_model=RunAgentResponse)

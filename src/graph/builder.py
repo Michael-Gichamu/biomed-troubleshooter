@@ -1,5 +1,8 @@
 """Graph construction and the LangGraph Studio factory entry point."""
 
+import logging
+from typing import Any
+
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, START, StateGraph
 
@@ -17,7 +20,58 @@ from src.graph.nodes import (
 )
 from src.graph.routing import route_from_decision, route_from_resume
 from src.graph.state import ConversationalAgentState
+from src.infrastructure.config import get_database_config
 from src.studio.tools import get_tools  # noqa -- keeps tool registration alive
+
+logger = logging.getLogger(__name__)
+
+
+def _make_checkpointer() -> Any:
+    """Pick a checkpointer backend based on configuration.
+
+    Returns a ``PostgresSaver`` when ``DATABASE_URL`` is set — this is what we
+    want in Cloud Run where replicas rotate and in-process dicts evaporate.
+    Falls back to ``MemorySaver`` otherwise, which keeps LangGraph Studio,
+    unit tests, and zero-infra local dev loops fast and dependency-free.
+
+    The Postgres saver builds its own ``psycopg`` connection pool; we deliberately
+    don't share the SQLAlchemy engine here because LangGraph's saver has its own
+    lifecycle (``.setup()`` to create tables on first use) and its own
+    transaction semantics that don't line up cleanly with SQLAlchemy sessions.
+    """
+    cfg = get_database_config()
+    if not cfg.is_configured:
+        logger.info("No DATABASE_URL — using in-memory MemorySaver checkpointer.")
+        return MemorySaver()
+
+    try:
+        # Import lazily so the memory-only path doesn't require the package
+        # to be installed (useful for LangGraph Studio & editable dev installs).
+        from langgraph.checkpoint.postgres import PostgresSaver
+        from psycopg_pool import ConnectionPool
+    except ImportError as exc:  # pragma: no cover — install-time configuration issue
+        logger.warning(
+            "DATABASE_URL is set but langgraph-checkpoint-postgres/psycopg-pool "
+            "isn't installed (%s). Falling back to MemorySaver — conversations "
+            "WILL NOT persist across replicas.",
+            exc,
+        )
+        return MemorySaver()
+
+    # kwargs matching langgraph-checkpoint-postgres >= 2.0 expectations.
+    # Cloud Run workers stay warm for a while but can idle; pre-ping avoids
+    # serving a request on a half-closed socket.
+    pool = ConnectionPool(
+        conninfo=cfg.url,
+        min_size=1,
+        max_size=max(cfg.pool_size, 2),
+        kwargs={"autocommit": True, "prepare_threshold": 0},
+        open=True,
+    )
+    saver = PostgresSaver(pool)
+    saver.setup()  # idempotent — CREATE TABLE IF NOT EXISTS for checkpoint tables
+    logger.info("PostgresSaver checkpointer ready (pool min=1 max=%d).", max(cfg.pool_size, 2))
+    return saver
 
 
 def create_conversational_graph():
@@ -32,42 +86,40 @@ def create_conversational_graph():
     """
     builder = StateGraph(ConversationalAgentState)
 
-    builder.add_node("rag",         rag_node)
-    builder.add_node("hypotheses",  hypotheses_node)
+    builder.add_node("rag", rag_node)
+    builder.add_node("hypotheses", hypotheses_node)
     builder.add_node("instruction", instruction_node)
-    builder.add_node("step",        step_node)
-    builder.add_node("reason",      reason_node)
-    builder.add_node("decision",    decision_node)
-    builder.add_node("repair",      repair_node)
-    builder.add_node("interrupt",   interrupt_node)
-    builder.add_node("resume",      resume_node)
-    builder.add_node("probe_wait",  probe_wait_node)
+    builder.add_node("step", step_node)
+    builder.add_node("reason", reason_node)
+    builder.add_node("decision", decision_node)
+    builder.add_node("repair", repair_node)
+    builder.add_node("interrupt", interrupt_node)
+    builder.add_node("resume", resume_node)
+    builder.add_node("probe_wait", probe_wait_node)
 
-    builder.add_edge(START,        "rag")
-    builder.add_edge("rag",        "hypotheses")
-    builder.add_edge("hypotheses",  "instruction")
+    builder.add_edge(START, "rag")
+    builder.add_edge("rag", "hypotheses")
+    builder.add_edge("hypotheses", "instruction")
     builder.add_edge("instruction", "probe_wait")
-    builder.add_edge("probe_wait",  "step")
-    builder.add_edge("step",       "reason")
-    builder.add_edge("reason",     "decision")
+    builder.add_edge("probe_wait", "step")
+    builder.add_edge("step", "reason")
+    builder.add_edge("reason", "decision")
 
     builder.add_conditional_edges(
         "decision",
         route_from_decision,
-        {"repair": "repair", "interrupt": "interrupt", "end": END, "instruction": "instruction"}
+        {"repair": "repair", "interrupt": "interrupt", "end": END, "instruction": "instruction"},
     )
 
     builder.add_edge("interrupt", "resume")
 
     builder.add_conditional_edges(
-        "resume",
-        route_from_resume,
-        {"instruction": "instruction", "end": END}
+        "resume", route_from_resume, {"instruction": "instruction", "end": END}
     )
 
     builder.add_edge("repair", END)
 
-    return builder.compile(checkpointer=MemorySaver())
+    return builder.compile(checkpointer=_make_checkpointer())
 
 
 def graph():
@@ -86,6 +138,7 @@ def graph():
     def _prewarm():
         try:
             from src.infrastructure.llm_manager import get_llm_manager
+
             mgr = get_llm_manager()
             mgr.current_llm.invoke([{"role": "user", "content": "hi"}])
             print("[PREWARM] LLM warm-up complete.")
@@ -94,6 +147,7 @@ def graph():
 
         try:
             from src.infrastructure.chromadb_client import _get_embedding_function
+
             _get_embedding_function()
             print("[PREWARM] Embedding model warm-up complete.")
         except Exception as exc:

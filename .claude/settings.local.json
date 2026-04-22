@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -m pytest tests/ -ra --strict-markers)",
+      "PowerShell(python -m pytest tests/unit/test_analytics_queries.py tests/unit/test_cases_repository.py tests/unit/test_equipment_repository.py -v 2>&1)"
+    ]
+  }
+}
