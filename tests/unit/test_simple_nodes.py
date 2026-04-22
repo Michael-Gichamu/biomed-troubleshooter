@@ -55,14 +55,18 @@ class TestProbeWaitNode:
         # probe_wait.py.
         with patch("src.graph.nodes.probe_wait.interrupt", return_value="12.5 V"):
             from src.graph.nodes.probe_wait import probe_wait_node
+
             result = probe_wait_node(base_state)
         assert result == {
             "pending_manual_reading": {
-                "value": 12.5, "unit": "V", "measurement_type": "manual",
+                "value": 12.5,
+                "unit": "V",
+                "measurement_type": "manual",
             }
         }
 
     def test_unparseable_resume_yields_none(self, base_state):
         with patch("src.graph.nodes.probe_wait.interrupt", return_value="resume"):
             from src.graph.nodes.probe_wait import probe_wait_node
+
             assert probe_wait_node(base_state) == {"pending_manual_reading": None}

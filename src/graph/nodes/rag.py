@@ -28,7 +28,7 @@ def rag_node(state: ConversationalAgentState):
 
     # Extract equipment model from message history if not already in state.
     if not equipment_model:
-        pattern = r"[a-z][a-z0-9]*(?:-[a-z0-9]+)+"   # generic slug pattern
+        pattern = r"[a-z][a-z0-9]*(?:-[a-z0-9]+)+"  # generic slug pattern
         for msg in reversed(state.messages):
             if isinstance(msg, HumanMessage):
                 match = re.search(pattern, _text(msg.content), re.IGNORECASE)
@@ -38,11 +38,15 @@ def rag_node(state: ConversationalAgentState):
 
     if not equipment_model:
         return {
-            "messages": [AIMessage(content=(
-                "**[1. Initialization]**\n\n"
-                "⚠️ No equipment model detected in your message. "
-                "Please mention the model ID (e.g. `cctv-psu-24w-v1`) to begin diagnosis."
-            ))]
+            "messages": [
+                AIMessage(
+                    content=(
+                        "**[1. Initialization]**\n\n"
+                        "⚠️ No equipment model detected in your message. "
+                        "Please mention the model ID (e.g. `cctv-psu-24w-v1`) to begin diagnosis."
+                    )
+                )
+            ]
         }
 
     # Get RAG knowledge (cached per equipment model).
@@ -52,12 +56,7 @@ def rag_node(state: ConversationalAgentState):
     try:
         config = get_equipment_config(equipment_model)
 
-        config_result = {
-            "test_points": [],
-            "thresholds": {},
-            "faults": [],
-            "signals": []
-        }
+        config_result = {"test_points": [], "thresholds": {}, "faults": [], "signals": []}
 
         # Get signals from config (signals is a Dict[str, SignalConfig]).
         if config.signals:
@@ -71,7 +70,7 @@ def rag_node(state: ConversationalAgentState):
                     "physical_description": sig.physical_description or "",
                     "image_url": sig.image_url or "",
                     "pro_tips": sig.pro_tips or [],
-                    "probe_placement": sig.probe_placement or ""
+                    "probe_placement": sig.probe_placement or "",
                 }
                 for sig in config.signals.values()
             ]
@@ -80,11 +79,7 @@ def rag_node(state: ConversationalAgentState):
         # Get signal dependencies.
         if hasattr(config, "signal_dependencies") and config.signal_dependencies:
             config_result["signal_dependencies"] = [
-                {
-                    "upstream": d.upstream,
-                    "downstream": d.downstream,
-                    "relationship": d.relationship
-                }
+                {"upstream": d.upstream, "downstream": d.downstream, "relationship": d.relationship}
                 for d in config.signal_dependencies
             ]
 
@@ -96,11 +91,11 @@ def rag_node(state: ConversationalAgentState):
                     states[state_name] = {
                         "min": state.min_value,
                         "max": state.max_value,
-                        "description": state.description
+                        "description": state.description,
                     }
                 config_result["thresholds"][signal_id] = {
                     "signal_id": threshold_data.signal_id,
-                    "states": states
+                    "states": states,
                 }
 
         # Get faults from config (faults is a Dict[str, FaultConfig]).
@@ -118,7 +113,7 @@ def rag_node(state: ConversationalAgentState):
                             "component": h.component,
                             "failure_mode": h.failure_mode,
                             "cause": h.cause,
-                            "confidence": h.confidence
+                            "confidence": h.confidence,
                         }
                         for h in f.hypotheses
                     ],
@@ -131,25 +126,36 @@ def rag_node(state: ConversationalAgentState):
                             "verification": r.verification,
                             "safety": r.safety,
                             "estimated_time": r.estimated_time,
-                            "difficulty": r.difficulty
+                            "difficulty": r.difficulty,
                         }
                         for r in f.recovery
-                    ]
+                    ],
                 }
                 for f in config.faults.values()
             ]
 
     except FileNotFoundError as e:
-        config_result = {"error": str(e), "test_points": [], "thresholds": {}, "faults": [], "signals": []}
+        config_result = {
+            "error": str(e),
+            "test_points": [],
+            "thresholds": {},
+            "faults": [],
+            "signals": [],
+        }
     except Exception as e:
-        config_result = {"error": str(e), "test_points": [], "thresholds": {}, "faults": [], "signals": []}
+        config_result = {
+            "error": str(e),
+            "test_points": [],
+            "thresholds": {},
+            "faults": [],
+            "signals": [],
+        }
 
     full_signals = config_result.get("signals", [])
 
     # Build expected_values with correct per-signal units.
     signal_units: dict[str, str] = {
-        s.get("signal_id", ""): s.get("unit", "V")
-        for s in full_signals
+        s.get("signal_id", ""): s.get("unit", "V") for s in full_signals
     }
 
     thresholds: dict = config_result.get("thresholds", {})
@@ -162,7 +168,7 @@ def rag_node(state: ConversationalAgentState):
                 "min": normal.get("min", 0),
                 "max": normal.get("max", 999_999),
                 "unit": signal_units.get(signal_id, "V"),
-                "description": normal.get("description", "")
+                "description": normal.get("description", ""),
             }
 
     test_points = config_result.get("test_points", [])
@@ -175,12 +181,11 @@ def rag_node(state: ConversationalAgentState):
 
     greeting = (
         "Hello Engineer, I am DIAG. I'll guide you through a systematic diagnostic process.\n\n"
-        if is_new_thread else ""
+        if is_new_thread
+        else ""
     )
 
-    rag_line = (
-        f"\n*Knowledge sources: {', '.join(rag_sources)}*" if rag_sources else ""
-    )
+    rag_line = f"\n*Knowledge sources: {', '.join(rag_sources)}*" if rag_sources else ""
 
     init_msg = (
         f"**[1. Initialization]**\n\n"
@@ -198,5 +203,5 @@ def rag_node(state: ConversationalAgentState):
         "expected_values": expected_values,
         "suspected_faults": faults,
         "config_cached": True,
-        "messages": [AIMessage(content=init_msg)]
+        "messages": [AIMessage(content=init_msg)],
     }

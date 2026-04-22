@@ -49,10 +49,12 @@ logger = logging.getLogger(__name__)
 # Per-provider slot
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class ProviderSlot:
     """Keys + models + cursor state for a single provider."""
-    name: str                        # "anthropic" | "groq" | "openai"
+
+    name: str  # "anthropic" | "groq" | "openai"
     api_keys: list[str] = field(default_factory=list)
     models: list[str] = field(default_factory=list)
     key_index: int = 0
@@ -91,6 +93,7 @@ class ProviderSlot:
 # ---------------------------------------------------------------------------
 # LLMManager
 # ---------------------------------------------------------------------------
+
 
 class LLMManager:
     """
@@ -163,7 +166,9 @@ class LLMManager:
             )
 
         # Resolve primary / fallback — fall back to whichever slot exists.
-        self._primary_name = primary_name if primary_name in self._slots else next(iter(self._slots))
+        self._primary_name = (
+            primary_name if primary_name in self._slots else next(iter(self._slots))
+        )
         if fallback_name in self._slots and fallback_name != self._primary_name:
             self._fallback_name = fallback_name
         else:
@@ -188,7 +193,9 @@ class LLMManager:
 
         logger.info(
             "LLMManager initialized: primary=%s, fallback=%s, configured=%s",
-            self._primary_name, self._fallback_name, list(self._slots.keys()),
+            self._primary_name,
+            self._fallback_name,
+            list(self._slots.keys()),
         )
         for name, slot in self._slots.items():
             logger.info("  %s: %d key(s), models=%s", name, len(slot.api_keys), slot.models)
@@ -286,7 +293,9 @@ class LLMManager:
 
         logger.info(
             "Active LLM: provider=%s, model=%s, key_index=%d",
-            provider_label, model, slot.key_index,
+            provider_label,
+            model,
+            slot.key_index,
         )
 
     # -----------------------------------------------------------------------
@@ -373,7 +382,8 @@ class LLMManager:
             self.key_retry_count = 0
             logger.info(
                 "Rotating to next API key on %s: key_index=%d",
-                self._active_provider, slot.key_index,
+                self._active_provider,
+                slot.key_index,
             )
             self._initialize_llm()
             return True
@@ -384,7 +394,8 @@ class LLMManager:
             self.key_retry_count = 0
             logger.info(
                 "Rotating to next model on %s: %s",
-                self._active_provider, slot.active_model,
+                self._active_provider,
+                slot.active_model,
             )
             self._initialize_llm()
             return True
@@ -393,7 +404,8 @@ class LLMManager:
         if self._fallback_name and self._active_provider != self._fallback_name:
             logger.warning(
                 "Provider %s exhausted — switching to fallback provider %s",
-                self._active_provider, self._fallback_name,
+                self._active_provider,
+                self._fallback_name,
             )
             self._active_provider = self._fallback_name
             self._slots[self._active_provider].reset()
@@ -414,7 +426,7 @@ class LLMManager:
         logger.info("Model retry count: %d/%d", self.model_retry_count, self.max_retries_per_model)
 
     def get_backoff_time(self) -> float:
-        backoff = self.base_backoff * (2 ** self.key_retry_count)
+        backoff = self.base_backoff * (2**self.key_retry_count)
         return min(backoff, self.max_backoff)
 
     def reset(self):
@@ -454,6 +466,7 @@ def get_active_llm() -> Any:
 # Invocation helpers with retry + rotation
 # ---------------------------------------------------------------------------
 
+
 def invoke_with_retry(messages: list[dict[str, str]], max_full_retries: int = 3) -> Any:
     """Invoke the active LLM with automatic retry and rotation."""
     manager = get_llm_manager()
@@ -478,7 +491,9 @@ def invoke_with_retry(messages: list[dict[str, str]], max_full_retries: int = 3)
             raise
 
 
-def invoke_with_tools_and_retry(messages: list[Any], tools: list[Any], max_full_retries: int = 3) -> Any:
+def invoke_with_tools_and_retry(
+    messages: list[Any], tools: list[Any], max_full_retries: int = 3
+) -> Any:
     """Invoke LLM with tools bound, with automatic retry and rotation."""
     manager = get_llm_manager()
 
@@ -512,9 +527,11 @@ def get_llm() -> Any:
 # LLMClient - Application-level wrapper for diagnostic reasoning
 # =============================================================================
 
+
 @dataclass
 class LLMConfig:
     """Configuration for LLM (kept for backwards compatibility)."""
+
     provider: str = "groq"
     model: str = "llama-3.3-70b-versatile"
     api_key: str = ""
@@ -582,11 +599,11 @@ Return ONLY the JSON, no other text."""
 
         try:
             response = invoke_with_retry([{"role": "user", "content": prompt}])
-            content = response.content if hasattr(response, 'content') else str(response)
+            content = response.content if hasattr(response, "content") else str(response)
             try:
                 result = json.loads(content)
             except json.JSONDecodeError:
-                json_match = re.search(r'\{[\s\S]*\}', content)
+                json_match = re.search(r"\{[\s\S]*\}", content)
                 if json_match:
                     result = json.loads(json_match.group())
                 else:

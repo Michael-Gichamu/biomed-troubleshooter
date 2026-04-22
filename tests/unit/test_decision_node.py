@@ -9,10 +9,13 @@ from src.graph.state import ConversationalAgentState
 def _state(**kwargs) -> ConversationalAgentState:
     """Build a decision-ready state with sensible defaults."""
     return ConversationalAgentState(
-        hypotheses=kwargs.pop("hypotheses", [
-            {"id": "H1", "description": "a"},
-            {"id": "H2", "description": "b"},
-        ]),
+        hypotheses=kwargs.pop(
+            "hypotheses",
+            [
+                {"id": "H1", "description": "a"},
+                {"id": "H2", "description": "b"},
+            ],
+        ),
         hypothesis_probabilities=kwargs.pop("probs", {"H1": 0.5, "H2": 0.5}),
         test_point_rankings=kwargs.pop("rankings", ["tp1", "tp2", "tp3"]),
         step_result=kwargs.pop("step_result", {"decision": "continue_diagnosis"}),
@@ -72,8 +75,7 @@ def test_exhausted_rankings_with_dominant_hypothesis_triggers_repair():
 
 
 def test_exhausted_rankings_without_dominant_hypothesis_ends():
-    s = _state(current_step=3, rankings=["tp1", "tp2", "tp3"],
-               probs={"H1": 0.5, "H2": 0.5})
+    s = _state(current_step=3, rankings=["tp1", "tp2", "tp3"], probs={"H1": 0.5, "H2": 0.5})
     result = decision_node(s)
     assert result["next_node"] == "end"
     assert result["diagnosis_status"] == "no_more_tests"

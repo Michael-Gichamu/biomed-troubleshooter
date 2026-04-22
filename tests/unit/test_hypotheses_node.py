@@ -28,8 +28,7 @@ class TestExtractConfirmedFindings:
 
     def test_returns_none_extracted_for_benign_symptom(self):
         tps = [{"signal_id": "x", "name": "X"}]
-        assert _extract_confirmed_findings("strange noise from the unit", tps) \
-               == "None extracted"
+        assert _extract_confirmed_findings("strange noise from the unit", tps) == "None extracted"
 
 
 class TestHypothesesNode:
@@ -45,15 +44,25 @@ class TestHypothesesNode:
         )
 
     def test_llm_json_is_parsed_into_state(self, seed_state, mock_llm):
-        canned = json.dumps({
-            "hypotheses": [
-                {"id": "HYPOTHESIS_1", "fault_id": "F001",
-                 "description": "Q1 short", "probability": 0.8},
-                {"id": "HYPOTHESIS_2", "fault_id": "",
-                 "description": "Startup issue", "probability": 0.2},
-            ],
-            "test_point_rankings": ["primary_mosfet", "output_voltage"],
-        })
+        canned = json.dumps(
+            {
+                "hypotheses": [
+                    {
+                        "id": "HYPOTHESIS_1",
+                        "fault_id": "F001",
+                        "description": "Q1 short",
+                        "probability": 0.8,
+                    },
+                    {
+                        "id": "HYPOTHESIS_2",
+                        "fault_id": "",
+                        "description": "Startup issue",
+                        "probability": 0.2,
+                    },
+                ],
+                "test_point_rankings": ["primary_mosfet", "output_voltage"],
+            }
+        )
         mock_llm(canned)
 
         result = hypotheses_node(seed_state)
@@ -67,10 +76,14 @@ class TestHypothesesNode:
 
     def test_invalid_signal_ids_are_filtered_out(self, seed_state, mock_llm):
         # LLM returns a bogus signal_id → must fall back to the valid set
-        mock_llm(json.dumps({
-            "hypotheses": [{"id": "H1", "description": "x", "probability": 1.0}],
-            "test_point_rankings": ["primary_mosfet", "does_not_exist", "output_voltage"],
-        }))
+        mock_llm(
+            json.dumps(
+                {
+                    "hypotheses": [{"id": "H1", "description": "x", "probability": 1.0}],
+                    "test_point_rankings": ["primary_mosfet", "does_not_exist", "output_voltage"],
+                }
+            )
+        )
         result = hypotheses_node(seed_state)
         assert "does_not_exist" not in result["test_point_rankings"]
         assert set(result["test_point_rankings"]) <= {"primary_mosfet", "output_voltage"}

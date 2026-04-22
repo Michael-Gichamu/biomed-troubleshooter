@@ -30,7 +30,7 @@ def instruction_node(state: ConversationalAgentState):
     parts: list[str] = []
 
     if current_signal:
-        step_num    = state.current_step + 1
+        step_num = state.current_step + 1
         signal_name = current_signal.get("name", current_signal_id)
 
         parts.append(f"## 🔬 Measurement {step_num} of {total_steps} -- {signal_name}")
@@ -62,14 +62,15 @@ def instruction_node(state: ConversationalAgentState):
         if disp_exp:
             parts.append(f"**Expected reading:** {disp_exp}")
         elif exp:
-            parts.append(
-                f"**Expected reading:** {exp['min']} – {exp['max']} {exp.get('unit','V')}"
-            )
+            parts.append(f"**Expected reading:** {exp['min']} – {exp['max']} {exp.get('unit','V')}")
 
         hyp_desc = next(
-            (h.get("description", "") for h in state.hypotheses
-             if h.get("id") == state.current_hypothesis),
-            ""
+            (
+                h.get("description", "")
+                for h in state.hypotheses
+                if h.get("id") == state.current_hypothesis
+            ),
+            "",
         )
         if hyp_desc:
             parts.append(f"*Testing hypothesis: {hyp_desc}*")
@@ -77,14 +78,20 @@ def instruction_node(state: ConversationalAgentState):
         param = current_signal.get("parameter", "")
         if param == "continuity":
             if current_signal_id == "schottky_diode":
-                manual_hint = ("- _Type your result (`D3 ok` · `shorted` · `open`) "
-                               "and press **Enter** to enter it manually._")
+                manual_hint = (
+                    "- _Type your result (`D3 ok` · `shorted` · `open`) "
+                    "and press **Enter** to enter it manually._"
+                )
             else:
-                manual_hint = ("- _Type your result (e.g. `no beep`, `beeped`, `OL`) "
-                               "and press **Enter** to enter it manually._")
+                manual_hint = (
+                    "- _Type your result (e.g. `no beep`, `beeped`, `OL`) "
+                    "and press **Enter** to enter it manually._"
+                )
         else:
-            manual_hint = ("- _Type your reading (e.g. `280 V DC` · `12.5 V` · `0.5 ohm` · `OL`) "
-                           "and press **Enter** to enter it manually._")
+            manual_hint = (
+                "- _Type your reading (e.g. `280 V DC` · `12.5 V` · `0.5 ohm` · `OL`) "
+                "and press **Enter** to enter it manually._"
+            )
 
         parts.append(
             "\n_Follow the instructions above, then:_\n"

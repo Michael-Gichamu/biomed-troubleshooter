@@ -30,24 +30,30 @@ def _merge(state, delta):
 
 def test_confirmed_hypothesis_flows_to_repair(base_state, mock_llm):
     # A FAULT measurement has been taken.
-    base_state.measurements = [{
-        "test_point": "primary_mosfet",
-        "signal_name": "Primary MOSFET (Q1)",
-        "value": 0.3,
-        "unit": "ohm",
-        "measurement_type": "CONTINUITY",
-        "evaluation": "fault",
-        "status": "success",
-    }]
+    base_state.measurements = [
+        {
+            "test_point": "primary_mosfet",
+            "signal_name": "Primary MOSFET (Q1)",
+            "value": 0.3,
+            "unit": "ohm",
+            "measurement_type": "CONTINUITY",
+            "evaluation": "fault",
+            "status": "success",
+        }
+    ]
 
     # 1) reason_node — LLM confirms HYPOTHESIS_1.
-    mock_llm(json.dumps({
-        "reasoning": "Q1 shorted — cascade failure confirmed.",
-        "probability_updates": {"HYPOTHESIS_1": 1.0, "HYPOTHESIS_2": 0.0},
-        "eliminated_faults": ["HYPOTHESIS_2"],
-        "confirmed_hypothesis": "HYPOTHESIS_1",
-        "updated_remaining_test_plan": [],
-    }))
+    mock_llm(
+        json.dumps(
+            {
+                "reasoning": "Q1 shorted — cascade failure confirmed.",
+                "probability_updates": {"HYPOTHESIS_1": 1.0, "HYPOTHESIS_2": 0.0},
+                "eliminated_faults": ["HYPOTHESIS_2"],
+                "confirmed_hypothesis": "HYPOTHESIS_1",
+                "updated_remaining_test_plan": [],
+            }
+        )
+    )
     _merge(base_state, reason_node(base_state))
     assert base_state.step_result["decision"] == "fault_confirmed"
 

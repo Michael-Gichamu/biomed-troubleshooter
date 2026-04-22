@@ -30,11 +30,13 @@ def _get_cached_rag_knowledge(equipment_model: str, force_refresh: bool = False)
 
     def _do_query():
         try:
-            result_holder[0] = query_diagnostic_knowledge.invoke({
-                "query": "diagnostic procedures troubleshooting fault",
-                "equipment_model": equipment_model,
-                "top_k": 5
-            })
+            result_holder[0] = query_diagnostic_knowledge.invoke(
+                {
+                    "query": "diagnostic procedures troubleshooting fault",
+                    "equipment_model": equipment_model,
+                    "top_k": 5,
+                }
+            )
         except Exception as exc:
             print(f"[RAG] Query thread error (non-fatal): {exc}")
 

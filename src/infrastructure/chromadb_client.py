@@ -11,19 +11,22 @@ from pathlib import Path
 # Lazy import for sentence-transformers to avoid import errors
 _embedding_function = None
 
+
 def _get_embedding_function():
     """Get or create the sentence-transformers embedding function."""
     global _embedding_function
     if _embedding_function is None:
         from sentence_transformers import SentenceTransformer
+
         # Use the same model that's already cached
-        _embedding_function = SentenceTransformer('all-MiniLM-L6-v2')
+        _embedding_function = SentenceTransformer("all-MiniLM-L6-v2")
     return _embedding_function
 
 
 @dataclass
 class ChromaDBConfig:
     """Configuration for ChromaDB."""
+
     persist_directory: str = "data/chromadb"
     collection_name: str = "troubleshooting"
     embedding_function: str = "default"  # default, openai, sentence-transformers
@@ -53,14 +56,14 @@ class ChromaDBClient:
         """Initialize ChromaDB client and collection."""
         # Create persistence directory
         Path(self.config.persist_directory).mkdir(parents=True, exist_ok=True)
-        
+
         # Try local PersistentClient first (no Docker needed!)
         try:
             import chromadb
             from chromadb.config import Settings
+
             self._client = chromadb.PersistentClient(
-                path=self.config.persist_directory,
-                settings=Settings(anonymized_telemetry=False)
+                path=self.config.persist_directory, settings=Settings(anonymized_telemetry=False)
             )
             print(f"[ChromaDB] Using local persistent storage at {self.config.persist_directory}")
         except Exception as local_err:
@@ -68,6 +71,7 @@ class ChromaDBClient:
             print(f"[ChromaDB] Local storage failed: {local_err}")
             try:
                 import chromadb
+
                 self._client = chromadb.EphemeralClient()
                 print("[ChromaDB] Using in-memory client")
             except OSError as ephemeral_err:
@@ -78,8 +82,8 @@ class ChromaDBClient:
             name=self.config.collection_name,
             metadata={
                 "description": "Troubleshooting documentation for biomedical equipment",
-                "version": "1.0"
-            }
+                "version": "1.0",
+            },
         )
 
     def reset(self) -> None:
@@ -88,12 +92,7 @@ class ChromaDBClient:
             self._client.delete_collection(self.config.collection_name)
             self._collection = None
 
-    def add_documents(
-        self,
-        documents: list[str],
-        metadatas: list[dict],
-        ids: list[str]
-    ) -> None:
+    def add_documents(self, documents: list[str], metadatas: list[dict], ids: list[str]) -> None:
         """
         Add documents to the collection.
 
@@ -110,18 +109,10 @@ class ChromaDBClient:
         embeddings = embedding_fn.encode(documents).tolist()
 
         self._collection.add(
-            documents=documents,
-            metadatas=metadatas,
-            ids=ids,
-            embeddings=embeddings
+            documents=documents, metadatas=metadatas, ids=ids, embeddings=embeddings
         )
 
-    def query(
-        self,
-        query_texts: list[str],
-        n_results: int = 5,
-        where: dict | None = None
-    ) -> dict:
+    def query(self, query_texts: list[str], n_results: int = 5, where: dict | None = None) -> dict:
         """
         Query the collection.
 
@@ -145,7 +136,7 @@ class ChromaDBClient:
             query_embeddings=query_embeddings,
             n_results=n_results,
             where=where,
-            include=["documents", "metadatas", "distances"]
+            include=["documents", "metadatas", "distances"],
         )
 
     def get_collection_stats(self) -> dict:
@@ -153,10 +144,7 @@ class ChromaDBClient:
         if not self.is_initialized:
             return {"count": 0}
 
-        return {
-            "count": self._collection.count(),
-            "name": self.config.collection_name
-        }
+        return {"count": self._collection.count(), "name": self.config.collection_name}
 
 
 def create_chromadb_client(persist_directory: str = "data/chromadb") -> ChromaDBClient:

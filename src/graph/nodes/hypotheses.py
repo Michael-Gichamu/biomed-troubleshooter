@@ -26,13 +26,22 @@ def _extract_confirmed_findings(symptom: str, test_points: list) -> str:
         for kw in [sid.lower(), name]:
             if not kw:
                 continue
-            if (f"{kw} is okay" in lower or f"{kw} ok" in lower
-                    or f"{kw} confirmed" in lower or f"{kw} fine" in lower
-                    or f"{kw} good" in lower or f"confirmed {kw}" in lower):
+            if (
+                f"{kw} is okay" in lower
+                or f"{kw} ok" in lower
+                or f"{kw} confirmed" in lower
+                or f"{kw} fine" in lower
+                or f"{kw} good" in lower
+                or f"confirmed {kw}" in lower
+            ):
                 confirmed_ok.append(f"{sid} ({tp.get('name', '')})")
                 break
-            if (f"replaced {kw}" in lower or f"{kw} replaced" in lower
-                    or f"changed {kw}" in lower or f"{kw} changed" in lower):
+            if (
+                f"replaced {kw}" in lower
+                or f"{kw} replaced" in lower
+                or f"changed {kw}" in lower
+                or f"{kw} changed" in lower
+            ):
                 already_replaced.append(f"{sid} ({tp.get('name', '')})")
                 break
 
@@ -61,31 +70,36 @@ def hypotheses_node(state: ConversationalAgentState):
     from src.infrastructure.llm_manager import invoke_with_retry
 
     equipment_model = state.equipment_model
-    test_points    = state.test_points
-    rag_knowledge  = state.rag_knowledge
-    faults         = state.suspected_faults
+    test_points = state.test_points
+    rag_knowledge = state.rag_knowledge
+    faults = state.suspected_faults
 
     symptom = " ".join(
-        _text(m.content)
-        for m in state.messages
-        if isinstance(m, HumanMessage)
+        _text(m.content) for m in state.messages if isinstance(m, HumanMessage)
     ).strip()
 
-    tp_str = "\n".join(
-        f"- {tp.get('signal_id','?')}: {tp.get('name','')} ({tp.get('parameter','')})"
-        for tp in test_points[:15]
-    ) or "No test points defined"
+    tp_str = (
+        "\n".join(
+            f"- {tp.get('signal_id','?')}: {tp.get('name','')} ({tp.get('parameter','')})"
+            for tp in test_points[:15]
+        )
+        or "No test points defined"
+    )
 
-    faults_str = "\n".join(
-        f"- {f.get('fault_id','')}: {f.get('name','')} -- {f.get('description','')[:150]}"
-        for f in faults[:10]
-    ) or "No fault definitions available"
+    faults_str = (
+        "\n".join(
+            f"- {f.get('fault_id','')}: {f.get('name','')} -- {f.get('description','')[:150]}"
+            for f in faults[:10]
+        )
+        or "No fault definitions available"
+    )
 
-    rag_str = "\n".join(
-        f"- {k.get('content','')[:200]}"
-        for k in rag_knowledge[:3]
-        if isinstance(k, dict)
-    ) or "No diagnostic knowledge available"
+    rag_str = (
+        "\n".join(
+            f"- {k.get('content','')[:200]}" for k in rag_knowledge[:3] if isinstance(k, dict)
+        )
+        or "No diagnostic knowledge available"
+    )
 
     confirmed_findings = _extract_confirmed_findings(symptom, test_points)
 
@@ -167,10 +181,10 @@ Output ONLY a valid JSON object, nothing else:
         response = invoke_with_retry([{"role": "user", "content": prompt}])
         content = response.content if response else "{}"
 
-        start = content.find('{')
-        end   = content.rfind('}')
+        start = content.find("{")
+        end = content.rfind("}")
         if start != -1 and end > start:
-            data = json.loads(content[start:end + 1])
+            data = json.loads(content[start : end + 1])
             hypotheses = data.get("hypotheses", [])
             for h in hypotheses:
                 hypothesis_probabilities[h.get("id", "")] = float(h.get("probability", 0.1))
@@ -181,7 +195,7 @@ Output ONLY a valid JSON object, nothing else:
                 "id": f"HYPOTHESIS_{i + 1}",
                 "fault_id": fault.get("fault_id", ""),
                 "description": fault.get("description", fault.get("name", ""))[:120],
-                "probability": 1.0 / max(min(len(faults), 5), 1)
+                "probability": 1.0 / max(min(len(faults), 5), 1),
             }
             hypotheses.append(h)
             hypothesis_probabilities[h["id"]] = h["probability"]
@@ -200,22 +214,19 @@ Output ONLY a valid JSON object, nothing else:
     current_hypothesis = ""
     if hypotheses:
         current_hypothesis = max(
-            hypotheses,
-            key=lambda h: hypothesis_probabilities.get(h["id"], 0)
+            hypotheses, key=lambda h: hypothesis_probabilities.get(h["id"], 0)
         ).get("id", "")
 
-    diagnostic_plan = test_point_rankings[:state.max_steps]
+    diagnostic_plan = test_point_rankings[: state.max_steps]
 
     sorted_h = sorted(
-        hypotheses,
-        key=lambda h: hypothesis_probabilities.get(h["id"], 0),
-        reverse=True
+        hypotheses, key=lambda h: hypothesis_probabilities.get(h["id"], 0), reverse=True
     )
 
     lines = [
         "**[3. Preliminary Assessment]**\n",
         f"Symptom: *{symptom}*\n",
-        "**Fault candidates by probability:**\n"
+        "**Fault candidates by probability:**\n",
     ]
     for h in sorted_h:
         prob = hypothesis_probabilities.get(h["id"], 0)
@@ -237,5 +248,5 @@ Output ONLY a valid JSON object, nothing else:
         "diagnostic_reasoning": [f"Initial hypotheses: {len(hypotheses)} candidates"],
         "diagnostic_plan": diagnostic_plan,
         "current_step": 0,
-        "messages": [AIMessage(content="\n".join(lines))]
+        "messages": [AIMessage(content="\n".join(lines))],
     }

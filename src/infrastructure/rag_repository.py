@@ -17,6 +17,7 @@ if TYPE_CHECKING:
 @dataclass
 class DocumentSnippet:
     """A retrieved document snippet."""
+
     doc_id: str
     title: str
     section: str | None
@@ -29,7 +30,7 @@ class DocumentSnippet:
             "title": self.title,
             "section": self.section,
             "content": self.content,
-            "relevance_score": self.relevance_score
+            "relevance_score": self.relevance_score,
         }
 
 
@@ -44,9 +45,7 @@ class RAGRepository:
     """
 
     def __init__(
-        self,
-        chromadb_client: Optional["ChromaDBClient"] = None,
-        namespace: str = "troubleshooting"
+        self, chromadb_client: Optional["ChromaDBClient"] = None, namespace: str = "troubleshooting"
     ):
         self._client = chromadb_client
         self.namespace = namespace
@@ -55,6 +54,7 @@ class RAGRepository:
     def from_directory(cls, persist_directory: str = "data/chromadb") -> "RAGRepository":
         """Factory method to create RAGRepository from directory."""
         from src.infrastructure.chromadb_client import create_chromadb_client
+
         client = create_chromadb_client(persist_directory)
         return cls(chromadb_client=client)
 
@@ -67,15 +67,11 @@ class RAGRepository:
         """Initialize the ChromaDB connection."""
         if self._client is None:
             from src.infrastructure.chromadb_client import create_chromadb_client
+
             self._client = create_chromadb_client()
         self._client.initialize()
 
-    def add_document(
-        self,
-        content: str,
-        metadata: dict,
-        doc_id: str | None = None
-    ) -> str:
+    def add_document(self, content: str, metadata: dict, doc_id: str | None = None) -> str:
         """
         Add a document to the knowledge base.
 
@@ -91,23 +87,15 @@ class RAGRepository:
             self.initialize()
 
         import uuid
+
         if doc_id is None:
             doc_id = str(uuid.uuid4())
 
-        self._client.add_documents(
-            documents=[content],
-            metadatas=[metadata],
-            ids=[doc_id]
-        )
+        self._client.add_documents(documents=[content], metadatas=[metadata], ids=[doc_id])
 
         return doc_id
 
-    def retrieve(
-        self,
-        query: str,
-        equipment_model: str,
-        top_k: int = 5
-    ) -> list[DocumentSnippet]:
+    def retrieve(self, query: str, equipment_model: str, top_k: int = 5) -> list[DocumentSnippet]:
         """
         Retrieve relevant documentation snippets.
 
@@ -130,7 +118,7 @@ class RAGRepository:
             results = self._client.query(
                 query_texts=[filtered_query],
                 n_results=top_k,
-                where={"equipment_model": equipment_model}
+                where={"equipment_model": equipment_model},
             )
 
             return self._parse_results(results)
@@ -159,7 +147,7 @@ class RAGRepository:
                 title=metadata.get("title", "Unknown"),
                 section=metadata.get("category"),
                 content=results["documents"][0][i],
-                relevance_score=relevance
+                relevance_score=relevance,
             )
             snippets.append(snippet)
 
@@ -191,10 +179,7 @@ class StaticRuleRepository:
         if self._rules_cache is None:
             self._rules_cache = self._load_rules()
 
-        return [
-            r for r in self._rules_cache
-            if r.get("equipment_model") == equipment_model
-        ]
+        return [r for r in self._rules_cache if r.get("equipment_model") == equipment_model]
 
     def _load_rules(self) -> list[dict]:
         """Load rules from JSON file."""
@@ -204,11 +189,7 @@ class StaticRuleRepository:
         except FileNotFoundError:
             return []
 
-    def find_matching_rules(
-        self,
-        equipment_model: str,
-        signal_patterns: list[dict]
-    ) -> list[dict]:
+    def find_matching_rules(self, equipment_model: str, signal_patterns: list[dict]) -> list[dict]:
         """
         Find rules matching signal patterns.
 
@@ -252,19 +233,12 @@ class EvidenceAggregator:
     No reasoning - just aggregation.
     """
 
-    def __init__(
-        self,
-        rag_repo: RAGRepository,
-        static_repo: StaticRuleRepository
-    ):
+    def __init__(self, rag_repo: RAGRepository, static_repo: StaticRuleRepository):
         self.rag_repo = rag_repo
         self.static_repo = static_repo
 
     def retrieve_evidence(
-        self,
-        query: str,
-        equipment_model: str,
-        signal_patterns: list[dict]
+        self, query: str, equipment_model: str, signal_patterns: list[dict]
     ) -> dict:
         """
         Retrieve evidence from all sources.
@@ -279,5 +253,5 @@ class EvidenceAggregator:
         return {
             "documents": [d.to_dict() for d in docs],
             "rules": rules,
-            "sources_retrieved": len(docs) + len(rules)
+            "sources_retrieved": len(docs) + len(rules),
         }

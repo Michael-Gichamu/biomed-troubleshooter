@@ -38,7 +38,7 @@ class USBMultimeterSource(SignalSource):
     def __init__(self, port: str | None = None):
         """
         Initialize USB multimeter source.
-        
+
         Args:
             port: COM port (e.g., "COM3"). Auto-detects if None.
         """
@@ -53,7 +53,7 @@ class USBMultimeterSource(SignalSource):
         """Connect to USB multimeter."""
         try:
             from src.infrastructure.usb_multimeter import USBMultimeterClient
-            
+
             self._client = USBMultimeterClient(port=self.port)
             if self._client.connect():
                 self._connected = True
@@ -75,7 +75,7 @@ class USBMultimeterSource(SignalSource):
     def receive_signals(self, equipment_id: str) -> SignalBatch | None:
         """
         Collect readings from multimeter.
-        
+
         Reads multiple measurements and returns them as a batch.
         """
         if not self._connected or not self._client:
@@ -83,25 +83,23 @@ class USBMultimeterSource(SignalSource):
 
         signals = []
         timestamp = datetime.utcnow().isoformat()
-        
+
         # Collect readings
         print("\n[USB] Collecting measurements (press Enter when done)...")
         print("[USB] Reading from multimeter...")
-        
+
         for i in range(self._max_readings):
             reading = self._client.read_measurement(timeout=5.0)
             if reading:
                 signal = Signal(
                     test_point=TestPoint(
-                        id=f"MM{i+1}",
-                        name=f"Measurement {i+1}",
-                        location="USB Multimeter"
+                        id=f"MM{i+1}", name=f"Measurement {i+1}", location="USB Multimeter"
                     ),
                     value=reading.value,
                     unit=reading.unit,
                     accuracy=0.01,  # Typical multimeter accuracy
                     measurement_type=reading.measurement_type.lower(),
-                    timestamp=reading.timestamp
+                    timestamp=reading.timestamp,
                 )
                 signals.append(signal)
                 print(f"  [{i+1}] {reading.measurement_type}: {reading.value} {reading.unit}")
@@ -111,11 +109,7 @@ class USBMultimeterSource(SignalSource):
         if not signals:
             return None
 
-        return SignalBatch(
-            timestamp=timestamp,
-            equipment_id=equipment_id,
-            signals=signals
-        )
+        return SignalBatch(timestamp=timestamp, equipment_id=equipment_id, signals=signals)
 
     def is_connected(self) -> bool:
         """Check if connected to multimeter."""
@@ -166,15 +160,12 @@ class ModeRouter:
 
     def get_mode_info(self) -> dict[str, Any]:
         """Get information about current mode."""
-        return {
-            "mode": self.config["mode"],
-            "usb_port": self.config["usb_port"] or "auto-detect"
-        }
+        return {"mode": self.config["mode"], "usb_port": self.config["usb_port"] or "auto-detect"}
 
     def switch_mode(self, new_mode: str) -> None:
         """
         Switch to a different mode.
-        
+
         Args:
             new_mode: "usb"
         """
@@ -191,20 +182,21 @@ class ModeRouter:
 # Convenience Functions
 # =============================================================================
 
+
 def create_signal_source(mode: str = None, **kwargs) -> SignalSource:
     """
     Factory function to create a signal source.
-    
+
     Args:
         mode: "usb". Uses APP_MODE env var if None.
         **kwargs: Additional arguments for the source
-        
+
     Returns:
         SignalSource instance
     """
     if mode is None:
         mode = os.getenv("APP_MODE", "usb").lower()
-    
+
     if mode == "usb":
         return USBMultimeterSource(kwargs.get("port"))
     else:

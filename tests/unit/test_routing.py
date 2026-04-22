@@ -21,13 +21,16 @@ class TestRouteFromDecision:
     def test_default_when_unset_is_interrupt(self, state):
         assert route_from_decision(state) == "interrupt"
 
-    @pytest.mark.parametrize("next_node, expected", [
-        ("repair",      "repair"),
-        ("end",         "end"),
-        ("instruction", "instruction"),
-        ("interrupt",   "interrupt"),
-        ("anything_else", "interrupt"),   # fallthrough → interrupt
-    ])
+    @pytest.mark.parametrize(
+        "next_node, expected",
+        [
+            ("repair", "repair"),
+            ("end", "end"),
+            ("instruction", "instruction"),
+            ("interrupt", "interrupt"),
+            ("anything_else", "interrupt"),  # fallthrough → interrupt
+        ],
+    )
     def test_explicit_targets(self, state, next_node, expected):
         state.next_node = next_node
         assert route_from_decision(state) == expected

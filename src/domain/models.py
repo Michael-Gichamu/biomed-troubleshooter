@@ -14,8 +14,10 @@ from typing import Any
 # ENUMS - Generic only, no equipment-specific values
 # =============================================================================
 
+
 class WorkflowType:
     """Workflow routing types - generic, no equipment-specific values."""
+
     INITIAL = "initial"
     FOLLOW_UP = "follow_up"
     VERIFICATION = "verification"
@@ -30,6 +32,7 @@ class WorkflowType:
 # VALUE OBJECTS
 # =============================================================================
 
+
 @dataclass(frozen=True, slots=True)
 class TestPoint:
     """
@@ -37,6 +40,7 @@ class TestPoint:
 
     NOTE: Signal IDs and parameters come from equipment config, not hard-coded here.
     """
+
     id: str
     name: str
     location: str | None = None
@@ -54,6 +58,7 @@ class Measurement:
 
     NOTE: Thresholds come from equipment config, not hard-coded here.
     """
+
     test_point: TestPoint
     value: float
     unit: str
@@ -84,6 +89,7 @@ class SignalState:
     NOTE: Semantic states come from equipment config thresholds, not hard-coded here.
     The state string is data-driven, not an enum.
     """
+
     measurement: Measurement
     state: str  # e.g., "normal", "missing", "over_voltage" - from config
     confidence: float = 1.0
@@ -109,6 +115,7 @@ class EquipmentId:
 
     NOTE: Model names come from data files, not hard-coded here.
     """
+
     model: str
     serial: str | None = None
 
@@ -124,9 +131,11 @@ class EquipmentId:
 # DOMAIN ENTITIES
 # =============================================================================
 
+
 @dataclass
 class SignalCollection:
     """Collection of measurements for an equipment session."""
+
     equipment_id: EquipmentId
     measurements: list[Measurement] = field(default_factory=list)
     collected_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
@@ -155,6 +164,7 @@ class DiagnosticSession:
 
     NOTE: All fault knowledge comes from equipment config files, not hard-coded.
     """
+
     session_id: str
     equipment_id: EquipmentId
     signals: SignalCollection
@@ -182,17 +192,15 @@ class DiagnosticSession:
 
     def add_reasoning_step(self, step: int, observation: str, inference: str, source: str) -> None:
         """Add a step to the reasoning chain."""
-        self.reasoning_chain.append({
-            "step": step,
-            "observation": observation,
-            "inference": inference,
-            "source": source
-        })
+        self.reasoning_chain.append(
+            {"step": step, "observation": observation, "inference": inference, "source": source}
+        )
 
 
 @dataclass
 class ReasoningStep:
     """A step in the troubleshooting reasoning process."""
+
     step: int
     observation: str
     inference: str
@@ -203,13 +211,14 @@ class ReasoningStep:
             "step": self.step,
             "observation": self.observation,
             "inference": self.inference,
-            "source": self.source
+            "source": self.source,
         }
 
 
 # =============================================================================
 # DOMAIN SERVICES (Generic, data-driven)
 # =============================================================================
+
 
 class SignalInterpreter:
     """
@@ -252,9 +261,7 @@ class SignalInterpreter:
                 deviation = None
 
             signal_state = SignalState(
-                measurement=measurement,
-                state=state or "unknown",
-                deviation_percent=deviation
+                measurement=measurement, state=state or "unknown", deviation_percent=deviation
             )
             states.append(signal_state)
 
@@ -274,7 +281,7 @@ class SignalInterpreter:
 
     def _calculate_deviation(self, measurement: Measurement, threshold) -> float | None:
         """Calculate percentage deviation from nominal."""
-        nominal = getattr(threshold, 'nominal_value', None) or measurement.nominal_value
+        nominal = getattr(threshold, "nominal_value", None) or measurement.nominal_value
         if nominal is None or nominal == 0:
             return None
         return ((measurement.value - nominal) / nominal) * 100
@@ -359,15 +366,17 @@ class RecommendationGenerator:
         # Transform recovery steps to recommendations
         recommendations = []
         for step in recovery:
-            recommendations.append({
-                "action": step.get("action", "inspect"),
-                "target": step.get("target", "Unknown"),
-                "instruction": step.get("instruction", ""),
-                "verification_step": step.get("verification", ""),
-                "estimated_difficulty": step.get("difficulty", "moderate"),
-                "safety_warning": step.get("safety", ""),
-                "estimated_time": step.get("estimated_time", "")
-            })
+            recommendations.append(
+                {
+                    "action": step.get("action", "inspect"),
+                    "target": step.get("target", "Unknown"),
+                    "instruction": step.get("instruction", ""),
+                    "verification_step": step.get("verification", ""),
+                    "estimated_difficulty": step.get("difficulty", "moderate"),
+                    "safety_warning": step.get("safety", ""),
+                    "estimated_time": step.get("estimated_time", ""),
+                }
+            )
 
         return recommendations
 
@@ -388,12 +397,7 @@ class HypothesisGenerator:
         """
         self.fault_configs = fault_configs
 
-    def generate(
-        self,
-        equipment_id: str,
-        signal_states: dict,
-        evidence: list[str]
-    ) -> dict:
+    def generate(self, equipment_id: str, signal_states: dict, evidence: list[str]) -> dict:
         """
         Generate a fault hypothesis from signal states and evidence.
 
@@ -416,7 +420,7 @@ class HypothesisGenerator:
                 "failure_mode": None,
                 "supporting_evidence": evidence,
                 "contradicting_evidence": [],
-                "fault_id": None
+                "fault_id": None,
             }
 
         # Get best hypothesis from fault
@@ -429,7 +433,7 @@ class HypothesisGenerator:
                 "failure_mode": None,
                 "supporting_evidence": evidence,
                 "contradicting_evidence": [],
-                "fault_id": fault.get("fault_id")
+                "fault_id": fault.get("fault_id"),
             }
 
         # Get highest-ranked hypothesis
@@ -442,7 +446,7 @@ class HypothesisGenerator:
             "failure_mode": best.get("failure_mode"),
             "supporting_evidence": evidence,
             "contradicting_evidence": [],
-            "fault_id": fault.get("fault_id")
+            "fault_id": fault.get("fault_id"),
         }
 
     def _find_matching_fault(self, signal_states: dict) -> dict | None:
@@ -455,9 +459,11 @@ class HypothesisGenerator:
 # SIGNAL BATCH MODELS (For CLI and Mock Mode)
 # =============================================================================
 
+
 @dataclass
 class Signal:
     """A signal measurement with test point and value."""
+
     test_point: TestPoint
     value: float
     unit: str
@@ -472,20 +478,21 @@ class Signal:
             "test_point": {
                 "id": self.test_point.id,
                 "name": self.test_point.name,
-                "location": self.test_point.location
+                "location": self.test_point.location,
             },
             "value": self.value,
             "unit": self.unit,
             "measurement_type": self.measurement_type,
             "accuracy": self.accuracy,
             "timestamp": self.timestamp,
-            "anomaly": self.anomaly
+            "anomaly": self.anomaly,
         }
 
 
 @dataclass
 class SignalBatch:
     """A batch of signals from equipment."""
+
     timestamp: str = ""
     equipment_id: str = ""
     signals: list[Signal] = field(default_factory=list)
@@ -499,7 +506,7 @@ class SignalBatch:
             test_point = TestPoint(
                 id=tp_data.get("id", "TP1"),
                 name=tp_data.get("name", "Unknown"),
-                location=tp_data.get("location")
+                location=tp_data.get("location"),
             )
             signal = Signal(
                 test_point=test_point,
@@ -508,14 +515,14 @@ class SignalBatch:
                 measurement_type=sig_data.get("measurement_type", "voltage"),
                 accuracy=sig_data.get("accuracy", 0.1),
                 timestamp=sig_data.get("timestamp", ""),
-                anomaly=sig_data.get("anomaly")
+                anomaly=sig_data.get("anomaly"),
             )
             signals.append(signal)
 
         return cls(
             timestamp=data.get("timestamp", ""),
             equipment_id=data.get("equipment_id", data.get("scenario_name", "")),
-            signals=signals
+            signals=signals,
         )
 
     def to_dict(self) -> dict:
@@ -523,7 +530,7 @@ class SignalBatch:
         return {
             "timestamp": self.timestamp,
             "equipment_id": self.equipment_id,
-            "signals": [s.to_dict() for s in self.signals]
+            "signals": [s.to_dict() for s in self.signals],
         }
 
 
@@ -531,9 +538,11 @@ class SignalBatch:
 # DIAGNOSTIC WORKFLOW MODELS (Consolidated)
 # =============================================================================
 
+
 @dataclass
 class DiagnosticStep:
     """A single step in the diagnostic process."""
+
     step_number: int
     test_point_name: str
     probe_placement_instructions: str = ""
@@ -556,13 +565,14 @@ class DiagnosticStep:
             "measurement_result": self.measurement_result,
             "is_completed": self.is_completed,
             "is_fault_confirmed": self.is_fault_confirmed,
-            "signal_id": self.signal_id
+            "signal_id": self.signal_id,
         }
 
 
 @dataclass
 class DiagnosticState:
     """Tracks the complete state of a diagnostic session."""
+
     equipment_model: str = ""
     current_step: int = 0
     completed_steps: list[int] = field(default_factory=list)
@@ -600,12 +610,12 @@ class DiagnosticState:
 
 class DiagnosticEngine:
     """Manages the diagnostic workflow using domain models."""
-    
+
     def __init__(
         self,
         equipment_config_loader=None,
         rag_repository=None,
-        state: DiagnosticState | None = None
+        state: DiagnosticState | None = None,
     ):
         self._config_loader = equipment_config_loader
         self._rag_repo = rag_repository
@@ -619,21 +629,25 @@ class DiagnosticEngine:
     def load_equipment_config(self, equipment_model: str) -> dict[str, Any]:
         if self._state.config_cached and self._state.equipment_model == equipment_model:
             return self._state.equipment_config
-        
+
         if self._config_loader is None:
             from src.infrastructure.equipment_config import EquipmentConfigLoader
+
             self._config_loader = EquipmentConfigLoader()
-        
+
         config = self._config_loader.load(equipment_model)
         self._state.equipment_model = equipment_model
-        
+
         # Simple dict conversion for state caching
         self._state.equipment_config = {
             "metadata": vars(config.metadata),
             "signals": {sid: vars(s) for sid, s in config.signals.items()},
-            "thresholds": {tid: {"signal_id": t.signal_id, "states": {n: vars(s) for n, s in t.states.items()}} for tid, t in config.thresholds.items()},
+            "thresholds": {
+                tid: {"signal_id": t.signal_id, "states": {n: vars(s) for n, s in t.states.items()}}
+                for tid, t in config.thresholds.items()
+            },
             "faults": {fid: vars(f) for fid, f in config.faults.items()},
-            "images": {iid: vars(img) for iid, img in config.images.items()}
+            "images": {iid: vars(img) for iid, img in config.images.items()},
         }
         self._state.config_cached = True
         return self._state.equipment_config
@@ -642,35 +656,50 @@ class DiagnosticEngine:
         self._state.symptoms = symptoms
         self._state.started_at = datetime.now(timezone.utc)
         self._state.diagnosis_progress = "in_progress"
-        
+
         if self._state.equipment_config:
             faults = self._state.equipment_config.get("faults", {})
             sorted_faults = sorted(faults.values(), key=lambda f: f.get("priority", 999))
             self._state.hypothesis_list = [f"{f['fault_id']}: {f['name']}" for f in sorted_faults]
             if self._state.hypothesis_list:
                 self._state.current_hypothesis = self._state.hypothesis_list[0]
-        
+
         if self._rag_repo and self._state.equipment_model:
-            context = self._rag_repo.retrieve(query=symptoms, equipment_model=self._state.equipment_model, top_k=5)
-            self._state.retrieved_context = {"documents": [d.to_dict() for d in context], "query": symptoms}
-        
+            context = self._rag_repo.retrieve(
+                query=symptoms, equipment_model=self._state.equipment_model, top_k=5
+            )
+            self._state.retrieved_context = {
+                "documents": [d.to_dict() for d in context],
+                "query": symptoms,
+            }
+
         self._build_diagnostic_steps()
         return self._state
 
     def _build_diagnostic_steps(self) -> None:
         self._steps = []
-        if not self._state.current_hypothesis: return
-        
+        if not self._state.current_hypothesis:
+            return
+
         fault_id = self._state.current_hypothesis.split(":")[0]
         config = self._state.equipment_config
         fault = config.get("faults", {}).get(fault_id)
-        if not fault: return
-        
+        if not fault:
+            return
+
         for i, hypothesis in enumerate(fault.get("hypotheses", [])):
             component = hypothesis.get("component", "")
             signals = config.get("signals", {})
-            signal = next((s for s in signals.values() if s.get("test_point") == component or s.get("name", "").lower() in component.lower()), None)
-            
+            signal = next(
+                (
+                    s
+                    for s in signals.values()
+                    if s.get("test_point") == component
+                    or s.get("name", "").lower() in component.lower()
+                ),
+                None,
+            )
+
             if signal:
                 step = DiagnosticStep(
                     step_number=i,
@@ -679,7 +708,7 @@ class DiagnosticEngine:
                     image_url=signal.get("image_url", ""),
                     expected_value=self._get_expected_value(signal),
                     hypothesis_being_tested=hypothesis.get("cause", ""),
-                    signal_id=signal.get("signal_id")
+                    signal_id=signal.get("signal_id"),
                 )
                 self._steps.append(step)
         self._state.current_step = 0
@@ -690,7 +719,9 @@ class DiagnosticEngine:
         if sig_id in thresholds:
             normal = thresholds[sig_id].get("states", {}).get("normal", {})
             if normal:
-                return f"{signal.get('unit', '')} (min: {normal.get('min')}, max: {normal.get('max')})"
+                return (
+                    f"{signal.get('unit', '')} (min: {normal.get('min')}, max: {normal.get('max')})"
+                )
         return signal.get("unit", "")
 
     def get_current_step(self) -> DiagnosticStep | None:
@@ -710,8 +741,9 @@ class DiagnosticEngine:
 
     def evaluate_step_result(self, measurement: dict) -> dict:
         current = self.get_current_step()
-        if not current: return {"status": "no_more_steps"}
-        
+        if not current:
+            return {"status": "no_more_steps"}
+
         sig_id = current.signal_id
         config = self._state.equipment_config
         if sig_id in config.get("thresholds", {}):
@@ -724,7 +756,11 @@ class DiagnosticEngine:
                 current.is_fault_confirmed = True
                 self._state.diagnosis_progress = "fault_confirmed"
                 self._state.completed_at = datetime.now(timezone.utc)
-                return {"status": "fault_confirmed", "fault_id": fault_id, "fault_name": fault.get("name")}
+                return {
+                    "status": "fault_confirmed",
+                    "fault_id": fault_id,
+                    "fault_name": fault.get("name"),
+                }
         return {"status": "continue"}
 
 
@@ -733,5 +769,3 @@ def create_diagnostic_engine(equipment_model: str, symptoms: str) -> DiagnosticE
     engine.load_equipment_config(equipment_model)
     engine.initialize_diagnosis(symptoms)
     return engine
-
-

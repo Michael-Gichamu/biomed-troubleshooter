@@ -16,26 +16,32 @@ from src.infrastructure.equipment_config import (
 
 
 class TestValidateEquipmentId:
-    @pytest.mark.parametrize("valid_id", [
-        "psu-v1",
-        "cctv-psu-24w-v1",
-        "model-a1-b2-c3",
-        "x-y",
-    ])
+    @pytest.mark.parametrize(
+        "valid_id",
+        [
+            "psu-v1",
+            "cctv-psu-24w-v1",
+            "model-a1-b2-c3",
+            "x-y",
+        ],
+    )
     def test_accepts_valid_slugs(self, valid_id):
         assert _validate_equipment_id(valid_id) == valid_id
 
-    @pytest.mark.parametrize("bad_id", [
-        "",                      # empty
-        "no_underscore",         # no hyphen at all → rejected by pattern
-        "PSU-V1",                # uppercase
-        "../etc/passwd",         # traversal
-        "/absolute/path",        # absolute
-        "a/b",                   # separator
-        "a\x00b",                # null byte
-        "a" * 65,                # too long
-        "1-starts-digit",        # must start with letter
-    ])
+    @pytest.mark.parametrize(
+        "bad_id",
+        [
+            "",  # empty
+            "no_underscore",  # no hyphen at all → rejected by pattern
+            "PSU-V1",  # uppercase
+            "../etc/passwd",  # traversal
+            "/absolute/path",  # absolute
+            "a/b",  # separator
+            "a\x00b",  # null byte
+            "a" * 65,  # too long
+            "1-starts-digit",  # must start with letter
+        ],
+    )
     def test_rejects_bad_ids(self, bad_id):
         with pytest.raises(InvalidEquipmentIdError):
             _validate_equipment_id(bad_id)
@@ -52,19 +58,24 @@ class TestEquipmentConfigLoader:
     def loader_with_tmp_config(self, tmp_path):
         cfg_dir = tmp_path / "equipment"
         cfg_dir.mkdir()
-        (cfg_dir / "psu-v1.yaml").write_text(yaml.safe_dump({
-            "metadata": {
-                "equipment_id": "psu-v1",
-                "name": "Test PSU",
-                "category": "power",
-                "manufacturer": "Acme",
-                "version": "1.0",
-                "created": "2025-01-01",
-            },
-            "signals": [],
-            "thresholds": {},
-            "faults": [],
-        }), encoding="utf-8")
+        (cfg_dir / "psu-v1.yaml").write_text(
+            yaml.safe_dump(
+                {
+                    "metadata": {
+                        "equipment_id": "psu-v1",
+                        "name": "Test PSU",
+                        "category": "power",
+                        "manufacturer": "Acme",
+                        "version": "1.0",
+                        "created": "2025-01-01",
+                    },
+                    "signals": [],
+                    "thresholds": {},
+                    "faults": [],
+                }
+            ),
+            encoding="utf-8",
+        )
         return EquipmentConfigLoader(config_dir=str(cfg_dir))
 
     def test_load_valid_id_returns_config(self, loader_with_tmp_config):

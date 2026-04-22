@@ -19,15 +19,15 @@ def reason_node(state: ConversationalAgentState):
     if not state.measurements:
         return {
             "step_result": {"decision": "error", "reasoning": "No measurements recorded yet"},
-            "current_step": state.current_step + 1
+            "current_step": state.current_step + 1,
         }
 
     last = state.measurements[-1]
-    tp_id        = last.get("test_point", "")
-    meas_value   = last.get("value", 0)
-    meas_unit    = last.get("unit", "V")
-    evaluation   = last.get("evaluation", "normal")
-    signal_name  = last.get("signal_name", tp_id)
+    tp_id = last.get("test_point", "")
+    meas_value = last.get("value", 0)
+    meas_unit = last.get("unit", "V")
+    evaluation = last.get("evaluation", "normal")
+    signal_name = last.get("signal_name", tp_id)
 
     # Handle unavailable readings: retry once, then abort.
     if evaluation == "measurement_unavailable":
@@ -35,21 +35,21 @@ def reason_node(state: ConversationalAgentState):
 
         if status_code == "error":
             cause = "The multimeter could not be contacted — USB port not identified."
-            fix   = (
+            fix = (
                 "1. Check the USB cable is firmly seated.\n"
                 "2. Verify the multimeter is powered on.\n"
                 "3. Confirm the correct COM/USB port is selected in settings."
             )
         elif status_code == "timeout_unstable":
             cause = "Readings were unstable — probe contact was unreliable."
-            fix   = (
+            fix = (
                 "1. Press probes firmly onto bare metal at the test point.\n"
                 "2. Avoid touching adjacent traces.\n"
                 "3. Hold probes steady for at least 3 seconds."
             )
         else:
             cause = "No reading was received within the allowed time window."
-            fix   = (
+            fix = (
                 "1. Confirm probe tips are making solid contact.\n"
                 "2. Re-check the test point location in the image above.\n"
                 "3. Ensure the equipment is powered on."
@@ -60,17 +60,21 @@ def reason_node(state: ConversationalAgentState):
                 "consecutive_failures": 1,
                 "step_result": {
                     "measurement": last,
-                    "evaluation":  evaluation,
-                    "reasoning":   f"First failure at {tp_id}: {cause}",
-                    "decision":    "retry_probe",
+                    "evaluation": evaluation,
+                    "reasoning": f"First failure at {tp_id}: {cause}",
+                    "decision": "retry_probe",
                 },
-                "messages": [AIMessage(content=(
-                    "**[5. Results Analysis]**\n\n"
-                    f"⚠️ **No reliable reading at {signal_name}**\n\n"
-                    f"**Cause:** {cause}\n\n"
-                    f"**How to fix:**\n{fix}\n\n"
-                    "_Retrying the same test point. Place probes again and press **Resume**._"
-                ))],
+                "messages": [
+                    AIMessage(
+                        content=(
+                            "**[5. Results Analysis]**\n\n"
+                            f"⚠️ **No reliable reading at {signal_name}**\n\n"
+                            f"**Cause:** {cause}\n\n"
+                            f"**How to fix:**\n{fix}\n\n"
+                            "_Retrying the same test point. Place probes again and press **Resume**._"
+                        )
+                    )
+                ],
             }
         else:
             return {
@@ -79,18 +83,22 @@ def reason_node(state: ConversationalAgentState):
                 "diagnosis_status": "aborted_no_reading",
                 "step_result": {
                     "measurement": last,
-                    "evaluation":  evaluation,
-                    "reasoning":   f"Second failure at {tp_id} — aborting.",
-                    "decision":    "abort_no_reading",
+                    "evaluation": evaluation,
+                    "reasoning": f"Second failure at {tp_id} — aborting.",
+                    "decision": "abort_no_reading",
                 },
-                "messages": [AIMessage(content=(
-                    "**[5. Results Analysis]**\n\n"
-                    f"🛑 **Diagnosis halted — {signal_name}**\n\n"
-                    "A reliable reading could not be obtained after two attempts.\n\n"
-                    f"**Cause:** {cause}\n\n"
-                    "Without a valid measurement here the diagnostic cannot continue reliably. "
-                    "Please resolve the instrument connection issue and restart the session."
-                ))],
+                "messages": [
+                    AIMessage(
+                        content=(
+                            "**[5. Results Analysis]**\n\n"
+                            f"🛑 **Diagnosis halted — {signal_name}**\n\n"
+                            "A reliable reading could not be obtained after two attempts.\n\n"
+                            f"**Cause:** {cause}\n\n"
+                            "Without a valid measurement here the diagnostic cannot continue reliably. "
+                            "Please resolve the instrument connection issue and restart the session."
+                        )
+                    )
+                ],
             }
 
     expected = state.expected_values.get(tp_id, {"min": 0, "max": 999_999, "unit": "V"})
@@ -107,26 +115,31 @@ def reason_node(state: ConversationalAgentState):
         for h in state.hypotheses
     )
 
-    remaining_tp = state.test_point_rankings[state.current_step + 1:]
+    remaining_tp = state.test_point_rankings[state.current_step + 1 :]
     remaining_tp_str = ", ".join(remaining_tp) if remaining_tp else "None"
 
     dependencies_def = state.equipment_config.get("signal_dependencies", [])
-    dependencies_str = "\n".join(
-        f"- Upstream: {d.get('upstream')} -> Downstream: {d.get('downstream')}. Relationship: {d.get('relationship')}"
-        for d in dependencies_def
-    ) if dependencies_def else "None provided"
+    dependencies_str = (
+        "\n".join(
+            f"- Upstream: {d.get('upstream')} -> Downstream: {d.get('downstream')}. Relationship: {d.get('relationship')}"
+            for d in dependencies_def
+        )
+        if dependencies_def
+        else "None provided"
+    )
 
     symptom = " ".join(
-        _text(m.content)
-        for m in state.messages
-        if isinstance(m, HumanMessage)
+        _text(m.content) for m in state.messages if isinstance(m, HumanMessage)
     ).strip()
     engineer_findings = _extract_confirmed_findings(symptom, state.test_points)
 
-    completed_str = "\n".join(
-        f"- {m.get('test_point','?')} ({m.get('signal_name','?')}): {m.get('value','?')} {m.get('unit','')} [{m.get('evaluation','?').upper()}]"
-        for m in state.measurements
-    ) or "None"
+    completed_str = (
+        "\n".join(
+            f"- {m.get('test_point','?')} ({m.get('signal_name','?')}): {m.get('value','?')} {m.get('unit','')} [{m.get('evaluation','?').upper()}]"
+            for m in state.measurements
+        )
+        or "None"
+    )
 
     prompt = f"""Update hypothesis probabilities based on this measurement.
 
@@ -225,19 +238,19 @@ Return ONLY valid JSON:
   "updated_remaining_test_plan": ["test_point_1", "test_point_2"]
 }}"""
 
-    reasoning            = ""
-    eliminated           = list(state.eliminated_faults)
-    updated_probs        = dict(state.hypothesis_probabilities)
+    reasoning = ""
+    eliminated = list(state.eliminated_faults)
+    updated_probs = dict(state.hypothesis_probabilities)
     confirmed_hypothesis = None
-    updated_test_plan    = list(remaining_tp)
+    updated_test_plan = list(remaining_tp)
 
     try:
         response = invoke_with_retry([{"role": "user", "content": prompt}])
-        content  = response.content if response else "{}"
-        start    = content.find('{')
-        end      = content.rfind('}')
+        content = response.content if response else "{}"
+        start = content.find("{")
+        end = content.rfind("}")
         if start != -1 and end > start:
-            data = json.loads(content[start:end + 1])
+            data = json.loads(content[start : end + 1])
             reasoning = data.get("reasoning", "")
             for h_id, prob in data.get("probability_updates", {}).items():
                 if h_id in updated_probs:
@@ -249,16 +262,15 @@ Return ONLY valid JSON:
 
             if "updated_remaining_test_plan" in data:
                 updated_test_plan = [
-                    tp for tp in data["updated_remaining_test_plan"]
-                    if tp in remaining_tp
+                    tp for tp in data["updated_remaining_test_plan"] if tp in remaining_tp
                 ]
     except Exception:
         reasoning = "Analysis inconclusive -- carrying forward current probabilities."
 
-    new_rankings = state.test_point_rankings[:state.current_step + 1] + updated_test_plan
+    new_rankings = state.test_point_rankings[: state.current_step + 1] + updated_test_plan
 
     active = {h: p for h, p in updated_probs.items() if h not in eliminated}
-    total  = sum(active.values())
+    total = sum(active.values())
     if total > 0:
         for h in active:
             updated_probs[h] = active[h] / total
@@ -291,9 +303,7 @@ Return ONLY valid JSON:
 
     parts.append("**Fault candidate status:**")
     sorted_h = sorted(
-        state.hypotheses,
-        key=lambda h: updated_probs.get(h.get("id",""), 0),
-        reverse=True
+        state.hypotheses, key=lambda h: updated_probs.get(h.get("id", ""), 0), reverse=True
     )
     for h in sorted_h:
         h_id = h.get("id", "")
@@ -301,7 +311,7 @@ Return ONLY valid JSON:
         if h_id in eliminated:
             parts.append(f"- ~~{desc}~~ -- eliminated")
         else:
-            p      = updated_probs.get(h_id, 0)
+            p = updated_probs.get(h_id, 0)
             marker = " ← **most likely**" if h_id == new_current else ""
             parts.append(f"- {desc}: **{p:.0%}**{marker}")
 
@@ -312,25 +322,23 @@ Return ONLY valid JSON:
     )
 
     next_tp = (
-        new_rankings[state.current_step + 1]
-        if state.current_step + 1 < len(new_rankings)
-        else None
+        new_rankings[state.current_step + 1] if state.current_step + 1 < len(new_rankings) else None
     )
 
     return {
         "hypothesis_probabilities": updated_probs,
-        "eliminated_faults":        eliminated,
-        "current_hypothesis":       new_current,
-        "test_point_rankings":      new_rankings,
-        "diagnostic_reasoning":     reasoning_chain,
+        "eliminated_faults": eliminated,
+        "current_hypothesis": new_current,
+        "test_point_rankings": new_rankings,
+        "diagnostic_reasoning": reasoning_chain,
         "step_result": {
-            "measurement":    last,
-            "evaluation":     evaluation,
-            "reasoning":      reasoning,
-            "decision":       decision,
-            "next_test_point": next_tp
+            "measurement": last,
+            "evaluation": evaluation,
+            "reasoning": reasoning,
+            "decision": decision,
+            "next_test_point": next_tp,
         },
-        "messages":            [AIMessage(content="\n".join(parts))],
-        "current_step":        state.current_step + 1,
+        "messages": [AIMessage(content="\n".join(parts))],
+        "current_step": state.current_step + 1,
         "consecutive_failures": 0,
     }

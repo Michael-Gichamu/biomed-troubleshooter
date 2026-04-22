@@ -19,8 +19,7 @@ def _text(content) -> str:
         raw = content
     elif isinstance(content, list):
         raw = " ".join(
-            b.get("text", "") for b in content
-            if isinstance(b, dict) and b.get("type") == "text"
+            b.get("text", "") for b in content if isinstance(b, dict) and b.get("type") == "text"
         )
     else:
         raw = ""
@@ -34,6 +33,7 @@ class ConversationalAgentState:
     Populated in ``rag_node`` once and carried forward. Nodes return dicts with
     only the keys they change — LangGraph merges them into state.
     """
+
     # ── Messaging ────────────────────────────────────────────────────────────
     messages: Annotated[list[BaseMessage], add_messages] = field(default_factory=list)
 
@@ -59,7 +59,7 @@ class ConversationalAgentState:
 
     # ── Diagnostic plan (kept for routing logic) ─────────────────────────────
     diagnostic_plan: list = field(default_factory=list)
-    current_step: int = 0          # index into test_point_rankings
+    current_step: int = 0  # index into test_point_rankings
     completed_steps: list = field(default_factory=list)
 
     # ── Measurements & faults ────────────────────────────────────────────────
@@ -82,7 +82,7 @@ class ConversationalAgentState:
     max_steps: int = 9
 
     # ── Measurement failure tracking ─────────────────────────────────────────
-    consecutive_failures: int = 0   # resets to 0 on any successful/fault reading
+    consecutive_failures: int = 0  # resets to 0 on any successful/fault reading
 
     # ── Manual reading entered by engineer at probe interrupt ────────────────
     pending_manual_reading: dict | None = None

@@ -13,6 +13,7 @@ from dataclasses import dataclass
 @dataclass
 class LangSmithConfig:
     """Configuration for LangSmith."""
+
     api_key: str | None = None
     project_name: str = "biomed-troubleshooter"
     endpoint: str = "https://api.smith.langchain.com"
@@ -50,10 +51,8 @@ class LangSmithClient:
 
         try:
             from langsmith import Client
-            self._client = Client(
-                api_url=self.config.endpoint,
-                api_key=api_key
-            )
+
+            self._client = Client(api_url=self.config.endpoint, api_key=api_key)
             self._initialized = True
             print(f"[LangSmith] Initialized project: {self.config.project_name}")
         except ImportError:
@@ -68,11 +67,7 @@ class LangSmithClient:
         return self.config.enabled and self._initialized
 
     def create_run(
-        self,
-        name: str,
-        run_type: str,
-        inputs: dict,
-        extra: dict | None = None
+        self, name: str, run_type: str, inputs: dict, extra: dict | None = None
     ) -> str | None:
         """
         Create a trace run.
@@ -89,29 +84,20 @@ class LangSmithClient:
                 run_type=run_type,
                 inputs=inputs,
                 extra=extra or {},
-                project_name=self.config.project_name
+                project_name=self.config.project_name,
             )
             return run_id
         except Exception as e:
             print(f"[LangSmith] Create run failed: {e}")
             return None
 
-    def end_run(
-        self,
-        run_id: str,
-        outputs: dict,
-        error: str | None = None
-    ) -> None:
+    def end_run(self, run_id: str, outputs: dict, error: str | None = None) -> None:
         """End a trace run."""
         if not self.is_enabled():
             return
 
         try:
-            self._client.end_run(
-                run_id=run_id,
-                outputs=outputs,
-                error=error
-            )
+            self._client.end_run(run_id=run_id, outputs=outputs, error=error)
         except Exception as e:
             print(f"[LangSmith] End run failed: {e}")
 
@@ -126,9 +112,8 @@ class LangSmithClient:
 
         try:
             from langchain.callbacks import LangChainTracer
-            tracer = LangChainTracer(
-                project_name=self.config.project_name
-            )
+
+            tracer = LangChainTracer(project_name=self.config.project_name)
             # Tracer is ready to be added to LLM/Chain callbacks
             self._tracer = tracer
         except ImportError:
@@ -148,9 +133,7 @@ def get_langsmith_client() -> LangSmithClient:
 
 
 def configure_langsmith(
-    api_key: str | None = None,
-    project_name: str = "biomed-troubleshooter",
-    enabled: bool = True
+    api_key: str | None = None, project_name: str = "biomed-troubleshooter", enabled: bool = True
 ) -> LangSmithClient:
     """
     Configure LangSmith observability.
@@ -166,11 +149,7 @@ def configure_langsmith(
     """
     from src.infrastructure.config import LangSmithConfig
 
-    config = LangSmithConfig(
-        api_key=api_key,
-        project_name=project_name,
-        enabled=enabled
-    )
+    config = LangSmithConfig(api_key=api_key, project_name=project_name, enabled=enabled)
     client = LangSmithClient(config)
     client.initialize()
 
@@ -181,9 +160,7 @@ def configure_langsmith(
 
 
 def initialize_observability(
-    api_key: str = None,
-    project_name: str = "biomed-troubleshooter",
-    enabled: bool = True
+    api_key: str = None, project_name: str = "biomed-troubleshooter", enabled: bool = True
 ) -> None:
     """
     Initialize LangSmith observability.
@@ -193,11 +170,7 @@ def initialize_observability(
         LANGCHAIN_PROJECT: Project name (default: biomed-troubleshooter)
         LANGCHAIN_TRACING: Enable tracing (default: true)
     """
-    configure_langsmith(
-        api_key=api_key,
-        project_name=project_name,
-        enabled=enabled
-    )
+    configure_langsmith(api_key=api_key, project_name=project_name, enabled=enabled)
 
 
 class TracingDecorator:
@@ -220,7 +193,7 @@ class TracingDecorator:
             run_id = client.create_run(
                 name=self.name,
                 run_type=self.run_type,
-                inputs={"args": str(args), "kwargs": str(kwargs)}
+                inputs={"args": str(args), "kwargs": str(kwargs)},
             )
 
             try:
@@ -243,6 +216,7 @@ def trace_agent_node(node_name: str) -> Callable:
         def validate_input(state: AgentState) -> AgentState:
             ...
     """
+
     def decorator(func: Callable) -> Callable:
         def wrapper(state, *args, **kwargs):
             client = get_langsmith_client()
@@ -254,19 +228,17 @@ def trace_agent_node(node_name: str) -> Callable:
             run_id = client.create_run(
                 name=f"node.{node_name}",
                 run_type="node",
-                inputs={"state_keys": list(state.__dict__.keys())}
+                inputs={"state_keys": list(state.__dict__.keys())},
             )
 
             try:
                 result = func(state, *args, **kwargs)
-                client.end_run(
-                    run_id,
-                    outputs={"node_history": result.node_history}
-                )
+                client.end_run(run_id, outputs={"node_history": result.node_history})
                 return result
             except Exception as e:
                 client.end_run(run_id, outputs={}, error=str(e))
                 raise
 
         return wrapper
+
     return decorator
