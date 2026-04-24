@@ -135,20 +135,47 @@ def rag_node(state: ConversationalAgentState):
             ]
 
     except FileNotFoundError as e:
-        config_result = {
-            "error": str(e),
-            "test_points": [],
-            "thresholds": {},
-            "faults": [],
-            "signals": [],
+        # Unknown equipment model — tell the user and let the graph short-circuit
+        # at the conditional edge after rag. Empty ``equipment_config`` signals
+        # "do not proceed into hypothesis generation".
+        return {
+            "equipment_model": equipment_model,
+            "equipment_config": {
+                "error": str(e),
+                "test_points": [],
+                "thresholds": {},
+                "faults": [],
+                "signals": [],
+            },
+            "messages": [
+                AIMessage(
+                    content=(
+                        f"**[1. Initialization]**\n\n"
+                        f"⚠️ Equipment model **{equipment_model}** was not found "
+                        f"in the catalogue. Double-check the model ID and try again."
+                    )
+                )
+            ],
         }
     except Exception as e:
-        config_result = {
-            "error": str(e),
-            "test_points": [],
-            "thresholds": {},
-            "faults": [],
-            "signals": [],
+        return {
+            "equipment_model": equipment_model,
+            "equipment_config": {
+                "error": str(e),
+                "test_points": [],
+                "thresholds": {},
+                "faults": [],
+                "signals": [],
+            },
+            "messages": [
+                AIMessage(
+                    content=(
+                        f"**[1. Initialization]**\n\n"
+                        f"⚠️ Failed to load configuration for **{equipment_model}**: "
+                        f"`{e}`. Please check the equipment catalogue."
+                    )
+                )
+            ],
         }
 
     full_signals = config_result.get("signals", [])

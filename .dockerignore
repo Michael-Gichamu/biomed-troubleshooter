@@ -26,9 +26,7 @@ __pycache__
 
 # Tests & dev scaffolding (not needed in prod image)
 tests
-raw_dump.py
-test_mm.py
-test_raw_serial.py
+scripts/hardware
 start.bat
 
 # Env files — NEVER bake credentials into an image

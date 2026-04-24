@@ -20,6 +20,34 @@ from src.graph.nodes import (
 )
 from src.graph.routing import route_from_decision, route_from_resume
 from src.graph.state import ConversationalAgentState
+
+
+def _route_after_rag(state: ConversationalAgentState) -> str:
+    """Short-circuit the graph when ``rag_node`` could not bootstrap a session.
+
+    ``rag_node`` emits a clarifying ``AIMessage`` and returns without populating
+    ``equipment_config`` in three failure modes:
+
+      * No ``equipment_model`` could be resolved from state or message history.
+      * The equipment YAML was not found (``FileNotFoundError``).
+      * The YAML loaded but parsing raised an unexpected exception.
+
+    Before this conditional edge existed the graph would still march through
+    ``hypotheses → instruction → probe_wait → step → reason → decision`` with
+    empty test-points and expected-values, producing several junk AI turns
+    before control eventually returned to the user. That was a UX bug — the
+    user had already been told to supply the model ID at the ``rag`` step.
+
+    Returning ``"end"`` here terminates the run cleanly after the one
+    clarifying message, so the next user turn re-enters ``rag`` with the new
+    input.
+    """
+    if not getattr(state, "equipment_model", None):
+        return "end"
+    cfg = getattr(state, "equipment_config", None) or {}
+    if cfg.get("error") or not cfg.get("test_points"):
+        return "end"
+    return "continue"
 from src.infrastructure.config import get_database_config
 from src.studio.tools import get_tools  # noqa -- keeps tool registration alive
 
@@ -98,7 +126,14 @@ def create_conversational_graph():
     builder.add_node("probe_wait", probe_wait_node)
 
     builder.add_edge(START, "rag")
-    builder.add_edge("rag", "hypotheses")
+    # Short-circuit to END when rag couldn't resolve an equipment_model or the
+    # equipment config failed to load. Without this edge, five downstream nodes
+    # would execute against empty state before the user saw a response.
+    builder.add_conditional_edges(
+        "rag",
+        _route_after_rag,
+        {"continue": "hypotheses", "end": END},
+    )
     builder.add_edge("hypotheses", "instruction")
     builder.add_edge("instruction", "probe_wait")
     builder.add_edge("probe_wait", "step")

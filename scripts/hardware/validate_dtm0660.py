@@ -1,15 +1,19 @@
 #!/usr/bin/env python3
 """
-Refactored test script for usb_multimeter.py
+Hardware validator for DTM0660-based USB multimeters.
+
+Not part of the pytest suite — run directly when validating a new cable or
+a new meter. The offline parser unit tests live in ``tests/unit/`` (pending
+Phase E extraction).
 
 Modes:
   --mock  → uses a fake serial port that feeds known‑good DTM0660 frames
-  --live  → connects to a real meter (same behavior as before)
+  --live  → connects to a real meter over CP210x USB-to-serial
 
 Examples:
-  python test_mm.py --mock
-  python test_mm.py --live --port COM3
-  python test_mm.py --live --port /dev/ttyUSB0
+  python scripts/hardware/validate_dtm0660.py --mock
+  python scripts/hardware/validate_dtm0660.py --live --port COM3
+  python scripts/hardware/validate_dtm0660.py --live --port /dev/ttyUSB0
 """
 import sys
 import argparse

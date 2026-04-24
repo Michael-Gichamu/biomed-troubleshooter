@@ -38,7 +38,6 @@ from typing import Any
 
 from sqlalchemy import (
     JSON,
-    BigInteger,
     DateTime,
     Float,
     ForeignKey,
@@ -63,10 +62,18 @@ _JSON_TYPE = JSON().with_variant(JSONB(), "postgresql")
 # dialect's UUID type hits on sqlite3.
 _UUID_TYPE = Uuid(as_uuid=True)
 
-# BIGSERIAL in Postgres → autoincrementing INTEGER PRIMARY KEY on SQLite.
-# Only the INTEGER column type autoincrements under sqlite3; BigInteger alone
-# silently fails with a NOT NULL violation on insert.
-_BIGINT_PK = BigInteger().with_variant(Integer(), "sqlite")
+# Plain INTEGER primary keys. We deliberately use Integer (not BigInteger) here
+# because:
+#   * On SQLite, only ``INTEGER PRIMARY KEY`` is a ROWID alias and therefore
+#     auto-increments. ``BigInteger().with_variant(Integer(), "sqlite")`` looks
+#     tempting but SQLAlchemy emits ``BIGINT PRIMARY KEY`` DDL on SQLite and
+#     autoincrement silently drops — inserts then fail with
+#     ``NOT NULL constraint failed: <table>.id`` via the RETURNING-insert path.
+#   * On Postgres, ``Integer`` becomes a 32-bit SERIAL — a 2.1 B row ceiling,
+#     several orders of magnitude above any realistic analytics volume for this
+#     project (≤ 1 M cases/year × 20 measurements/case ≈ 20 M rows/yr).
+# If/when we outgrow it, a single Alembic migration to BIGINT is straightforward.
+_BIGINT_PK = Integer
 
 
 # ---------------------------------------------------------------------------
